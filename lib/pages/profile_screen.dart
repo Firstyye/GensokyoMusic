@@ -1,6 +1,7 @@
 
 
 import 'package:flutter/material.dart';
+import '../constant/my_constant.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -37,26 +38,70 @@ class ProfileScreen extends StatelessWidget {
               ),
             SizedBox(height: 10,),
             Text('Cirno', 
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),),
+            style: headerTextStyle,
+           ),
             SizedBox(height: 20,),
             ElevatedButton(
               style : ElevatedButton.styleFrom(
                 
-                backgroundColor: Colors.blue[100],
-                foregroundColor: Colors.blue,
+                backgroundColor: lightBackgroundColor,
+                foregroundColor: const Color.fromARGB(255, 205, 224, 255),
                 shape : RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(color: Colors.blueAccent)
                 )
               ),
               onPressed: (){}, 
               child: Text('Cirno_Gensokyo@gmail.com',
-              style: TextStyle(
-                color : Colors.blueAccent
-              ),) 
+              style: bodyTextStyle,) 
               ),
+              SizedBox(height: 30,),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(25,25,25,5),
+                child: Container(
+                  width: double.infinity,
+                  height: 40,
+                  color: darkBackgroundColor,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Icon(Icons.edit, color: lightBackgroundColor, size: 24,),
+                      ),
+                      Text("Edit Profile", style: bodyTextStyle,),
+                      Spacer(),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Icon(Icons.arrow_forward, color: lightBackgroundColor, size: 24,),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(25, 0, 25, 25),
+                child: Container(
+                  width: double.infinity,
+                  height: 40,
+                  color: darkBackgroundColor,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Icon(Icons.edit, color: lightBackgroundColor, size: 24,),
+                      ),
+                      Text("Edit Profile", style: bodyTextStyle,),
+                      Spacer(),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Icon(Icons.arrow_forward, color: lightBackgroundColor, size: 24,),
+                      ),
+                    ],
+                  ),
+                ),
+              )
           ],
         ),
       ),
