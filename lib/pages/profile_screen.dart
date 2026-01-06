@@ -197,6 +197,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(25, 0, 25, 5),
+                child: Container(
+                  width: 600,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: darkBackgroundColor,
+                    
+                    
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Icon(Icons.help, color: lightBackgroundColor, size: 24,),
+                      ),
+                      Text("Help", style: bodyTextStyle,),
+                      Spacer(),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Icon(Icons.arrow_forward, color: lightBackgroundColor, size: 24,),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(25, 0, 25, 5),
                 
                 child: GestureDetector(
                   onTap: (){
