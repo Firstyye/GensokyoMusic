@@ -4,8 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 Color primaryColor = const Color.fromARGB(255, 0, 0, 0);
 Color secondaryColor = const Color.fromARGB(255, 239, 202, 202);
 
-Color lightBackgroundColor = const Color.fromARGB(255, 142, 184, 255);
-Color darkBackgroundColor = const Color.fromARGB(255, 216, 216, 216);
+Color lightBackgroundColor = Colors.blueAccent;
+Color darkBackgroundColor = const Color.fromARGB(255, 226, 243, 255);
+
+Color dangerColor = Colors.red;
+
+Color backgroundColor = const Color.fromARGB(255, 255, 255, 255);
 
 TextStyle headerTextStyle = TextStyle(
   fontFamily: GoogleFonts.poppins().fontFamily,
