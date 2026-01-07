@@ -29,10 +29,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // shape: Border(bottom: BorderSide(color: Colors.blueAccent, width: 2.5)),
         scrolledUnderElevation: 0.0,
         backgroundColor: backgroundColor,
-        leading: Icon(
-          Icons.arrow_back_ios_outlined,
-          color: Colors.blueAccent,
-          size: 24.0,
+        leading: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Icon(
+            Icons.arrow_back_ios_outlined,
+            color: Colors.blueAccent,
+            size: 24,
+          ),
         ),
         title: Text('Profile', style: bodyTextStyle.copyWith(
           color: Colors.black,
@@ -42,7 +45,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Icon(Icons.notifications, color: Colors.blueAccent, size: 24),
+            child: Icon(Icons.notifications_active_rounded, color: Colors.blueAccent, size: 24),
           ),
         ],
       ),
@@ -95,8 +98,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   textAlign: TextAlign.center,
                 ),
 
+                const SizedBox(height: 5),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.calendar_month, size: 24,),
+                    SizedBox(width: 5,),
+                    Text(
+                      'Joined since : 5 January 2023',
+                      style : bodyTextStyle.copyWith(
+                        fontWeight: FontWeight.w100,
+                        fontSize: 12,
+                      ),
+                    
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 20),
-
                 // Email Button
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -132,8 +150,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("Settings"),
-                      Divider(color: Colors.blueAccent), 
+                      // Text("Settings"),
+                      // Divider(color: Colors.blueAccent), 
                       // Top Item (Rounded Top)
                       _buildMenuItem(
                         icon: Icons.edit,
@@ -149,6 +167,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         text: "Invite a friend",
                       ),
                       _buildMenuItem(icon: Icons.help, text: "Help"),
+
 
                       // Bottom Item (Rounded Bottom + Logout Color)
                       _buildMenuItem(
@@ -210,7 +229,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         height: 50, // Slightly taller for better touch targets
         margin: const EdgeInsets.only(bottom: 2), // Small gap between items
         decoration: BoxDecoration(
-          color: darkBackgroundColor,
+          color: isDestructive ? dangerTransparentColor : darkBackgroundColor,
           borderRadius: BorderRadius.vertical(
             top: isTop ? const Radius.circular(12) : Radius.zero,
             bottom: isBottom ? const Radius.circular(12) : Radius.zero,

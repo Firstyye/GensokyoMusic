@@ -8,6 +8,7 @@ Color lightBackgroundColor = Colors.blueAccent;
 Color darkBackgroundColor = const Color.fromARGB(255, 226, 243, 255);
 
 Color dangerColor = Colors.red;
+Color dangerTransparentColor = const Color.fromARGB(255, 255, 226, 226);
 
 Color backgroundColor = const Color.fromARGB(255, 255, 255, 255);
 
