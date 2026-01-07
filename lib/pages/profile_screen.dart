@@ -166,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         icon: Icons.group_add_sharp,
                         text: "Invite a friend",
                       ),
-                      _buildMenuItem(icon: Icons.help, text: "Help"),
+                      _buildMenuItem(icon: Icons.help, text: "Help & Support"),
 
 
                       // Bottom Item (Rounded Bottom + Logout Color)
