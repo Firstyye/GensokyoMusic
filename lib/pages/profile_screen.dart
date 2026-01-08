@@ -24,7 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: backgroundColor,
-
+      extendBody: true,
       appBar: AppBar(
         // shape: Border(bottom: BorderSide(color: Colors.blueAccent, width: 2.5)),
         scrolledUnderElevation: 0.0,
@@ -50,6 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       // 2. Wrap in SingleChildScrollView to prevent overflow on small screens
+      
       body: SingleChildScrollView(
         child: Center(
           // 3. ConstrainedBox ensures it doesn't get too wide on tablets/web
@@ -60,17 +61,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 const SizedBox(height: 20),
-
+      
                 // Profile Picture Stack
                 Stack(
                   children: [
                     CircleAvatar(
-                      radius: 105,
+                      radius: 110,
                       backgroundColor: Colors.blueAccent,
                       child: CircleAvatar(
-                        radius: 100,
-                        backgroundImage: NetworkImage(
-                          "https://avatars.githubusercontent.com/u/43317716?s=400&v=4",
+                        radius: 105,
+                        backgroundColor: backgroundColor,
+                        child: CircleAvatar(
+                          radius: 100,
+                          backgroundImage: AssetImage('lib/pages/images/avatar.jpg'),
                         ),
                       ),
                     ),
@@ -89,15 +92,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ],
                 ),
-
+      
                 const SizedBox(height: 20),
-
+      
                 Text(
                   'Cirno, The Fairy',
                   style: headerTextStyle.copyWith(fontSize: 30),
                   textAlign: TextAlign.center,
                 ),
-
+      
                 const SizedBox(height: 5),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -140,11 +143,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
-
+      
                 const SizedBox(height: 30),
-
-                // --- REFACTORED MENU ITEMS ---
-                // Using a Column inside a Container to group the rounded corners
+      
+                
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 25),
                   child: Column(
@@ -158,7 +160,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         text: "Edit Profile",
                         isTop: true,
                       ),
-
+      
                       // Middle Items (No Rounded Corners)
                       _buildMenuItem(icon: Icons.lock, text: "Add Pin"),
                       _buildMenuItem(icon: Icons.settings, text: "Settings"),
@@ -167,9 +169,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         text: "Invite a friend",
                       ),
                       _buildMenuItem(icon: Icons.help, text: "Help & Support"),
-
-
-                      // Bottom Item (Rounded Bottom + Logout Color)
+      
+      
+                      // Bottom Item (Rounded Bottom + Logout Color)\
+                      
+                       
                       _buildMenuItem(
                         icon: Icons.logout,
                         text: "Logout",
@@ -182,7 +186,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                 ),
-
+      
                 // Extra space at bottom for scrolling
                 const SizedBox(height: 50),
               ],
@@ -193,7 +197,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       bottomNavigationBar: CurvedNavigationBar(
         height: 75,
         index: _selectedIndex,
-        backgroundColor: backgroundColor,
+        backgroundColor: Colors.transparent,
         color: Colors.blueAccent,
         onTap: _onItemTapped,
         items: const [
