@@ -24,7 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: backgroundColor,
-      extendBody: true,
+
       appBar: AppBar(
         // shape: Border(bottom: BorderSide(color: Colors.blueAccent, width: 2.5)),
         scrolledUnderElevation: 0.0,
@@ -37,20 +37,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
             size: 24,
           ),
         ),
-        title: Text('Profile', style: bodyTextStyle.copyWith(
-          color: Colors.black,
-          fontSize: 24,
-        )),
+        title: Text(
+          'Profile',
+          style: bodyTextStyle.copyWith(color: Colors.black, fontSize: 24),
+        ),
         centerTitle: true,
         actions: [
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Icon(Icons.notifications_active_rounded, color: Colors.blueAccent, size: 24),
+            child: Icon(
+              Icons.notifications_active_rounded,
+              color: Colors.blueAccent,
+              size: 24,
+            ),
           ),
         ],
       ),
+
       // 2. Wrap in SingleChildScrollView to prevent overflow on small screens
-      
       body: SingleChildScrollView(
         child: Center(
           // 3. ConstrainedBox ensures it doesn't get too wide on tablets/web
@@ -60,60 +64,92 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
-                const SizedBox(height: 20),
-      
                 // Profile Picture Stack
-                Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 110,
-                      backgroundColor: Colors.blueAccent,
-                      child: CircleAvatar(
-                        radius: 105,
-                        backgroundColor: backgroundColor,
-                        child: CircleAvatar(
-                          radius: 100,
-                          backgroundImage: AssetImage('lib/pages/images/avatar.jpg'),
+                SizedBox(
+                  height: 250,
+                  width: double.infinity,
+                  child: Stack(
+                    alignment: Alignment.bottomCenter,
+                    children: [
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: 160,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            
+                            color: Colors.blueAccent,
+                            image: DecorationImage(
+                              image: AssetImage(
+                                'lib/pages/images/banner.jpg',
+                               
+                              ),
+                              fit : BoxFit.cover
+                            )
+                          ),
                         ),
                       ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: CircleAvatar(
-                        radius: 30,
-                        backgroundColor: lightBackgroundColor,
-                        child: const Icon(
-                          Icons.edit,
-                          color: Colors.white,
-                          size: 30,
+                      Positioned(
+                        bottom: 0,
+                        child: Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            CircleAvatar(
+                              radius: 110,
+                              backgroundColor: Colors.blueAccent,
+                              child: CircleAvatar(
+                                radius: 105,
+                                backgroundColor: backgroundColor,
+                                child: CircleAvatar(
+                                  radius: 100,
+                                  backgroundImage: AssetImage(
+                                    'lib/pages/images/avatar.jpg',
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            Positioned(
+                              bottom: 5,
+                              right: 5,
+                              child: CircleAvatar(
+                                radius: 30,
+                                backgroundColor: lightBackgroundColor,
+                                child: const Icon(
+                                  Icons.edit,
+                                  color: Colors.white,
+                                  size: 30,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-      
+
                 const SizedBox(height: 20),
-      
+
                 Text(
                   'Cirno, The Fairy',
                   style: headerTextStyle.copyWith(fontSize: 30),
                   textAlign: TextAlign.center,
                 ),
-      
+
                 const SizedBox(height: 5),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.calendar_month, size: 24,),
-                    SizedBox(width: 5,),
+                    Icon(Icons.calendar_month, size: 24),
+                    SizedBox(width: 5),
                     Text(
                       'Joined since : 5 January 2023',
-                      style : bodyTextStyle.copyWith(
+                      style: bodyTextStyle.copyWith(
                         fontWeight: FontWeight.w100,
                         fontSize: 12,
                       ),
-                    
                     ),
                   ],
                 ),
@@ -143,24 +179,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
-      
+
                 const SizedBox(height: 30),
-      
-                
+
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 25),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Text("Settings"),
-                      // Divider(color: Colors.blueAccent), 
+                      // Divider(color: Colors.blueAccent),
                       // Top Item (Rounded Top)
                       _buildMenuItem(
                         icon: Icons.edit,
                         text: "Edit Profile",
                         isTop: true,
                       ),
-      
+
                       // Middle Items (No Rounded Corners)
                       _buildMenuItem(icon: Icons.lock, text: "Add Pin"),
                       _buildMenuItem(icon: Icons.settings, text: "Settings"),
@@ -169,11 +204,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         text: "Invite a friend",
                       ),
                       _buildMenuItem(icon: Icons.help, text: "Help & Support"),
-      
-      
+
                       // Bottom Item (Rounded Bottom + Logout Color)\
-                      
-                       
                       _buildMenuItem(
                         icon: Icons.logout,
                         text: "Logout",
@@ -186,9 +218,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                 ),
-      
+
                 // Extra space at bottom for scrolling
-                const SizedBox(height: 50),
+                const SizedBox(height: 30),
               ],
             ),
           ),
