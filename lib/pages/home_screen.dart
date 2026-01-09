@@ -49,8 +49,10 @@ class _HomeScreenState extends State<HomeScreen> {
             Icon(Icons.settings, color: const Color.fromARGB(255, 128, 128, 128), size: 48),
             const SizedBox(height: 16),
             Row(
+              
               children: [
                 Container(
+                  alignment: Alignment.center,
                   width: 200,
                   height: 200,
                   color: Colors.red,

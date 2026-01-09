@@ -10,6 +10,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  
   int _selectedIndex = 3;
 
   void _onItemTapped(int index) {
@@ -21,6 +22,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     // 1. Get screen width to make dynamic decisions if needed
+    double screenWidth = MediaQuery.of(context).size.width;
+    
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -71,6 +74,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Stack(
                     alignment: Alignment.bottomCenter,
                     children: [
+                      
                       Positioned(
                         top: 0,
                         left: 0,
@@ -90,6 +94,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                       ),
+
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        child: ElevatedButton(
+                          
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.all(10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            backgroundColor: Colors.transparent,
+                           ),
+                          onPressed: (){
+                            // showDialog(context: context, builder: (context) => Dialog(
+                            //   backgroundColor: backgroundColor,
+                            //   shape: RoundedRectangleBorder(
+                            //     borderRadius: BorderRadius.circular(10),
+                            //   ),
+                            //   child: Padding(
+                            //     padding: const EdgeInsets.all(8.0),
+                            //     child: Column(
+                            //       crossAxisAlignment: CrossAxisAlignment.center,
+                            //       mainAxisSize: MainAxisSize.min,
+                            //       mainAxisAlignment: MainAxisAlignment.center,
+                            //       children: [
+                            //         Text('Change Banner', style: bodyTextStyle.copyWith(
+                            //           color: const Color.fromARGB(255, 0, 0, 0),
+                            //           fontSize: screenWidth >= 600 ? 16 : screenWidth < 600 && screenWidth >= 400 ? 12 : 10,
+                            //         ),),
+                                    
+                            //       ],
+                            //       ),
+                            //   ),
+                            // ));
+                          },
+                          
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              
+                              children: [
+                                
+                                Icon(Icons.palette_outlined, color: Colors.blueAccent,),
+                                SizedBox(width: 5,),
+                                Text("Edit Banner" , style : bodyTextStyle.copyWith(
+                                  color: Colors.white,
+                                  fontSize: screenWidth >= 600 ? 16 : screenWidth < 600 && screenWidth >= 400 ? 12 : 10,
+                                  ))
+                              ],
+                            ),
+                          ),
+                        )),
+
                       Positioned(
                         bottom: 0,
                         child: Stack(
