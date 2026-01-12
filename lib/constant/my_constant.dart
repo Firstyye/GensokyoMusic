@@ -11,6 +11,7 @@ Color dangerColor = Colors.red;
 Color dangerTransparentColor = const Color.fromARGB(255, 255, 226, 226);
 
 Color backgroundColor = const Color.fromARGB(255, 255, 255, 255);
+Color darkModeBackgroundColor = const Color.fromARGB(255, 18, 18, 18);
 
 TextStyle headerTextStyle = TextStyle(
   fontFamily: GoogleFonts.poppins().fontFamily,
@@ -24,3 +25,10 @@ TextStyle bodyTextStyle = TextStyle(
   fontSize: 16,
   fontWeight: FontWeight.w400,
 );
+
+Color darkThemeAppbar = const Color.fromARGB(255, 29,29,29);
+Color darkThemeColor = const Color.fromARGB(255, 254,216,54);
+Color darkThemeSecondaryColor = const Color.fromARGB(255, 90, 84, 61);
+Color darkThemeTextColor = const Color.fromARGB(255, 255, 255, 255);
+Color darkElevatedButtonColor = const Color.fromARGB(255, 255, 236, 152);
+Color darkElevatedButtonTextColor = const Color.fromARGB(255, 182, 160, 63);
