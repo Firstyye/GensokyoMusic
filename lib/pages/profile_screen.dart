@@ -80,17 +80,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         left: 0,
                         right: 0,
                         height: 160,
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            
-                            color: Colors.blueAccent,
-                            image: DecorationImage(
-                              image: AssetImage(
-                                'lib/pages/images/banner.jpg',
-                               
+                        child: GestureDetector(
+                          onTap: () {
+                            print("Show Banner");
+                            showDialog(context: context, builder: (context) => GestureDetector(
+                              onTap: (){
+                                Navigator.of(context).pop();
+                              },
+                              child: Dialog(
+                                  backgroundColor: Colors.transparent,
+                                  elevation: 0,
+                                  child : Container(
+                                    padding: EdgeInsets.all(5),
+
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(10),
+                                      color: isSwitched ? backgroundColor : darkThemeColor,
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.asset(
+                                        'lib/pages/images/banner.jpg',
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ) 
+                                  )
+                              
+                              
                               ),
-                              fit : BoxFit.cover
-                            )
+                            ));
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              
+                              color: Colors.blueAccent,
+                              image: DecorationImage(
+                                image: AssetImage(
+                                  'lib/pages/images/banner.jpg',
+                                 
+                                ),
+                                fit : BoxFit.cover
+                              )
+                            ),
                           ),
                         ),
                       ),
@@ -268,7 +299,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       _buildMenuItem(icon: Icons.help, text: "Help & Support"),
                       _buildMenuItem(
-                        icon: isSwitched ? Icons.dark_mode : Icons.light_mode, 
+                        icon: isSwitched ? Icons.light_mode : Icons.dark_mode, 
                         text: "Change Theme",
                         isChangeTheme: true
                         ),
@@ -324,13 +355,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }) {
     // Determine colors based on whether it is a "Destructive" (Logout) action
     final Color iconColor = isDestructive ? dangerColor : lightBackgroundColor;
-    final Color iconDarkColor = isDestructive ? dangerColor : darkThemeColor;
+    final Color iconDarkColor = isDestructive ? dangerDarkColor : darkThemeColor;
 
 
     final Color textColor = isDestructive
         ? dangerColor
         : Colors.black; // Assuming black for default text
-    final Color darkTextColor = isDestructive ? dangerColor : darkThemeTextColor;
+    final Color darkTextColor = isDestructive ? dangerDarkColor : darkThemeTextColor;
 
     return GestureDetector(
       onTap: onTap,
@@ -340,7 +371,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         height: 50, // Slightly taller for better touch targets
         margin: const EdgeInsets.only(bottom: 2), // Small gap between items
         decoration: BoxDecoration(
-          color: isDestructive ? dangerTransparentColor : isSwitched ? darkBackgroundColor : darkThemeSecondaryColor,
+          color: isDestructive ? (isSwitched ?  dangerTransparentColor : dangerTransparentDarkColor) : (isSwitched ? lightThemeBackgroundColor : darkThemeSecondaryColor),
           borderRadius: BorderRadius.vertical(
             top: isTop ? const Radius.circular(12) : Radius.zero,
             bottom: isBottom ? const Radius.circular(12) : Radius.zero,
@@ -368,7 +399,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                   activeThumbColor: Colors.blueAccent,
                   inactiveThumbColor: darkThemeColor,
-                  inactiveTrackColor: darkModeBackgroundColor,
+                  inactiveTrackColor: darkElevatedButtonColor,
+                  trackOutlineColor: WidgetStatePropertyAll(  
+                    isSwitched ? Colors.blueAccent : darkThemeColor,
+                  ),
                 ) : 
                 Icon( 
                   Icons.arrow_forward,
