@@ -10,8 +10,13 @@ Color darkBackgroundColor = const Color.fromARGB(255, 226, 243, 255);
 Color dangerColor = Colors.red;
 Color dangerTransparentColor = const Color.fromARGB(255, 255, 226, 226);
 
+Color dangerDarkColor = const Color.fromARGB(255, 255, 102, 102);
+Color dangerTransparentDarkColor = const Color.fromARGB(255, 102, 0, 0);
+
 Color backgroundColor = const Color.fromARGB(255, 255, 255, 255);
 Color darkModeBackgroundColor = const Color.fromARGB(255, 18, 18, 18);
+
+Color bottomNavigationBarIcon = const Color.fromARGB(255, 17,17,17);
 
 TextStyle headerTextStyle = TextStyle(
   fontFamily: GoogleFonts.poppins().fontFamily,

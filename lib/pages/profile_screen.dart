@@ -302,11 +302,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: Colors.transparent,
         color: isSwitched ? Colors.blueAccent : darkThemeColor,
         onTap: _onItemTapped,
-        items: const [
-          Icon(Icons.home, size: 30, color: Colors.white),
-          Icon(Icons.search, size: 30, color: Colors.white),
-          Icon(Icons.calendar_month, size: 30, color: Colors.white),
-          Icon(Icons.people, size: 30, color: Colors.white),
+        items:  [
+          Icon(Icons.home, size: 30, color: isSwitched ? Colors.white : bottomNavigationBarIcon),
+          Icon(Icons.search, size: 30, color: isSwitched ? Colors.white : bottomNavigationBarIcon),
+          Icon(Icons.calendar_month, size: 30, color: isSwitched ? Colors.white : bottomNavigationBarIcon),
+          Icon(Icons.people, size: 30, color: isSwitched ? Colors.white : bottomNavigationBarIcon),
         ],
       ),
     );
