@@ -169,7 +169,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onPressed: () {},
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Text(
+                    child: 
+                    Text(
                       'Cirno_Gensokyo@gmail.com',
                       style: bodyTextStyle.copyWith(
                         color: const Color.fromRGBO(45, 146, 208, 1),
@@ -271,7 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             bottom: isBottom ? const Radius.circular(12) : Radius.zero,
           ),
         ),
-        child: Padding(
+        child:  Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
