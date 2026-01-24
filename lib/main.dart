@@ -25,6 +25,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Yo App',
+      // home: IntroScreen(),
       home: seen ? ProfileScreen() : IntroScreen(),
     );
   }

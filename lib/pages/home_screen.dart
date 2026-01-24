@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-
+import '../constant/my_constant.dart';
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import '../constant/my_constant.dart';
+import '../pages/profile_screen.dart';
 class HomeScreen extends StatefulWidget {
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -7,11 +10,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  bool isSwitched = true;
   int _selectedIndex = 0;
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
+      switch (index){
+      case 3:
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => ProfileScreen()),
+        );
+      }
     });
   }
 
@@ -86,23 +96,33 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
+      bottomNavigationBar: CurvedNavigationBar(
+        height: 75,
+        index: _selectedIndex,
+        backgroundColor: Colors.transparent,
+        color: isSwitched ? Colors.blueAccent : darkThemeColor,
         onTap: _onItemTapped,
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
-        backgroundColor: Colors.green,
         items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.wysiwyg_rounded),
-            label: 'Document',
+          Icon(
+            Icons.home,
+            size: 30,
+            color: isSwitched ? Colors.white : bottomNavigationBarIcon,
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_applications_sharp),
-            label: 'Settings',
+          Icon(
+            Icons.search,
+            size: 30,
+            color: isSwitched ? Colors.white : bottomNavigationBarIcon,
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          Icon(
+            Icons.gamepad,
+            size: 30,
+            color: isSwitched ? Colors.white : bottomNavigationBarIcon,
+          ),
+          Icon(
+            Icons.people,
+            size: 30,
+            color: isSwitched ? Colors.white : bottomNavigationBarIcon,
+          ),
         ],
       ),
     );

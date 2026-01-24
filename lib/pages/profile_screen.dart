@@ -2,6 +2,8 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import '../constant/my_constant.dart';
 import '../widgets/_buildMenuItem.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../pages/home_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,7 +18,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _onItemTapped(int index) {
     setState(() {
+      
       _selectedIndex = index;
+      switch (index){
+        case 0:
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => HomeScreen()),
+          );
+      
+      }
     });
   }
 
@@ -396,7 +406,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: isSwitched ? Colors.white : bottomNavigationBarIcon,
           ),
           Icon(
-            Icons.calendar_month,
+            Icons.gamepad,
             size: 30,
             color: isSwitched ? Colors.white : bottomNavigationBarIcon,
           ),
