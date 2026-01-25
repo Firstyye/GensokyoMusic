@@ -406,7 +406,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: isSwitched ? Colors.white : bottomNavigationBarIcon,
           ),
           Icon(
-            Icons.gamepad,
+            Icons.play_circle_fill,
             size: 30,
             color: isSwitched ? Colors.white : bottomNavigationBarIcon,
           ),

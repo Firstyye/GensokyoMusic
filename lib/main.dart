@@ -26,7 +26,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Yo App',
       // home: IntroScreen(),
-      home: seen ? ProfileScreen() : IntroScreen(),
+      home: seen ? HomeScreen() : IntroScreen(),
     );
   }
 }
