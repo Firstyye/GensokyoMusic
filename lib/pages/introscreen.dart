@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:introduction_screen/introduction_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:yo/pages/home_screen.dart';
 import 'package:yo/constant/my_constant.dart';
 import 'package:yo/pages/profile_screen.dart';
 
@@ -20,7 +20,7 @@ class _IntroScreenState extends State<IntroScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('seen', true);
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => ProfileScreen()),
+      MaterialPageRoute(builder: (context) => HomeScreen()),
     );
   }
 
@@ -172,7 +172,7 @@ class _IntroScreenState extends State<IntroScreen> {
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.setBool('seen', true);
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => ProfileScreen()),
+                      MaterialPageRoute(builder: (context) => HomeScreen()),
                     );
                   },
                   child: Text(
@@ -182,64 +182,78 @@ class _IntroScreenState extends State<IntroScreen> {
                 ),
               ),
               Positioned(
+                left: 0,
+                right: 0,
                 bottom: 125,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: lightBackgroundColor,
-                      side: BorderSide(color: lightBackgroundColor, width: 2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                child: Center(
+                  child: SizedBox(
+                    width: 300,
+                    height: 55,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        
+                        backgroundColor: lightBackgroundColor,
+                        side: BorderSide(color: lightBackgroundColor, width: 2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        
                       ),
-                      padding: EdgeInsets.symmetric(horizontal: 100, vertical: 15),
-                    ),
-                    onPressed: () {
-                      if (_currentPage == pages.length - 1) {
-                        _onIntroEnd(context);
-                      }else{
-                      introKey.currentState?.next();
-                     
-                      }
-                    },
-                    child: Row(
-                      children: [
-                        Text(_currentPage == pages.length - 1 ? "Done" : "Next", 
-                        style: TextStyle(color: Colors.white)),
-                        SizedBox(width: 10),
-                        Icon(_currentPage == pages.length - 1 ? Icons.check_circle_outline_outlined : Icons.arrow_forward_rounded, 
-                        color: Colors.white),
-                      ],
+                      onPressed: () {
+                        if (_currentPage == pages.length - 1) {
+                          _onIntroEnd(context);
+                        }else{
+                        introKey.currentState?.next();
+                       
+                        }
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(_currentPage == pages.length - 1 ? "Done" : "Next", 
+                          style: bodyTextStyle.copyWith(color: Colors.white)),
+                          SizedBox(width: 10),
+                          Icon(_currentPage == pages.length - 1 ? Icons.check_circle_outline_outlined : Icons.arrow_forward_rounded, 
+                          color: Colors.white),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-              
+              SizedBox(height: 20),
               _currentPage == 0 ? Container() : Positioned(
-                bottom: 75,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color.fromRGBO(255, 255, 255, 1),
-                      side: BorderSide(color: lightBackgroundColor, width: 2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                left: 0,
+                right: 0,
+                bottom: 60,
+                child: Center(
+                  child: SizedBox(
+                    width: 300,
+                    height: 55,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        
+                        backgroundColor: Color.fromRGBO(255, 255, 255, 1),
+                        side: BorderSide(color: lightBackgroundColor, width: 2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        
                       ),
-                      padding: EdgeInsets.symmetric(horizontal: 100, vertical: 15),
-                    ),
-                    onPressed: () {
-                      
-                      introKey.currentState?.previous();
-                     
-                      
-                    },
-                    child: Row(
-                      children: [
-                        Text("Back", style: TextStyle(color: lightBackgroundColor)),
-                        SizedBox(width: 10),
-                        Icon(Icons.arrow_back_rounded, color: lightBackgroundColor),
-                      ],
+                      onPressed: () {
+                        
+                        introKey.currentState?.previous();
+                        
+                        
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text("Back", style: bodyTextStyle.copyWith(color: lightBackgroundColor)),
+                          SizedBox(width: 10),
+                          Icon(Icons.arrow_back_rounded, color: lightBackgroundColor),
+                        ],
+                      ),
                     ),
                   ),
                 ),
