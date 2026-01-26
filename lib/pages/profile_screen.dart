@@ -38,15 +38,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: isSwitched ? backgroundColor : darkModeBackgroundColor,
 
       appBar: AppBar(
-        // shape: Border(bottom: BorderSide(color: Colors.blueAccent, width: 2.5)),
+        
         scrolledUnderElevation: 0.0,
         backgroundColor: isSwitched ? backgroundColor : darkModeBackgroundColor,
         leading: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Icon(
-            Icons.arrow_back_ios_outlined,
-            color: isSwitched ? Colors.blueAccent : darkThemeColor,
-            size: 24,
+          padding: const EdgeInsets.only(left : 16.0),
+          child: CircleAvatar(
+            backgroundColor: Colors.grey.withOpacity(0.2),
+            radius: 20,
+            child: Icon(
+              Icons.arrow_back_ios_outlined,
+              color: isSwitched ? Colors.blueAccent : darkThemeColor,
+              size: 24,
+            ),
           ),
         ),
         title: Text(
@@ -59,11 +63,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         centerTitle: true,
         actions: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Icon(
-              Icons.notifications_active_rounded,
-              color: isSwitched ? Colors.blueAccent : darkThemeColor,
-              size: 24,
+            padding: const EdgeInsets.only(right: 16.0),
+            child: CircleAvatar(
+              backgroundColor: Colors.grey.withOpacity(0.2),
+              radius: 20,
+              child: Icon(
+                Icons.notifications_active_rounded,
+                color: isSwitched ? Colors.blueAccent : darkThemeColor,
+                size: 24,
+              ),
             ),
           ),
         ],
