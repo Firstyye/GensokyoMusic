@@ -198,6 +198,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                       fontWeight: FontWeight.w300,
                                     ),
                                   ),
+                                  Text(
+                                    "(Tap here)",
+                                    style: bodyTextStyle.copyWith(
+                                      fontSize: 10,
+                                      color: Colors.black.withOpacity(0.35),
+                                      fontWeight: FontWeight.w100,
+                                    )
+                                  )
                                 ],
                               ),
                             ),
