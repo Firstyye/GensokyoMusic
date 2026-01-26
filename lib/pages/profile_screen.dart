@@ -2,7 +2,6 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import '../constant/my_constant.dart';
 import '../widgets/_buildMenuItem.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../pages/home_screen.dart';
 
 class ProfileScreen extends StatefulWidget {

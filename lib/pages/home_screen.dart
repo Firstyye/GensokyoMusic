@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:cupertino_icons/cupertino_icons.dart';
 import '../constant/my_constant.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:mobkit_dashed_border/mobkit_dashed_border.dart';
@@ -64,12 +63,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'THE STRONGEST',
-                    style: bodyTextStyle.copyWith(
-                      fontSize: 8,
-                      color: Colors.blueAccent
-                      ),
+                  Container(
+                    padding: const EdgeInsets.only(left: 5, right: 5, top: 2, bottom: 2),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.blueAccent, width: 1),
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'MEMBER',
+                      style: bodyTextStyle.copyWith(
+                        fontSize: 8,
+                        color: Colors.blueAccent
+                        ),
+                    ),
                   ),
                   Text(
                     'Cirno, The Fairy',
@@ -100,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.fromLTRB(20.0, 20.0, 20.0, 0.0),
             child: Stack(
               children: [
                 ListView(
@@ -283,11 +290,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       artist: "ShibayanRecords",
                       image: 'lib/pages/images/SongBanner/TOHO_BOSSNOVA2.jpg',
                     ),
-                    Padding(padding: EdgeInsets.only(bottom: 80)),
+                    Padding(padding: EdgeInsets.only(bottom: 95)),
                   ],
                 ),
                 
-                Positioned(bottom: 5, left: 0, right: 0, child: MiniPlayer()),
+                Positioned(bottom: 20, left: 0, right: 0, child: MiniPlayer()),
               ],
             ),
           ),
