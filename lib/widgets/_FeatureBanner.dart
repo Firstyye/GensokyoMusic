@@ -17,9 +17,9 @@ class FeatureBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(top: 20.0, bottom: 20),
+      padding: EdgeInsets.only(top: 20.0, bottom: 20, right: 20),
       child: Container(
-        width: double.infinity,
+        width: 370,
         height: 150,
         decoration: BoxDecoration(
           boxShadow: [

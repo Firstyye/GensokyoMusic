@@ -212,10 +212,30 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-                    FeatureBanner(
-                      titlename:
-                          "Chou Saikyou! Saishuu Kichiku Imouto Flandre S",
-                      circlename: "COOL&CREATE",
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          FeatureBanner(
+                            titlename:
+                                "Chou Saikyou! Saishuu Kichiku Imouto Flandre S",
+                            circlename: "COOL&CREATE",
+                          ),
+                          FeatureBanner(
+                            titlename:
+                                "Touhou Hits Covers -Ska Punk Flavor-",
+                            circlename: "IOSYS",
+                            backgroundimage: 'lib/pages/images/SongBanner/SkaPunkFlavor.jpg',
+                          ),
+                          FeatureBanner(
+                            titlename:
+                                "Santa Prisma",
+                            circlename: "	魂音泉, (TINY PLANETS)",
+                            backgroundimage: "lib/pages/images/SongBanner/SantaPrisma.jpg",
+                          ),
+                          
+                        ],
+                      ),
                     ),
                     
                     Row(

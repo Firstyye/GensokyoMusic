@@ -9,9 +9,28 @@ class MiniPlayer extends StatefulWidget {
   State<MiniPlayer> createState() => _MiniPlayerState();
 }
 
-class _MiniPlayerState extends State<MiniPlayer> {
+class _MiniPlayerState extends State<MiniPlayer> with TickerProviderStateMixin {
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this, 
+    duration: const Duration(milliseconds: 5000))..repeat();
+  bool playpause = true;
+  bool favorite = true;
   @override
+  void togglespin(){
+    setState(() {
+      playpause = !playpause;
+      if(_controller.isAnimating){
+        _controller.stop();
+      }else{
+        _controller.repeat();
+      }
+    });
+  }
   Widget build(BuildContext context) {
+    
+
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: Container(
@@ -28,14 +47,21 @@ class _MiniPlayerState extends State<MiniPlayer> {
         child: Row(
           children: [
             const SizedBox(width: 16),
-            Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(colors: [Colors.cyan, Colors.blue]),
+            RotationTransition(
+              turns:_controller ,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage('lib/pages/images/banner.jpg'),
+                    fit: BoxFit.fill
+                  ),
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(colors: [Colors.cyan, Colors.blue]),
+                ),
+                child: const Icon(Icons.album, color: Colors.white),
               ),
-              child: const Icon(Icons.album, color: Colors.white),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -48,24 +74,32 @@ class _MiniPlayerState extends State<MiniPlayer> {
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    "Playing Now",
+                    "Playing Now | 3:42/4:30",
                     style: TextStyle(fontSize: 10, color: Colors.cyan),
                   ),
                 ],
               ),
             ),
             IconButton(
-              onPressed: (){},
+              onPressed: (){
+                setState(() {
+                  favorite = !favorite;
+                });
+              },
               icon: Icon(
                 CupertinoIcons.heart_circle,
                 size:40,
-                color: dangerColor,
+                color: favorite ? dangerColor : primaryColor,
               ),
             ),
             IconButton(
-              onPressed: () {},
-              icon: const Icon(
-                Icons.play_circle_fill,
+              onPressed: () {
+                setState(() {
+                  togglespin();
+                });
+              },
+              icon: Icon(
+                playpause ? Icons.play_circle_fill : Icons.pause_circle,
                 size: 40,
                 color: Colors.black,
               ),
