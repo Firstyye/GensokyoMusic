@@ -10,52 +10,53 @@ class MiniPlayer extends StatefulWidget {
 }
 
 class _MiniPlayerState extends State<MiniPlayer> with TickerProviderStateMixin {
-
   late final AnimationController _controller = AnimationController(
-    vsync: this, 
-    duration: const Duration(milliseconds: 5000))..repeat();
-  bool playpause = true;
+    vsync: this,
+    duration: const Duration(milliseconds: 5000),
+  )..repeat();
+  bool playpause = false;
   bool favorite = true;
-  @override
-  void togglespin(){
+  void togglespin() {
     setState(() {
       playpause = !playpause;
-      if(_controller.isAnimating){
+      if (_controller.isAnimating) {
         _controller.stop();
-      }else{
+      } else {
         _controller.repeat();
       }
     });
   }
+
   Widget build(BuildContext context) {
-    
-
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withOpacity(0.9), 
+              Colors.lightBlue.shade50.withOpacity(0.95),
+            ],
+          ),
           borderRadius: BorderRadius.all(Radius.circular(12)),
-          border: Border.all(
-            color: Colors.grey,
-            width: 1,
-          )
+          border: Border.all(color: Colors.grey, width: 1),
         ),
         height: 70,
-         // สีขาวโปร่งแสง
+        // สีขาวโปร่งแสง
         child: Row(
           children: [
             const SizedBox(width: 16),
             RotationTransition(
-              turns:_controller ,
+              turns: _controller,
               child: Container(
                 width: 44,
                 height: 44,
                 decoration: const BoxDecoration(
                   image: DecorationImage(
                     image: AssetImage('lib/pages/images/banner.jpg'),
-                    fit: BoxFit.fill
+                    fit: BoxFit.fill,
                   ),
                   shape: BoxShape.circle,
                   gradient: LinearGradient(colors: [Colors.cyan, Colors.blue]),
@@ -81,14 +82,14 @@ class _MiniPlayerState extends State<MiniPlayer> with TickerProviderStateMixin {
               ),
             ),
             IconButton(
-              onPressed: (){
+              onPressed: () {
                 setState(() {
                   favorite = !favorite;
                 });
               },
               icon: Icon(
                 CupertinoIcons.heart_circle,
-                size:40,
+                size: 40,
                 color: favorite ? dangerColor : primaryColor,
               ),
             ),
