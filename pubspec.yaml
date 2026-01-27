@@ -36,6 +36,8 @@ dependencies:
   introduction_screen: ^4.0.0
   shared_preferences: ^2.5.4
   mobkit_dashed_border: ^0.0.8
+  font_awesome_flutter: ^10.12.0
+  flutter_svg: ^2.2.3
  
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -68,6 +70,9 @@ flutter:
     - lib/pages/images/
     - lib/pages/images/OnBoarding/
     - lib/pages/images/SongBanner/
+    - lib/pages/icons/
+    - assets/icons/
+    - assets/images/
     
 
   # An image asset can refer to one or more resolution-specific "variants", see
