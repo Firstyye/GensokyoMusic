@@ -2,114 +2,84 @@ import 'package:flutter/material.dart';
 import 'package:yo/constant/my_constant.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../pages/signup.dart';
+import 'package:yo/pages/loginscreen.dart';
 
-
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignupScreenState extends State<SignupScreen> {
   bool isSwitch = false;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmpasswordController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
+  getClip(Size size) {
+    var path = Path();
+    path.lineTo(0, size.height / 4.25);
+    var firstControlPoint = Offset(size.width / 4, size.height / 3);
+    var firstEndPoint = Offset(size.width / 2, size.height / 3 - 60);
+    var secondControlPoint = Offset(
+      size.width - (size.width / 4),
+      size.height / 4 - 65,
+    );
+    var secondEndPoint = Offset(size.width, size.height / 3 - 40);
+
+    path.quadraticBezierTo(
+      firstControlPoint.dx,
+      firstControlPoint.dy,
+      firstEndPoint.dx,
+      firstEndPoint.dy,
+    );
+    path.quadraticBezierTo(
+      secondControlPoint.dx,
+      secondControlPoint.dy,
+      secondEndPoint.dx,
+      secondEndPoint.dy,
+    );
+
+    path.lineTo(size.width, size.height / 3);
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
+  }
+
+  getBottomClip(Size size) {
+    var path = Path();
+    // เริ่มต้นที่มุมซ้ายล่าง
+    path.moveTo(0, size.height);
+    // ลากขึ้นไปจุดเริ่มโค้ง (ขยับความสูงตรง size.height * 0.85)
+    path.lineTo(0, size.height * 0.45);
+
+    var firstControlPoint = Offset(size.width * 0.25, size.height * 0.75);
+    var firstEndPoint = Offset(size.width * 0.5, size.height * 0.88);
+
+    var secondControlPoint = Offset(size.width * 0.75, size.height);
+    var secondEndPoint = Offset(size.width, size.height * 0.45);
+
+    path.quadraticBezierTo(
+      firstControlPoint.dx,
+      firstControlPoint.dy,
+      firstEndPoint.dx,
+      firstEndPoint.dy,
+    );
+    path.quadraticBezierTo(
+      secondControlPoint.dx,
+      secondControlPoint.dy,
+      secondEndPoint.dx,
+      secondEndPoint.dy,
+    );
+
+    path.lineTo(size.width, size.height);
+    path.close();
+    return path;
+  }
 
   @override
   Widget build(BuildContext context) {
-    getBottomClipLayer2(Size size) {
-      var path = Path();
-      path.moveTo(0, size.height);
-      // ปรับความสูงเริ่มต้นให้ต่างจากอันแรกเล็กน้อย (0.55)
-      path.lineTo(0, size.height * 0.55);
-
-      var firstControlPoint = Offset(size.width * 0.35, size.height * 0.35);
-      var firstEndPoint = Offset(size.width * 0.6, size.height * 0.8);
-
-      var secondControlPoint = Offset(size.width * 0.8, size.height * 1.1);
-      var secondEndPoint = Offset(size.width, size.height * 0.55);
-
-      path.quadraticBezierTo(
-        firstControlPoint.dx,
-        firstControlPoint.dy,
-        firstEndPoint.dx,
-        firstEndPoint.dy,
-      );
-      path.quadraticBezierTo(
-        secondControlPoint.dx,
-        secondControlPoint.dy,
-        secondEndPoint.dx,
-        secondEndPoint.dy,
-      );
-
-      path.lineTo(size.width, size.height);
-      path.close();
-      return path;
-    }
-
-    getClip(Size size) {
-      var path = Path();
-      path.lineTo(0, size.height / 4.25);
-      var firstControlPoint = Offset(size.width / 4, size.height / 3);
-      var firstEndPoint = Offset(size.width / 2, size.height / 3 - 60);
-      var secondControlPoint = Offset(
-        size.width - (size.width / 4),
-        size.height / 4 - 65,
-      );
-      var secondEndPoint = Offset(size.width, size.height / 3 - 40);
-
-      path.quadraticBezierTo(
-        firstControlPoint.dx,
-        firstControlPoint.dy,
-        firstEndPoint.dx,
-        firstEndPoint.dy,
-      );
-      path.quadraticBezierTo(
-        secondControlPoint.dx,
-        secondControlPoint.dy,
-        secondEndPoint.dx,
-        secondEndPoint.dy,
-      );
-
-      path.lineTo(size.width, size.height / 3);
-      path.lineTo(size.width, 0);
-      path.close();
-      return path;
-    }
-
-    getBottomClip(Size size) {
-      var path = Path();
-      // เริ่มต้นที่มุมซ้ายล่าง
-      path.moveTo(0, size.height);
-      // ลากขึ้นไปจุดเริ่มโค้ง (ขยับความสูงตรง size.height * 0.85)
-      path.lineTo(0, size.height * 0.45);
-
-      var firstControlPoint = Offset(size.width * 0.25, size.height * 0.75);
-      var firstEndPoint = Offset(size.width * 0.5, size.height * 0.88);
-
-      var secondControlPoint = Offset(size.width * 0.75, size.height);
-      var secondEndPoint = Offset(size.width, size.height * 0.45);
-
-      path.quadraticBezierTo(
-        firstControlPoint.dx,
-        firstControlPoint.dy,
-        firstEndPoint.dx,
-        firstEndPoint.dy,
-      );
-      path.quadraticBezierTo(
-        secondControlPoint.dx,
-        secondControlPoint.dy,
-        secondEndPoint.dx,
-        secondEndPoint.dy,
-      );
-
-      path.lineTo(size.width, size.height);
-      path.close();
-      return path;
-    }
-
     return Scaffold(
       body: Stack(
         children: [
@@ -125,8 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-          
-      
+
           // 2. Wave ด้านล่าง
           Positioned(
             bottom: 0,
@@ -162,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
 
                     Text(
-                      "Welcome back!",
+                      "Register",
                       style: headerTextStyle.copyWith(
                         fontWeight: FontWeight.bold,
                         fontSize: 20,
@@ -170,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     SizedBox(height: 5),
                     Text(
-                      "Time to vibe with everyone again.",
+                      " Sign up to enjoy all the features of the app.",
                       style: bodyTextStyle.copyWith(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w100,
@@ -179,10 +148,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     SizedBox(height: 20),
                     _BuildTextField(
+                      controller: _usernameController,
+                      hintText: "Username",
+                      isObscureText: false,
+                      isPassword: false,
+                      icon: Icons.person,
+                    ),
+                    _BuildTextField(
                       controller: _emailController,
                       hintText: "Email",
                       isObscureText: false,
                       isPassword: false,
+                      typeText: false,
                       icon: Icons.email,
                     ),
 
@@ -193,37 +170,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       isPassword: true,
                       icon: Icons.lock,
                     ),
-
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          Switch(
-                            value: isSwitch,
-                            onChanged: (value) {
-                              setState(() {
-                                isSwitch = value;
-                              });
-                            },
-                            activeTrackColor: Colors.blueAccent,
-                          ),
-                          SizedBox(width: 5),
-                          Text(
-                            "Remember me",
-                            style: bodyTextStyle.copyWith(fontSize: 10),
-                          ),
-                          Spacer(),
-                          Text(
-                            "Forgot Password?",
-                            style: bodyTextStyle.copyWith(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w100,
-                              color: Colors.blueAccent.withOpacity(0.9),
-                            ),
-                          ),
-                        ],
-                      ),
+                    _BuildTextField(
+                      controller: _confirmpasswordController,
+                      hintText: "Confirm Password",
+                      isObscureText: true,
+                      isPassword: true,
+                      icon: Icons.lock,
                     ),
 
                     Padding(
@@ -240,7 +192,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
 
                         child: Text(
-                          "LOGIN",
+                          "SIGN UP",
                           style: bodyTextStyle.copyWith(
                             fontSize: 16,
                             color: Colors.white,
@@ -254,7 +206,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Text(
-                          "Don't have an account?",
+                          "Already have an account?",
 
                           style: headerTextStyle.copyWith(
                             fontSize: 10,
@@ -264,11 +216,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         GestureDetector(
                           onTap: () {
                             Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => SignupScreen()),
+                              MaterialPageRoute(
+                                builder: (context) => LoginScreen(),
+                              ),
                             );
                           },
                           child: Text(
-                            " Sign Up ",
+                            " Login ",
                             style: headerTextStyle.copyWith(
                               fontSize: 10,
                               color: Colors.blueAccent,
@@ -285,47 +239,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(child: Divider(thickness: 1, endIndent: 10)),
-                        Text(
-                          "OR CONTINUE WITH",
-                          style: headerTextStyle.copyWith(
-                            fontSize: 10,
-                            color: Colors.grey.withOpacity(0.9),
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        Expanded(child: Divider(thickness: 1, indent: 10)),
-                      ],
-                    ),
-                    SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _LoginButton(
-                          assetPath: "assets/icons/android_neutral_rd_na.svg",
-                          semanticsLabel: 'Google logo',
-                        ),
-                        _LoginButton(
-                          icon: FontAwesomeIcons.github,
-                          iconSize: 24,
-                          semanticsLabel: 'Github logo',
-                        ),
-                        _LoginButton(
-                          icon: FontAwesomeIcons.facebook,
-                          iconSize: 24,
-                          iconColor: Colors.blue[700],
-                          semanticsLabel: 'Facebook logo',
-                        ),
-                        _LoginButton(
-                          icon: FontAwesomeIcons.twitter,
-                          iconSize: 24,
-                          iconColor: Colors.blue,
-                          semanticsLabel: 'Twitter logo',
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -407,6 +320,7 @@ class _BuildTextField extends StatefulWidget {
   bool isPassword;
   final IconData icon;
   bool isHidden;
+  bool typeText;
   _BuildTextField({
     Key? key,
     required this.controller,
@@ -415,6 +329,7 @@ class _BuildTextField extends StatefulWidget {
     required this.icon,
     required this.isPassword,
     this.isHidden = true,
+    this.typeText = true,
   });
 
   @override
@@ -455,7 +370,7 @@ class _BuildTextFieldState extends State<_BuildTextField> {
             color: Colors.grey.withOpacity(0.9),
           ),
         ),
-        keyboardType: widget.isObscureText
+        keyboardType: widget.typeText
             ? TextInputType.text
             : TextInputType.emailAddress,
         onChanged: (value) {},
