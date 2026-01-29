@@ -131,7 +131,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
 
                     Text(
-                      "Register",
+                      "Ready to get started?",
                       style: headerTextStyle.copyWith(
                         fontWeight: FontWeight.bold,
                         fontSize: 20,
