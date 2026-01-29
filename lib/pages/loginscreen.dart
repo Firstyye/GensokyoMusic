@@ -143,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Image(
                         width: 350,
                         height: 300,
-                        image: AssetImage('assets/images/CirnoLogin.png'),
+                        image: AssetImage('assets/images/Register.png'),
                       ),
                     ),
 
@@ -166,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     SizedBox(height: 20),
                     _BuildTextField(
                       controller: _emailController,
-                      hintText: "Email",
+                      labelText: "Email",
                       isObscureText: false,
                       isPassword: false,
                       icon: Icons.email,
@@ -174,7 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     _BuildTextField(
                       controller: _passwordController,
-                      hintText: "Password",
+                      labelText: "Password",
                       isObscureText: true,
                       isPassword: true,
                       icon: Icons.lock,
@@ -388,7 +388,8 @@ class _LoginButton extends StatelessWidget {
 
 class _BuildTextField extends StatefulWidget {
   final TextEditingController controller;
-  final String hintText;
+  final String labelText;
+  final String? hintText;
   bool isObscureText;
   bool isPassword;
   final IconData icon;
@@ -396,7 +397,8 @@ class _BuildTextField extends StatefulWidget {
   _BuildTextField({
     Key? key,
     required this.controller,
-    required this.hintText,
+    required this.labelText,
+    this.hintText,
     required this.isObscureText,
     required this.icon,
     required this.isPassword,
@@ -416,6 +418,8 @@ class _BuildTextFieldState extends State<_BuildTextField> {
         obscureText: widget.isObscureText,
         controller: widget.controller,
         decoration: InputDecoration(
+          floatingLabelStyle: TextStyle(
+            color: Colors.blueAccent,),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(color: Colors.blueAccent, width: 2),
@@ -435,8 +439,13 @@ class _BuildTextFieldState extends State<_BuildTextField> {
                   ),
                 )
               : null,
-          labelText: widget.hintText,
+          labelText: widget.labelText,
           labelStyle: bodyTextStyle.copyWith(
+            fontSize: 12,
+            color: Colors.grey.withOpacity(0.9),
+          ),
+          hintText: widget.hintText,
+          hintStyle: bodyTextStyle.copyWith(
             fontSize: 12,
             color: Colors.grey.withOpacity(0.9),
           ),

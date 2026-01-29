@@ -154,7 +154,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     SizedBox(height: 5),
                     Text(
-                      " Sign up to enjoy all the features of the app.",
+                      "Create an account to start your musical journey now!",
+                      textAlign: TextAlign.center,
                       style: bodyTextStyle.copyWith(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w100,
@@ -331,6 +332,7 @@ class _LoginButton extends StatelessWidget {
 class _BuildTextField extends StatefulWidget {
   final TextEditingController controller;
   final String labelText;
+  final String? hintText;
   bool isObscureText;
   bool isPassword;
   final IconData icon;
@@ -340,6 +342,7 @@ class _BuildTextField extends StatefulWidget {
     Key? key,
     required this.controller,
     required this.labelText,
+    this.hintText,
     required this.isObscureText,
     required this.icon,
     required this.isPassword,
@@ -360,6 +363,8 @@ class _BuildTextFieldState extends State<_BuildTextField> {
         obscureText: widget.isObscureText,
         controller: widget.controller,
         decoration: InputDecoration(
+          floatingLabelStyle: TextStyle(
+            color: Colors.blueAccent,),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(color: Colors.blueAccent, width: 2),
@@ -381,6 +386,11 @@ class _BuildTextFieldState extends State<_BuildTextField> {
               : null,
           labelText: widget.labelText,
           labelStyle: bodyTextStyle.copyWith(
+            fontSize: 12,
+            color: Colors.grey.withOpacity(0.9),
+          ),
+          hintText: widget.hintText,
+          hintStyle: bodyTextStyle.copyWith(
             fontSize: 12,
             color: Colors.grey.withOpacity(0.9),
           ),
