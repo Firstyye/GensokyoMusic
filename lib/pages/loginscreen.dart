@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:wave/config.dart';
 import 'package:yo/constant/my_constant.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../pages/signup.dart';
+import 'package:wave/wave.dart';
 
 
 class LoginScreen extends StatefulWidget {
@@ -19,35 +21,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    getBottomClipLayer2(Size size) {
-      var path = Path();
-      path.moveTo(0, size.height);
-      // ปรับความสูงเริ่มต้นให้ต่างจากอันแรกเล็กน้อย (0.55)
-      path.lineTo(0, size.height * 0.55);
-
-      var firstControlPoint = Offset(size.width * 0.35, size.height * 0.35);
-      var firstEndPoint = Offset(size.width * 0.6, size.height * 0.8);
-
-      var secondControlPoint = Offset(size.width * 0.8, size.height * 1.1);
-      var secondEndPoint = Offset(size.width, size.height * 0.55);
-
-      path.quadraticBezierTo(
-        firstControlPoint.dx,
-        firstControlPoint.dy,
-        firstEndPoint.dx,
-        firstEndPoint.dy,
-      );
-      path.quadraticBezierTo(
-        secondControlPoint.dx,
-        secondControlPoint.dy,
-        secondEndPoint.dx,
-        secondEndPoint.dy,
-      );
-
-      path.lineTo(size.width, size.height);
-      path.close();
-      return path;
-    }
 
     getClip(Size size) {
       var path = Path();
@@ -113,6 +86,35 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
+
+          Positioned(
+            bottom: -70,
+            left: 0,
+            right: 0,
+            child: WaveWidget(config:
+             CustomConfig(
+              colors : [Colors.blueAccent, Color.fromARGB(255, 193, 216, 255).withOpacity(0.6)],
+              durations: [8000,6000], 
+              heightPercentages: [0.65,0.66]
+              ),
+              backgroundColor: Colors.transparent,
+              size: Size(2000, 500),
+              ),
+          ),
+
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: CustomPaint(
+              size: Size(MediaQuery.of(context).size.width, 500),
+              painter: _ClipPainter(
+                getClip(Size(MediaQuery.of(context).size.width, 1000)),
+                color: const Color.fromARGB(255, 131, 176, 255),
+              ),
+            ),
+          ),
+
           Positioned(
             top: 0,
             left: 0,
@@ -121,30 +123,14 @@ class _LoginScreenState extends State<LoginScreen> {
               size: Size(MediaQuery.of(context).size.width, 300),
               painter: _ClipPainter(
                 getClip(Size(MediaQuery.of(context).size.width, 800)),
-                color: Colors.blueAccent, // สีน้ำเงินหลัก
+                color: Colors.blueAccent,
               ),
             ),
           ),
           
       
-          // 2. Wave ด้านล่าง
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: CustomPaint(
-              size: Size(
-                MediaQuery.of(context).size.width,
-                150,
-              ), // กำหนดความสูงพื้นที่วาด
-              painter: _ClipPainter(
-                getBottomClip(
-                  Size(MediaQuery.of(context).size.width, 150),
-                ), // ใช้ size เดียวกัน
-                color: Colors.blueAccent, // สีฟ้าอ่อนโปร่งแสง
-              ),
-            ),
-          ),
+         
+          
           Stack(
             children: [
               Padding(

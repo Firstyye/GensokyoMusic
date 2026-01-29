@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:wave/config.dart';
 import 'package:yo/constant/my_constant.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yo/pages/loginscreen.dart';
+import 'package:wave/wave.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -84,6 +86,35 @@ class _SignupScreenState extends State<SignupScreen> {
       body: Stack(
         children: [
           Positioned(
+            bottom: -70,
+            left: 0,
+            right: 0,
+            child: WaveWidget(config:
+             CustomConfig(
+              colors : [Colors.blueAccent,const Color.fromARGB(255, 193, 216, 255).withOpacity(0.6)],
+              durations: [8000,7000], 
+              heightPercentages: [0.65,0.66]
+              ),
+              backgroundColor: Colors.transparent,
+              size: Size(2000, 500),
+              ),
+          ),
+
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: CustomPaint(
+              size: Size(MediaQuery.of(context).size.width, 500),
+              painter: _ClipPainter(
+                getClip(Size(MediaQuery.of(context).size.width, 1000)),
+                color: const Color.fromARGB(255, 131, 176, 255),
+              ),
+            ),
+          ),
+            
+
+          Positioned(
             top: 0,
             left: 0,
             right: 0,
@@ -91,29 +122,13 @@ class _SignupScreenState extends State<SignupScreen> {
               size: Size(MediaQuery.of(context).size.width, 300),
               painter: _ClipPainter(
                 getClip(Size(MediaQuery.of(context).size.width, 800)),
-                color: Colors.blueAccent, // สีน้ำเงินหลัก
+                color: Colors.blueAccent,
               ),
             ),
           ),
 
-          // 2. Wave ด้านล่าง
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: CustomPaint(
-              size: Size(
-                MediaQuery.of(context).size.width,
-                150,
-              ), // กำหนดความสูงพื้นที่วาด
-              painter: _ClipPainter(
-                getBottomClip(
-                  Size(MediaQuery.of(context).size.width, 150),
-                ), // ใช้ size เดียวกัน
-                color: Colors.blueAccent, // สีฟ้าอ่อนโปร่งแสง
-              ),
-            ),
-          ),
+          
+         
           Stack(
             children: [
               Padding(
@@ -131,7 +146,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
 
                     Text(
-                      "Register",
+                      "Ready to get started?",
                       style: headerTextStyle.copyWith(
                         fontWeight: FontWeight.bold,
                         fontSize: 20,
@@ -149,14 +164,14 @@ class _SignupScreenState extends State<SignupScreen> {
                     SizedBox(height: 20),
                     _BuildTextField(
                       controller: _usernameController,
-                      hintText: "Username",
+                      labelText: "Username",
                       isObscureText: false,
                       isPassword: false,
                       icon: Icons.person,
                     ),
                     _BuildTextField(
                       controller: _emailController,
-                      hintText: "Email",
+                      labelText: "Email",
                       isObscureText: false,
                       isPassword: false,
                       typeText: false,
@@ -165,14 +180,14 @@ class _SignupScreenState extends State<SignupScreen> {
 
                     _BuildTextField(
                       controller: _passwordController,
-                      hintText: "Password",
+                      labelText: "Password",
                       isObscureText: true,
                       isPassword: true,
                       icon: Icons.lock,
                     ),
                     _BuildTextField(
                       controller: _confirmpasswordController,
-                      hintText: "Confirm Password",
+                      labelText: "Confirm Password",
                       isObscureText: true,
                       isPassword: true,
                       icon: Icons.lock,
@@ -315,7 +330,7 @@ class _LoginButton extends StatelessWidget {
 
 class _BuildTextField extends StatefulWidget {
   final TextEditingController controller;
-  final String hintText;
+  final String labelText;
   bool isObscureText;
   bool isPassword;
   final IconData icon;
@@ -324,7 +339,7 @@ class _BuildTextField extends StatefulWidget {
   _BuildTextField({
     Key? key,
     required this.controller,
-    required this.hintText,
+    required this.labelText,
     required this.isObscureText,
     required this.icon,
     required this.isPassword,
@@ -364,7 +379,7 @@ class _BuildTextFieldState extends State<_BuildTextField> {
                   ),
                 )
               : null,
-          labelText: widget.hintText,
+          labelText: widget.labelText,
           labelStyle: bodyTextStyle.copyWith(
             fontSize: 12,
             color: Colors.grey.withOpacity(0.9),
