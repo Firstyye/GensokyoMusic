@@ -17,7 +17,8 @@ class _SignupScreenState extends State<SignupScreen> {
   bool isSwitch = false;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmpasswordController = TextEditingController();
+  final TextEditingController _confirmpasswordController =
+      TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   getClip(Size size) {
     var path = Path();
@@ -89,15 +90,18 @@ class _SignupScreenState extends State<SignupScreen> {
             bottom: -70,
             left: 0,
             right: 0,
-            child: WaveWidget(config:
-             CustomConfig(
-              colors : [Colors.blueAccent,const Color.fromARGB(255, 193, 216, 255).withOpacity(0.6)],
-              durations: [8000,7000], 
-              heightPercentages: [0.65,0.66]
+            child: WaveWidget(
+              config: CustomConfig(
+                colors: [
+                  Colors.blueAccent,
+                  const Color.fromARGB(255, 193, 216, 255).withOpacity(0.6),
+                ],
+                durations: [8000, 7000],
+                heightPercentages: [0.65, 0.66],
               ),
               backgroundColor: Colors.transparent,
               size: Size(2000, 500),
-              ),
+            ),
           ),
 
           Positioned(
@@ -112,7 +116,6 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
             ),
           ),
-            
 
           Positioned(
             top: 0,
@@ -127,8 +130,6 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
           ),
 
-          
-         
           Stack(
             children: [
               Padding(
@@ -191,7 +192,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       labelText: "Confirm Password",
                       isObscureText: true,
                       isPassword: true,
-                      icon: Icons.lock,
+                      icon: Icons.lock_reset,
                     ),
 
                     Padding(
@@ -231,11 +232,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         GestureDetector(
                           onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => LoginScreen(),
-                              ),
-                            );
+                            Navigator.of(context).pop();
                           },
                           child: Text(
                             " Login ",
@@ -265,7 +262,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             color: Colors.grey.withOpacity(0.9),
                           ),
                         ),
-                        
+
                         Expanded(child: Divider(thickness: 1, indent: 10)),
                       ],
                     ),
@@ -295,9 +292,8 @@ class _SignupScreenState extends State<SignupScreen> {
                           semanticsLabel: 'Twitter logo',
                         ),
                       ],
-                    )
+                    ),
                   ],
-                  
                 ),
               ),
             ],
@@ -405,8 +401,7 @@ class _BuildTextFieldState extends State<_BuildTextField> {
         obscureText: widget.isObscureText,
         controller: widget.controller,
         decoration: InputDecoration(
-          floatingLabelStyle: TextStyle(
-            color: Colors.blueAccent,),
+          floatingLabelStyle: TextStyle(color: Colors.blueAccent),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(color: Colors.blueAccent, width: 2),
