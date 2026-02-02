@@ -130,173 +130,177 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
           ),
 
-          Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SafeArea(
-                      child: Image(
-                        width: 350,
-                        height: 300,
-                        image: AssetImage('assets/images/CirnoLogin.png'),
-                      ),
-                    ),
-
-                    Text(
-                      "Ready to get started?",
-                      style: headerTextStyle.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                    ),
-                    SizedBox(height: 5),
-                    Text(
-                      "Create an account to start your musical journey now!",
-                      textAlign: TextAlign.center,
-                      style: bodyTextStyle.copyWith(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w100,
-                        color: Colors.grey.withOpacity(0.9),
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    _BuildTextField(
-                      controller: _usernameController,
-                      labelText: "Username",
-                      isObscureText: false,
-                      isPassword: false,
-                      icon: Icons.person,
-                    ),
-                    _BuildTextField(
-                      controller: _emailController,
-                      labelText: "Email",
-                      isObscureText: false,
-                      isPassword: false,
-                      typeText: false,
-                      icon: Icons.email,
-                    ),
-
-                    _BuildTextField(
-                      controller: _passwordController,
-                      labelText: "Password",
-                      isObscureText: true,
-                      isPassword: true,
-                      icon: Icons.lock,
-                    ),
-                    _BuildTextField(
-                      controller: _confirmpasswordController,
-                      labelText: "Confirm Password",
-                      isObscureText: true,
-                      isPassword: true,
-                      icon: Icons.lock_reset,
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          backgroundColor: Colors.blueAccent,
-                          foregroundColor: Colors.white,
-                        ),
-
-                        child: Text(
-                          "SIGN UP",
-                          style: bodyTextStyle.copyWith(
-                            fontSize: 16,
-                            color: Colors.white,
-                          ),
+          SingleChildScrollView(
+            child: Stack(
+              
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SafeArea(
+                        child: Image(
+                          width: 350,
+                          height: 300,
+                          image: AssetImage('assets/images/CirnoLogin.png'),
                         ),
                       ),
-                    ),
-                    SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Already have an account?",
-
-                          style: headerTextStyle.copyWith(
-                            fontSize: 10,
-                            color: Colors.grey.withOpacity(0.9),
-                          ),
+            
+                      Text(
+                        "Ready to get started?",
+                        style: headerTextStyle.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
                         ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).pop();
-                          },
+                      ),
+                      SizedBox(height: 5),
+                      Text(
+                        "Create an account to start your musical journey now!",
+                        textAlign: TextAlign.center,
+                        style: bodyTextStyle.copyWith(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w100,
+                          color: Colors.grey.withOpacity(0.9),
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      _BuildTextField(
+                        controller: _usernameController,
+                        labelText: "Username",
+                        isObscureText: false,
+                        isPassword: false,
+                        icon: Icons.person,
+                      ),
+                      _BuildTextField(
+                        controller: _emailController,
+                        labelText: "Email",
+                        isObscureText: false,
+                        isPassword: false,
+                        typeText: false,
+                        icon: Icons.email,
+                      ),
+            
+                      _BuildTextField(
+                        controller: _passwordController,
+                        labelText: "Password",
+                        isObscureText: true,
+                        isPassword: true,
+                        icon: Icons.lock,
+                      ),
+                      _BuildTextField(
+                        controller: _confirmpasswordController,
+                        labelText: "Confirm Password",
+                        isObscureText: true,
+                        isPassword: true,
+                        icon: Icons.lock_reset,
+                      ),
+            
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            backgroundColor: Colors.blueAccent,
+                            foregroundColor: Colors.white,
+                          ),
+            
                           child: Text(
-                            " Login ",
-                            style: headerTextStyle.copyWith(
-                              fontSize: 10,
-                              color: Colors.blueAccent,
+                            "SIGN UP",
+                            style: bodyTextStyle.copyWith(
+                              fontSize: 16,
+                              color: Colors.white,
                             ),
                           ),
                         ),
-                        Text(
-                          "Here",
-                          style: headerTextStyle.copyWith(
-                            fontSize: 10,
-                            color: Colors.grey.withOpacity(0.9),
+                      ),
+                      SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            "Already have an account?",
+            
+                            style: headerTextStyle.copyWith(
+                              fontSize: 10,
+                              color: Colors.grey.withOpacity(0.9),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(child: Divider(thickness: 1, endIndent: 10)),
-                        Text(
-                          "OR CONTINUE WITH",
-                          style: headerTextStyle.copyWith(
-                            fontSize: 10,
-                            color: Colors.grey.withOpacity(0.9),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).pop();
+                            },
+                            child: Text(
+                              " Login ",
+                              style: headerTextStyle.copyWith(
+                                fontSize: 10,
+                                color: Colors.blueAccent,
+                              ),
+                            ),
                           ),
-                        ),
-
-                        Expanded(child: Divider(thickness: 1, indent: 10)),
-                      ],
-                    ),
-                    SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _LoginButton(
-                          assetPath: "assets/icons/android_neutral_rd_na.svg",
-                          semanticsLabel: 'Google logo',
-                        ),
-                        _LoginButton(
-                          icon: FontAwesomeIcons.github,
-                          iconSize: 24,
-                          semanticsLabel: 'Github logo',
-                        ),
-                        _LoginButton(
-                          icon: FontAwesomeIcons.facebook,
-                          iconSize: 24,
-                          iconColor: Colors.blue[700],
-                          semanticsLabel: 'Facebook logo',
-                        ),
-                        _LoginButton(
-                          icon: FontAwesomeIcons.twitter,
-                          iconSize: 24,
-                          iconColor: Colors.blue,
-                          semanticsLabel: 'Twitter logo',
-                        ),
-                      ],
-                    ),
-                  ],
+                          Text(
+                            "Here",
+                            style: headerTextStyle.copyWith(
+                              fontSize: 10,
+                              color: Colors.grey.withOpacity(0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(child: Divider(thickness: 1, endIndent: 10)),
+                          Text(
+                            "OR CONTINUE WITH",
+                            style: headerTextStyle.copyWith(
+                              fontSize: 10,
+                              color: Colors.grey.withOpacity(0.9),
+                            ),
+                          ),
+            
+                          Expanded(child: Divider(thickness: 1, indent: 10)),
+                        ],
+                      ),
+                      SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _LoginButton(
+                            assetPath: "assets/icons/android_neutral_rd_na.svg",
+                            semanticsLabel: 'Google logo',
+                          ),
+                          _LoginButton(
+                            icon: FontAwesomeIcons.github,
+                            iconSize: 24,
+                            semanticsLabel: 'Github logo',
+                          ),
+                          _LoginButton(
+                            icon: FontAwesomeIcons.facebook,
+                            iconSize: 24,
+                            iconColor: Colors.blue[700],
+                            semanticsLabel: 'Facebook logo',
+                          ),
+                          _LoginButton(
+                            icon: FontAwesomeIcons.twitter,
+                            iconSize: 24,
+                            iconColor: Colors.blue,
+                            semanticsLabel: 'Twitter logo',
+                          ),
+                        ],
+                      ),
+                     
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -339,29 +343,27 @@ class _LoginButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.only(right: 8.0, left: 8.0),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            padding: EdgeInsets.only(left: 10, right: 10),
-            minimumSize: Size(75, 75),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-
-            foregroundColor: Colors.black,
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0, left: 8.0),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          padding: EdgeInsets.only(left: 10, right: 10),
+          minimumSize: Size(75, 75),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
           ),
-          onPressed: () {},
-          child: icon != null
-              ? Icon(icon, size: iconSize, color: iconColor)
-              : SvgPicture.asset(
-                  'assets/icons/android_neutral_rd_na.svg',
-                  semanticsLabel: semanticsLabel ?? 'Google logo',
-                  width: 50,
-                  height: 50,
-                ),
+    
+          foregroundColor: Colors.black,
         ),
+        onPressed: () {},
+        child: icon != null
+            ? Icon(icon, size: iconSize, color: iconColor)
+            : SvgPicture.asset(
+                'assets/icons/android_neutral_rd_na.svg',
+                semanticsLabel: semanticsLabel ?? 'Google logo',
+                width: 50,
+                height: 50,
+              ),
       ),
     );
   }
@@ -401,6 +403,7 @@ class _BuildTextFieldState extends State<_BuildTextField> {
         obscureText: widget.isObscureText,
         controller: widget.controller,
         decoration: InputDecoration(
+          
           floatingLabelStyle: TextStyle(color: Colors.blueAccent),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),

@@ -6,7 +6,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../pages/signup.dart';
 import 'package:wave/wave.dart';
 
-
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -21,7 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     getClip(Size size) {
       var path = Path();
       path.lineTo(0, size.height / 4.25);
@@ -86,20 +84,22 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
-
           Positioned(
             bottom: -70,
             left: 0,
             right: 0,
-            child: WaveWidget(config:
-             CustomConfig(
-              colors : [Colors.blueAccent, Color.fromARGB(255, 193, 216, 255).withOpacity(0.6)],
-              durations: [8000,6000], 
-              heightPercentages: [0.65,0.66]
+            child: WaveWidget(
+              config: CustomConfig(
+                colors: [
+                  Colors.blueAccent,
+                  Color.fromARGB(255, 193, 216, 255).withOpacity(0.6),
+                ],
+                durations: [8000, 6000],
+                heightPercentages: [0.65, 0.66],
               ),
               backgroundColor: Colors.transparent,
               size: Size(2000, 500),
-              ),
+            ),
           ),
 
           Positioned(
@@ -127,10 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-          
-      
-         
-          
+
           Stack(
             children: [
               Padding(
@@ -250,7 +247,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         GestureDetector(
                           onTap: () {
                             Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => SignupScreen()),
+                              MaterialPageRoute(
+                                builder: (context) => SignupScreen(),
+                              ),
                             );
                           },
                           child: Text(
@@ -418,8 +417,8 @@ class _BuildTextFieldState extends State<_BuildTextField> {
         obscureText: widget.isObscureText,
         controller: widget.controller,
         decoration: InputDecoration(
-          floatingLabelStyle: TextStyle(
-            color: Colors.blueAccent,),
+          
+          floatingLabelStyle: TextStyle(color: Colors.blueAccent),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(color: Colors.blueAccent, width: 2),
