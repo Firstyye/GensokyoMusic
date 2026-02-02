@@ -255,7 +255,49 @@ class _SignupScreenState extends State<SignupScreen> {
                       ],
                     ),
                     SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(child: Divider(thickness: 1, endIndent: 10)),
+                        Text(
+                          "OR CONTINUE WITH",
+                          style: headerTextStyle.copyWith(
+                            fontSize: 10,
+                            color: Colors.grey.withOpacity(0.9),
+                          ),
+                        ),
+                        
+                        Expanded(child: Divider(thickness: 1, indent: 10)),
+                      ],
+                    ),
+                    SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _LoginButton(
+                          assetPath: "assets/icons/android_neutral_rd_na.svg",
+                          semanticsLabel: 'Google logo',
+                        ),
+                        _LoginButton(
+                          icon: FontAwesomeIcons.github,
+                          iconSize: 24,
+                          semanticsLabel: 'Github logo',
+                        ),
+                        _LoginButton(
+                          icon: FontAwesomeIcons.facebook,
+                          iconSize: 24,
+                          iconColor: Colors.blue[700],
+                          semanticsLabel: 'Facebook logo',
+                        ),
+                        _LoginButton(
+                          icon: FontAwesomeIcons.twitter,
+                          iconSize: 24,
+                          iconColor: Colors.blue,
+                          semanticsLabel: 'Twitter logo',
+                        ),
+                      ],
+                    )
                   ],
+                  
                 ),
               ),
             ],
