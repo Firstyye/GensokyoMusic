@@ -1,11 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:yo/pages/loginscreen.dart';
 import '../constant/my_constant.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:mobkit_dashed_border/mobkit_dashed_border.dart';
 import '../constant/my_constant.dart';
 import '../pages/profile_screen.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../widgets/_buildSongMenu.dart';
 import '../widgets/_FeatureBanner.dart';
@@ -16,9 +17,12 @@ class HomeScreen extends StatefulWidget {
   @override
   State<HomeScreen> createState() => _HomeScreenState();
   const HomeScreen({super.key});
+  
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  
+  final user = FirebaseAuth.instance.currentUser;
   bool isSwitched = true;
   int _selectedIndex = 0;
 
@@ -33,9 +37,10 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
   }
-
+  
   @override
   Widget build(BuildContext context) {
+    setState(() {});
     return Scaffold(
       appBar: AppBar(
         
@@ -79,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   Text(
-                    'Cirno, The Fairy',
+                    user?.displayName ?? 'Cirno, The Fairy',
                     style: bodyTextStyle.copyWith(fontSize: 16),
                   ),
                 ],
@@ -95,10 +100,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           SizedBox(width: 16.0),
 
-          CircleAvatar(
-            backgroundColor: Colors.grey.withOpacity(0.2),
-            radius: 20,
-            child: Icon(Icons.exit_to_app, color: dangerColor, size: 24.0),
+          GestureDetector(
+            onTap: () async {
+              await FirebaseAuth.instance.signOut();
+              Navigator.of(context).push(MaterialPageRoute(builder: (context) => LoginScreen()));
+            },
+            child: CircleAvatar(
+              backgroundColor: Colors.grey.withOpacity(0.2),
+              radius: 20,
+              child: Icon(Icons.exit_to_app, color: dangerColor, size: 24.0),
+            ),
           ),
           SizedBox(width: 16.0),
         ],

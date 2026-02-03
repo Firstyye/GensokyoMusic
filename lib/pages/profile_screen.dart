@@ -1,5 +1,7 @@
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:yo/pages/loginscreen.dart';
 import '../constant/my_constant.dart';
 import '../widgets/_buildMenuItem.dart';
 import '../pages/home_screen.dart';
@@ -12,19 +14,18 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final user = FirebaseAuth.instance.currentUser;
   bool isSwitched = true;
   int _selectedIndex = 3;
 
   void _onItemTapped(int index) {
     setState(() {
-      
       _selectedIndex = index;
-      switch (index){
+      switch (index) {
         case 0:
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => HomeScreen()),
-          );
-      
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (context) => HomeScreen()));
       }
     });
   }
@@ -38,11 +39,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: isSwitched ? backgroundColor : darkModeBackgroundColor,
 
       appBar: AppBar(
-        
         scrolledUnderElevation: 0.0,
         backgroundColor: isSwitched ? backgroundColor : darkModeBackgroundColor,
         leading: Padding(
-          padding: const EdgeInsets.only(left : 16.0),
+          padding: const EdgeInsets.only(left: 16.0),
           child: CircleAvatar(
             backgroundColor: Colors.grey.withOpacity(0.2),
             radius: 20,
@@ -260,7 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 20),
 
                 Text(
-                  'Cirno, The Fairy',
+                  user?.displayName ?? 'Cirno, The Fairy',
                   style: headerTextStyle.copyWith(
                     color: isSwitched ? Colors.black : darkThemeTextColor,
                     fontSize: 30,
@@ -310,7 +310,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Text(
-                      'Cirno_Gensokyo@gmail.com',
+                      user?.email ?? 'Cirno_Gensokyo@gmail.com',
                       style: bodyTextStyle.copyWith(
                         color: isSwitched
                             ? const Color.fromRGBO(45, 146, 208, 1)
@@ -380,8 +380,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         isBottom: true,
                         isDestructive: true,
                         isSwitched: isSwitched,
-                        onTap: () {
-                          // Handle Logout
+                        onTap: () async {
+                          await FirebaseAuth.instance.signOut();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => LoginScreen(),
+                            ),
+                          );
                         },
                       ),
                     ],

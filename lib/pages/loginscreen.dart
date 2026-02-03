@@ -3,8 +3,10 @@ import 'package:wave/config.dart';
 import 'package:yo/constant/my_constant.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:yo/pages/home_screen.dart';
 import '../pages/signup.dart';
 import 'package:wave/wave.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,6 +22,65 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    void _showMyDialog(String txtMsg) async {
+      return showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return Expanded(
+            child: AlertDialog(
+              backgroundColor: Colors.blueAccent.shade100,
+              title: const Text('Login Failed'),
+              content: Text(txtMsg),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.pop(context, 'Cancel'),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, 'OK'),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    }
+
+    Future<void> signinWithEmailAndPassword() async {
+      try {
+        final credential = await FirebaseAuth.instance
+            .signInWithEmailAndPassword(
+              email: _emailController.text,
+              password: _passwordController.text,
+            );
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Login successfully", style: bodyTextStyle.copyWith(color: Colors.white),),
+            backgroundColor: Colors.blueAccent.shade400,
+            
+          ),
+        );
+        Duration(seconds: 2);
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+        );
+      } on FirebaseAuthException catch (e) {
+        if (!mounted) return;
+        print('Failed with error code: ${e.code}');
+        print(e.message);
+        if (e.code == "invalid-email") {
+          _showMyDialog("no user found for that email");
+          print("no user found for that email");
+        } else if (e.code == 'INVALID_LOGIN_CREDENTIALS') {
+          _showMyDialog("wrong password for that user");
+          print("wrong password for that user");
+        }
+      }
+    }
+
     getClip(Size size) {
       var path = Path();
       path.lineTo(0, size.height / 4.25);
@@ -212,7 +273,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          signinWithEmailAndPassword();
+                        },
                         style: ElevatedButton.styleFrom(
                           minimumSize: Size(double.infinity, 50),
                           shape: RoundedRectangleBorder(
@@ -417,7 +480,6 @@ class _BuildTextFieldState extends State<_BuildTextField> {
         obscureText: widget.isObscureText,
         controller: widget.controller,
         decoration: InputDecoration(
-          
           floatingLabelStyle: TextStyle(color: Colors.blueAccent),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),

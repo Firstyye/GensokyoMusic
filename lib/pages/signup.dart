@@ -1,8 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:wave/config.dart';
 import 'package:yo/constant/my_constant.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:yo/pages/home_screen.dart';
 import 'package:yo/pages/loginscreen.dart';
 import 'package:wave/wave.dart';
 
@@ -20,6 +22,67 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _confirmpasswordController =
       TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
+
+  Future<void> createUserWithEmailAndPassword() async {
+    try {
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text,
+            password: _passwordController.text,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+         SnackBar(
+          backgroundColor: Colors.greenAccent.shade400,
+          content: Text("Register successfully",style: bodyTextStyle.copyWith(color: Colors.white),),
+          
+        ),
+      );
+      FirebaseAuth.instance.currentUser!.updateDisplayName(
+        _usernameController.text,
+      );
+      FirebaseAuth.instance.signOut();
+      await Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (context) => LoginScreen()));
+    } on FirebaseAuthException catch (e) {
+      if (e.code == "weak-password") {
+        _showMyDialog("weak password");
+        print("weak password");
+      } else if (e.code == "email-already-in-use") {
+        _showMyDialog("email already in use");
+        print("email already in use");
+      }
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  void _showMyDialog(String txtMsg) async {
+    return showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Expanded(
+          child: AlertDialog(
+            backgroundColor: Colors.blueAccent.shade100,
+            title: const Text('Register Failed'),
+            content: Text(txtMsg),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'Cancel'),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'OK'),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   getClip(Size size) {
     var path = Path();
     path.lineTo(0, size.height / 4.25);
@@ -137,8 +200,7 @@ class _SignupScreenState extends State<SignupScreen> {
             child: SingleChildScrollView(
               child: Padding(
                 padding: EdgeInsets.only(bottom: viewInsets.bottom),
-                child: Stack( 
-                  
+                child: Stack(
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(16.0),
@@ -153,7 +215,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               image: AssetImage('assets/images/CirnoLogin.png'),
                             ),
                           ),
-                
+
                           Text(
                             "Ready to get started?",
                             style: headerTextStyle.copyWith(
@@ -187,7 +249,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             typeText: false,
                             icon: Icons.email,
                           ),
-                
+
                           _BuildTextField(
                             controller: _passwordController,
                             labelText: "Password",
@@ -202,11 +264,26 @@ class _SignupScreenState extends State<SignupScreen> {
                             isPassword: true,
                             icon: Icons.lock_reset,
                           ),
-                
+
                           Padding(
                             padding: const EdgeInsets.all(8.0),
                             child: ElevatedButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                if (_usernameController.text.isEmpty) {
+                                  _showMyDialog("Invalid Username");
+                                  print("Invalid Username");
+                                } else if (_emailController.text.isEmpty) {
+                                  _showMyDialog("Invalid Email");
+                                  print("Invalid Email");
+                                } else if (_passwordController.text !=
+                                        _confirmpasswordController.text ||
+                                    _passwordController.text.isEmpty) {
+                                  _showMyDialog("Password does not match");
+                                  print("password does not match");
+                                  return;
+                                }
+                                createUserWithEmailAndPassword();
+                              },
                               style: ElevatedButton.styleFrom(
                                 minimumSize: Size(double.infinity, 50),
                                 shape: RoundedRectangleBorder(
@@ -215,7 +292,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                 backgroundColor: Colors.blueAccent,
                                 foregroundColor: Colors.white,
                               ),
-                
+
                               child: Text(
                                 "SIGN UP",
                                 style: bodyTextStyle.copyWith(
@@ -232,7 +309,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             children: [
                               Text(
                                 "Already have an account?",
-                
+
                                 style: headerTextStyle.copyWith(
                                   fontSize: 10,
                                   color: Colors.grey.withOpacity(0.9),
@@ -262,7 +339,9 @@ class _SignupScreenState extends State<SignupScreen> {
                           SizedBox(height: 20),
                           Row(
                             children: [
-                              Expanded(child: Divider(thickness: 1, endIndent: 10)),
+                              Expanded(
+                                child: Divider(thickness: 1, endIndent: 10),
+                              ),
                               Text(
                                 "OR CONTINUE WITH",
                                 style: headerTextStyle.copyWith(
@@ -270,8 +349,10 @@ class _SignupScreenState extends State<SignupScreen> {
                                   color: Colors.grey.withOpacity(0.9),
                                 ),
                               ),
-                
-                              Expanded(child: Divider(thickness: 1, indent: 10)),
+
+                              Expanded(
+                                child: Divider(thickness: 1, indent: 10),
+                              ),
                             ],
                           ),
                           SizedBox(height: 20),
@@ -279,7 +360,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               _LoginButton(
-                                assetPath: "assets/icons/android_neutral_rd_na.svg",
+                                assetPath:
+                                    "assets/icons/android_neutral_rd_na.svg",
                                 semanticsLabel: 'Google logo',
                               ),
                               _LoginButton(
@@ -301,7 +383,6 @@ class _SignupScreenState extends State<SignupScreen> {
                               ),
                             ],
                           ),
-                         
                         ],
                       ),
                     ),
@@ -360,7 +441,7 @@ class _LoginButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
-    
+
           foregroundColor: Colors.black,
         ),
         onPressed: () {},
@@ -411,7 +492,6 @@ class _BuildTextFieldState extends State<_BuildTextField> {
         obscureText: widget.isObscureText,
         controller: widget.controller,
         decoration: InputDecoration(
-          
           floatingLabelStyle: TextStyle(color: Colors.blueAccent),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),

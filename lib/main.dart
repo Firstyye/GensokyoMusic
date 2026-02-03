@@ -3,10 +3,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'pages/home_screen.dart';
 import 'pages/introscreen.dart';
 import 'pages/loginscreen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 bool seen = false;
 
 void main() async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform);
   WidgetsFlutterBinding.ensureInitialized();
 
   final prefs = await SharedPreferences.getInstance();
@@ -15,6 +19,7 @@ void main() async {
   runApp(MyApp());
 }
 
+  
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
