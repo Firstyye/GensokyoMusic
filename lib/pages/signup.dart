@@ -1,3 +1,4 @@
+import 'package:delightful_toast/toast/components/toast_card.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:wave/config.dart';
@@ -5,6 +6,8 @@ import 'package:yo/constant/my_constant.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yo/pages/home_screen.dart';
+import 'package:delightful_toast/delight_toast.dart';
+import 'package:quickalert/quickalert.dart';
 import 'package:yo/pages/loginscreen.dart';
 import 'package:wave/wave.dart';
 
@@ -31,13 +34,23 @@ class _SignupScreenState extends State<SignupScreen> {
             password: _passwordController.text,
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-         SnackBar(
-          backgroundColor: Colors.greenAccent.shade400,
-          content: Text("Register successfully",style: bodyTextStyle.copyWith(color: Colors.white),),
-          
+      DelightToastBar(
+        snackbarDuration: Duration(seconds: 4),
+        autoDismiss: true,
+        builder: (context) => ToastCard(
+          color: Colors.green,
+          title: Text(
+            "Register Successful",
+            style: bodyTextStyle.copyWith(color: Colors.white),
+          ),
+
+          leading: Icon(
+            FontAwesomeIcons.circleCheck,
+            color: Colors.white,
+            size: 20,
+          ),
         ),
-      );
+      ).show(context);
       FirebaseAuth.instance.currentUser!.updateDisplayName(
         _usernameController.text,
       );
@@ -47,10 +60,20 @@ class _SignupScreenState extends State<SignupScreen> {
       ).pushReplacement(MaterialPageRoute(builder: (context) => LoginScreen()));
     } on FirebaseAuthException catch (e) {
       if (e.code == "weak-password") {
-        _showMyDialog("weak password");
+        QuickAlert.show(
+          context: context,
+          type: QuickAlertType.error,
+          title: 'Register Failed',
+          text: 'Password is too weak',
+        );
         print("weak password");
       } else if (e.code == "email-already-in-use") {
-        _showMyDialog("email already in use");
+        QuickAlert.show(
+          context: context,
+          type: QuickAlertType.error,
+          title: 'Register Failed',
+          text: 'Email is already in use',
+        );
         print("email already in use");
       }
     } catch (e) {
@@ -270,15 +293,30 @@ class _SignupScreenState extends State<SignupScreen> {
                             child: ElevatedButton(
                               onPressed: () {
                                 if (_usernameController.text.isEmpty) {
-                                  _showMyDialog("Invalid Username");
+                                  QuickAlert.show(
+                                    context: context,
+                                    type: QuickAlertType.error,
+                                    title: 'Register Failed',
+                                    text: 'Invalid Username',
+                                  );
                                   print("Invalid Username");
                                 } else if (_emailController.text.isEmpty) {
-                                  _showMyDialog("Invalid Email");
+                                  QuickAlert.show(
+                                    context: context,
+                                    type: QuickAlertType.error,
+                                    title: 'Register Failed',
+                                    text: 'Invalid Email',
+                                  );
                                   print("Invalid Email");
                                 } else if (_passwordController.text !=
                                         _confirmpasswordController.text ||
                                     _passwordController.text.isEmpty) {
-                                  _showMyDialog("Password does not match");
+                                  QuickAlert.show(
+                                    context: context,
+                                    type: QuickAlertType.error,
+                                    title: 'Register Failed',
+                                    text: 'Password does not match',
+                                  );
                                   print("password does not match");
                                   return;
                                 }

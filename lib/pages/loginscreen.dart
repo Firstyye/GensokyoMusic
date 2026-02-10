@@ -1,3 +1,4 @@
+import 'package:delightful_toast/toast/components/toast_card.dart';
 import 'package:flutter/material.dart';
 import 'package:wave/config.dart';
 import 'package:yo/constant/my_constant.dart';
@@ -6,6 +7,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yo/pages/home_screen.dart';
 import '../pages/signup.dart';
 import 'package:wave/wave.dart';
+import 'package:delightful_toast/delight_toast.dart';
+import 'package:quickalert/quickalert.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -55,27 +58,47 @@ class _LoginScreenState extends State<LoginScreen> {
               password: _passwordController.text,
             );
 
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Login successfully", style: bodyTextStyle.copyWith(color: Colors.white),),
-            backgroundColor: Colors.blueAccent.shade400,
-            
-          ),
-        );
         Duration(seconds: 2);
+        DelightToastBar(
+          snackbarDuration: Duration(seconds: 4),
+          autoDismiss: true,
+          builder: (context) => ToastCard(
+            color: Colors.blueAccent,
+            title: Text(
+              "Login Successful",
+              style: bodyTextStyle.copyWith(color: Colors.white),
+            ),
+
+            leading: Icon(
+              FontAwesomeIcons.circleCheck,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+        ).show(context);
+        print("show toast");
+        Duration(seconds: 5);
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => HomeScreen()),
         );
       } on FirebaseAuthException catch (e) {
-        if (!mounted) return;
         print('Failed with error code: ${e.code}');
         print(e.message);
         if (e.code == "invalid-email") {
-          _showMyDialog("no user found for that email");
+          QuickAlert.show(
+            context: context,
+            type: QuickAlertType.error,
+            title: 'Login Failed',
+            text: 'Not a valid email address',
+          );
           print("no user found for that email");
         } else if (e.code == 'INVALID_LOGIN_CREDENTIALS') {
-          _showMyDialog("wrong password for that user");
+          QuickAlert.show(
+            context: context,
+            type: QuickAlertType.error,
+            title: 'Oops...',
+            text: 'Wrong password. Please try again.',
+          );
           print("wrong password for that user");
         }
       }
