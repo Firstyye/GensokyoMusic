@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
           snackbarDuration: Duration(seconds: 4),
           autoDismiss: true,
           builder: (context) => ToastCard(
-            color: Colors.blueAccent,
+            color: Colors.green,
             title: Text(
               "Login Successful",
               style: bodyTextStyle.copyWith(color: Colors.white),
@@ -73,6 +73,10 @@ class _LoginScreenState extends State<LoginScreen> {
               FontAwesomeIcons.circleCheck,
               color: Colors.white,
               size: 20,
+            ),
+            trailing: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Icon(Icons.close_rounded, size: 20, color: Colors.white),
             ),
           ),
         ).show(context);
@@ -87,17 +91,70 @@ class _LoginScreenState extends State<LoginScreen> {
         if (e.code == "invalid-email") {
           QuickAlert.show(
             context: context,
+            confirmBtnTextStyle: bodyTextStyle,
             type: QuickAlertType.error,
-            title: 'Login Failed',
-            text: 'Not a valid email address',
+            showConfirmBtn: false,
+            title: 'Login Failed', 
+            text : "Invalid email format. Please enter a valid email address.",
+            widget: Column(
+              children: [
+                const SizedBox(height: 20),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red, width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    foregroundColor: Colors.red, 
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 10,
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Okay',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
           );
           print("no user found for that email");
-        } else if (e.code == 'INVALID_LOGIN_CREDENTIALS') {
+        } else if (e.code == 'invalid-credential') {
           QuickAlert.show(
             context: context,
             type: QuickAlertType.error,
-            title: 'Oops...',
+            showConfirmBtn: false,
+            title: 'Login Failed',
             text: 'Wrong password. Please try again.',
+            widget: Column(
+              children: [
+                const SizedBox(height: 20),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red, width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    foregroundColor: Colors.red, 
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 10,
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Okay',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
           );
           print("wrong password for that user");
         }

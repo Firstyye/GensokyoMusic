@@ -62,17 +62,71 @@ class _SignupScreenState extends State<SignupScreen> {
       if (e.code == "weak-password") {
         QuickAlert.show(
           context: context,
+          confirmBtnTextStyle: bodyTextStyle,
           type: QuickAlertType.error,
           title: 'Register Failed',
           text: 'Password is too weak',
+          showConfirmBtn: false,
+          widget: Column(
+            children: [
+              const SizedBox(height: 20),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red, width: 2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  foregroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 10,
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  'Okay',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
         );
         print("weak password");
       } else if (e.code == "email-already-in-use") {
         QuickAlert.show(
           context: context,
           type: QuickAlertType.error,
+          confirmBtnTextStyle: bodyTextStyle,
           title: 'Register Failed',
           text: 'Email is already in use',
+          showConfirmBtn: false,
+          widget: Column(
+            children: [
+              const SizedBox(height: 20),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red, width: 2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  foregroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 10,
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  'Okay',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
         );
         print("email already in use");
       }
@@ -298,6 +352,39 @@ class _SignupScreenState extends State<SignupScreen> {
                                     type: QuickAlertType.error,
                                     title: 'Register Failed',
                                     text: 'Invalid Username',
+                                    showConfirmBtn: false,
+                                    widget: Column(
+                                      children: [
+                                        const SizedBox(height: 20),
+                                        OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            side: const BorderSide(
+                                              color: Colors.red,
+                                              width: 2,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            foregroundColor: Colors.red,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 30,
+                                              vertical: 10,
+                                            ),
+                                          ),
+                                          onPressed: () {
+                                            Navigator.pop(context);
+                                          },
+                                          child: const Text(
+                                            'Okay',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   );
                                   print("Invalid Username");
                                 } else if (_emailController.text.isEmpty) {
@@ -306,6 +393,39 @@ class _SignupScreenState extends State<SignupScreen> {
                                     type: QuickAlertType.error,
                                     title: 'Register Failed',
                                     text: 'Invalid Email',
+                                    showConfirmBtn: false,
+                                    widget: Column(
+                                      children: [
+                                        const SizedBox(height: 20),
+                                        OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            side: const BorderSide(
+                                              color: Colors.red,
+                                              width: 2,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            foregroundColor: Colors.red,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 30,
+                                              vertical: 10,
+                                            ),
+                                          ),
+                                          onPressed: () {
+                                            Navigator.pop(context);
+                                          },
+                                          child: const Text(
+                                            'Okay',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   );
                                   print("Invalid Email");
                                 } else if (_passwordController.text !=
@@ -316,6 +436,39 @@ class _SignupScreenState extends State<SignupScreen> {
                                     type: QuickAlertType.error,
                                     title: 'Register Failed',
                                     text: 'Password does not match',
+                                    showConfirmBtn: false,
+                                    widget: Column(
+                                      children: [
+                                        const SizedBox(height: 20),
+                                        OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            side: const BorderSide(
+                                              color: Colors.red,
+                                              width: 2,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            foregroundColor: Colors.red,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 30,
+                                              vertical: 10,
+                                            ),
+                                          ),
+                                          onPressed: () {
+                                            Navigator.pop(context);
+                                          },
+                                          child: const Text(
+                                            'Okay',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   );
                                   print("password does not match");
                                   return;
