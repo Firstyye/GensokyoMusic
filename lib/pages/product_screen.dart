@@ -93,7 +93,7 @@ class _ProductScreenState extends State<ProductScreen> {
               print("Product's ID : $index");
             },
             
-            leading: Image.network("https://corsproxy.io/?url=${product['mainPicture']}", width: 80, height: 80),
+            leading: Image.network("${product['mainPicture']}", width: 80, height: 80),
             title: Text(product['name']),
             subtitle: Text("\$${product['price'].toStringAsFixed(2)}"),
             trailing: product['inStock']

@@ -10,9 +10,10 @@ import 'firebase_options.dart';
 bool seen = false;
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform);
-  WidgetsFlutterBinding.ensureInitialized();
+  
 
   final prefs = await SharedPreferences.getInstance();
   seen = prefs.getBool('seen') ?? false;
@@ -29,7 +30,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Yo App',
-      home: ProductScreen(),
+      home: LoginScreen(),
       // home: seen ? HomeScreen() : IntroScreen(),
     );
   }

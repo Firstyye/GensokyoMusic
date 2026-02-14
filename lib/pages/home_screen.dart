@@ -12,19 +12,34 @@ import '../widgets/_buildSongMenu.dart';
 import '../widgets/_FeatureBanner.dart';
 import '../widgets/_buildMiniPlayer.dart';
 import '../widgets/_SongCard.dart';
+import 'package:yo/data/touhoudb_service.dart';
+import 'package:yo/data/customSongsList.dart';
+import 'package:yo/data/albumsList.dart';
+import 'package:yo/data/toprateSong.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
   State<HomeScreen> createState() => _HomeScreenState();
   const HomeScreen({super.key});
-  
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  
   final user = FirebaseAuth.instance.currentUser;
   bool isSwitched = true;
   int _selectedIndex = 0;
+  final TouhouDBService _service = TouhouDBService();
+  late Future<List<customSongList>> _songsFuture;
+  late Future<List<Albumslist>> _albumsFuture;
+  late Future<List<TopRatedSongList>> _topRatedSongsFuture;
+  bool isLoading = true;
+  @override
+  void initState() {
+    super.initState();
+    _songsFuture = _service.fetchSongs();
+    _albumsFuture = _service.fetchAlbum();
+    _topRatedSongsFuture = _service.fetchTopRatedSongs();
+    isLoading = false;
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -37,13 +52,11 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
   }
-  
+
   @override
   Widget build(BuildContext context) {
-    setState(() {});
     return Scaffold(
       appBar: AppBar(
-        
         scrolledUnderElevation: 0.0,
         shape: Border(
           bottom: BorderSide(color: Colors.grey.withOpacity(0.2), width: 1.0),
@@ -69,7 +82,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.only(left: 5, right: 5, top: 2, bottom: 2),
+                    padding: const EdgeInsets.only(
+                      left: 5,
+                      right: 5,
+                      top: 2,
+                      bottom: 2,
+                    ),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.blueAccent, width: 1),
                       color: Colors.transparent,
@@ -79,8 +97,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       'MEMBER',
                       style: bodyTextStyle.copyWith(
                         fontSize: 8,
-                        color: Colors.blueAccent
-                        ),
+                        color: Colors.blueAccent,
+                      ),
                     ),
                   ),
                   Text(
@@ -103,7 +121,9 @@ class _HomeScreenState extends State<HomeScreen> {
           GestureDetector(
             onTap: () async {
               await FirebaseAuth.instance.signOut();
-              Navigator.of(context).push(MaterialPageRoute(builder: (context) => LoginScreen()));
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (context) => LoginScreen()));
             },
             child: CircleAvatar(
               backgroundColor: Colors.grey.withOpacity(0.2),
@@ -168,7 +188,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             SongCard(
                               title: 'Ghost flight in the sky',
                               viewerCount: '82',
-                              backgroundImage: 'lib/pages/images/SongBanner/TOHO_BOSSNOVA8.jpg',
+                              backgroundImage:
+                                  'lib/pages/images/SongBanner/TOHO_BOSSNOVA8.jpg',
                             ),
 
                             Container(
@@ -215,8 +236,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                       fontSize: 10,
                                       color: Colors.black.withOpacity(0.35),
                                       fontWeight: FontWeight.w100,
-                                    )
-                                  )
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -238,32 +259,34 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          FeatureBanner(
-                            titlename:
-                                "Chou Saikyou! Saishuu Kichiku Imouto Flandre S",
-                            circlename: "COOL&CREATE",
+                    FutureBuilder(
+                      future: _albumsFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return Center(child: CircularProgressIndicator());
+                        } else if (snapshot.hasError) {
+                          return Text("Error loading albums");
+                        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                          return Text("No albums found");
+                        }
+                        final albums = snapshot.data!.take(5).toList();
+
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: albums.map((album) {
+                              return FeatureBanner(
+                                titlename: album.name,
+                                circlename: album.artist,
+                                buttonname: "NEW ALBUM",
+                                backgroundimage: album.image,
+                              );
+                            }).toList(),
                           ),
-                          FeatureBanner(
-                            titlename:
-                                "Touhou Hits Covers -Ska Punk Flavor-",
-                            circlename: "IOSYS",
-                            backgroundimage: 'lib/pages/images/SongBanner/SkaPunkFlavor.jpg',
-                          ),
-                          FeatureBanner(
-                            titlename:
-                                "Santa Prisma",
-                            circlename: "	魂音泉, (TINY PLANETS)",
-                            backgroundimage: "lib/pages/images/SongBanner/SantaPrisma.jpg",
-                          ),
-                          
-                        ],
-                      ),
+                        );
+                      },
                     ),
-                    
+
                     Row(
                       children: [
                         Text(
@@ -279,40 +302,32 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     SizedBox(height: 20),
-                    SongMenu(
-                      number: "1",
-                      title: "Koi no Hyoketsu Otenba Yukemuri Cirno Onsen", 
-                      artist: "IOSYS",
-                      image: 'lib/pages/images/SongBanner/1383.jpg',
-                    ),
-                    SongMenu(
-                      number: "2",
-                      title: "Sanae-san", 
-                      artist: "RD-Sounds feat. めらみぽっぷ",
-                      image: 'lib/pages/images/SongBanner/sanae_san.jpg',
-                    ),
-                    SongMenu(
-                      number: "3",
-                      title: "Cirno's Perfect Math Class", 
-                      artist: "IOSYS",
-                      image: 'lib/pages/images/SongBanner/Cirno.jpg',
-                    ),
-                    SongMenu(
-                      number: "4",
-                      title: "クオリア", 
-                      artist: "IOSYS",
-                      image: "lib/pages/images/SongBanner/ROCKIN'ON.jpg",
-                    ),
-                    SongMenu(
-                      number: "5",
-                      title: "Narcissus no Sayonara, Goodbye to Narcissus", 
-                      artist: "ShibayanRecords",
-                      image: 'lib/pages/images/SongBanner/TOHO_BOSSNOVA2.jpg',
-                    ),
+                    FutureBuilder(future: _topRatedSongsFuture, builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(child: CircularProgressIndicator());
+                      } else if (snapshot.hasError) {
+                        return Text("Error loading songs");
+                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return Text("No songs found");
+                      }
+                      final songs = snapshot.data!;
+                      return Column(
+                        children: songs.map((song) {
+                          String index = (songs.indexOf(song) + 1).toString();
+                          
+                          return SongMenu(
+                            title: song.name,
+                            artist: song.artist,
+                            image: song.image,
+                            number: index,
+                          );
+                        }).toList(),
+                      );
+                    }),
                     Padding(padding: EdgeInsets.only(bottom: 95)),
                   ],
                 ),
-                
+
                 Positioned(bottom: 20, left: 0, right: 0, child: MiniPlayer()),
               ],
             ),

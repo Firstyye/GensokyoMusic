@@ -17,6 +17,12 @@ class SongMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    ImageProvider imageProvider;
+    if( image != null && image!.startsWith('http')) {
+      imageProvider = NetworkImage(image!);
+    } else {
+      imageProvider = AssetImage(image ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg');
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 10.0),
       child: Column(
@@ -50,9 +56,7 @@ class SongMenu extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     image: DecorationImage(
-                      image: AssetImage(
-                        image ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg',
-                      ),
+                      image: imageProvider,
                       fit: BoxFit.fill,
                     ),
                   ),

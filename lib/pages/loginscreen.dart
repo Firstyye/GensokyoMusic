@@ -1,5 +1,6 @@
 import 'package:delightful_toast/toast/components/toast_card.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:wave/config.dart';
 import 'package:yo/constant/my_constant.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -10,6 +11,7 @@ import 'package:wave/wave.dart';
 import 'package:delightful_toast/delight_toast.dart';
 import 'package:quickalert/quickalert.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,34 +24,33 @@ class _LoginScreenState extends State<LoginScreen> {
   bool isSwitch = false;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-
   @override
   Widget build(BuildContext context) {
-    void _showMyDialog(String txtMsg) async {
-      return showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return Expanded(
-            child: AlertDialog(
-              backgroundColor: Colors.blueAccent.shade100,
-              title: const Text('Login Failed'),
-              content: Text(txtMsg),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.pop(context, 'Cancel'),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, 'OK'),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
-        },
+    
+    Future<void> singInWithGoogle() async {
+      await GoogleSignIn.instance.initialize(
+        clientId: "519148811246-q0gp1aniaalgreq2igsu7umar215tihg.apps.googleusercontent.com"
       );
+       
+      try{
+        final GoogleSignInAccount? googleUser = await GoogleSignIn.instance.authenticate(
+          
+        );
+        if(googleUser == null){
+          throw Exception("Google Sign-In aborted by user");
+        }
+        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+        final credential = GoogleAuthProvider.credential(
+    
+          idToken: googleAuth.idToken,
+        );
+        final userCred = await FirebaseAuth.instance.signInWithCredential(credential);
+        final user = userCred.user;
+      }on FirebaseAuthException catch(e){
+        print('Failed with error code: ${e.code}');
+        print(e.message);
+      }
     }
-
     Future<void> signinWithEmailAndPassword() async {
       try {
         final credential = await FirebaseAuth.instance
@@ -76,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             trailing: Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Icon(Icons.close_rounded, size: 20, color: Colors.white),
+              child: Icon(Icons.swipe_left, size: 20, color: Colors.white),
             ),
           ),
         ).show(context);
@@ -269,195 +270,203 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
 
-          Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SafeArea(
-                      child: Image(
-                        width: 350,
-                        height: 300,
-                        image: AssetImage('assets/images/Register.png'),
+          SingleChildScrollView(
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SafeArea(
+                        child: Image(
+                          width: 350,
+                          height: 300,
+                          image: AssetImage('assets/images/Register.png'),
+                        ),
                       ),
-                    ),
-
-                    Text(
-                      "Welcome back!",
-                      style: headerTextStyle.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
+            
+                      Text(
+                        "Welcome back!",
+                        style: headerTextStyle.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 5),
-                    Text(
-                      "Time to vibe with everyone again.",
-                      style: bodyTextStyle.copyWith(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w100,
-                        color: Colors.grey.withOpacity(0.9),
+                      SizedBox(height: 5),
+                      Text(
+                        "Time to vibe with everyone again.",
+                        style: bodyTextStyle.copyWith(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w100,
+                          color: Colors.grey.withOpacity(0.9),
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 20),
-                    _BuildTextField(
-                      controller: _emailController,
-                      labelText: "Email",
-                      isObscureText: false,
-                      isPassword: false,
-                      icon: Icons.email,
-                    ),
-
-                    _BuildTextField(
-                      controller: _passwordController,
-                      labelText: "Password",
-                      isObscureText: true,
-                      isPassword: true,
-                      icon: Icons.lock,
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          Switch(
-                            value: isSwitch,
-                            onChanged: (value) {
-                              setState(() {
-                                isSwitch = value;
-                              });
-                            },
-                            activeTrackColor: Colors.blueAccent,
+                      SizedBox(height: 20),
+                      _BuildTextField(
+                        controller: _emailController,
+                        labelText: "Email",
+                        isObscureText: false,
+                        isPassword: false,
+                        icon: Icons.email,
+                      ),
+            
+                      _BuildTextField(
+                        controller: _passwordController,
+                        labelText: "Password",
+                        isObscureText: true,
+                        isPassword: true,
+                        icon: Icons.lock,
+                      ),
+            
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            Switch(
+                              value: isSwitch,
+                              onChanged: (value) {
+                                setState(() {
+                                  isSwitch = value;
+                                });
+                              },
+                              activeTrackColor: Colors.blueAccent,
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              "Remember me",
+                              style: bodyTextStyle.copyWith(fontSize: 10),
+                            ),
+                            Spacer(),
+                            Text(
+                              "Forgot Password?",
+                              style: bodyTextStyle.copyWith(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w100,
+                                color: Colors.blueAccent.withOpacity(0.9),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+            
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            signinWithEmailAndPassword();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            backgroundColor: Colors.blueAccent,
+                            foregroundColor: Colors.white,
                           ),
-                          SizedBox(width: 5),
-                          Text(
-                            "Remember me",
-                            style: bodyTextStyle.copyWith(fontSize: 10),
-                          ),
-                          Spacer(),
-                          Text(
-                            "Forgot Password?",
+            
+                          child: Text(
+                            "LOGIN",
                             style: bodyTextStyle.copyWith(
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            "Don't have an account?",
+            
+                            style: headerTextStyle.copyWith(
                               fontSize: 10,
-                              fontWeight: FontWeight.w100,
-                              color: Colors.blueAccent.withOpacity(0.9),
+                              color: Colors.grey.withOpacity(0.9),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => SignupScreen(),
+                                ),
+                              );
+                            },
+                            child: Text(
+                              " Sign Up ",
+                              style: headerTextStyle.copyWith(
+                                fontSize: 10,
+                                color: Colors.blueAccent,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            "Here",
+                            style: headerTextStyle.copyWith(
+                              fontSize: 10,
+                              color: Colors.grey.withOpacity(0.9),
                             ),
                           ),
                         ],
                       ),
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          signinWithEmailAndPassword();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          backgroundColor: Colors.blueAccent,
-                          foregroundColor: Colors.white,
-                        ),
-
-                        child: Text(
-                          "LOGIN",
-                          style: bodyTextStyle.copyWith(
-                            fontSize: 16,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Don't have an account?",
-
-                          style: headerTextStyle.copyWith(
-                            fontSize: 10,
-                            color: Colors.grey.withOpacity(0.9),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => SignupScreen(),
-                              ),
-                            );
-                          },
-                          child: Text(
-                            " Sign Up ",
+                      SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(child: Divider(thickness: 1, endIndent: 10)),
+                          Text(
+                            "OR CONTINUE WITH",
                             style: headerTextStyle.copyWith(
                               fontSize: 10,
-                              color: Colors.blueAccent,
+                              color: Colors.grey.withOpacity(0.9),
                             ),
                           ),
-                        ),
-                        Text(
-                          "Here",
-                          style: headerTextStyle.copyWith(
-                            fontSize: 10,
-                            color: Colors.grey.withOpacity(0.9),
+                          SizedBox(height: 20),
+                          Expanded(child: Divider(thickness: 1, indent: 10)),
+                        ],
+                      ),
+                   
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              singInWithGoogle();
+                            },
+                            child: _LoginButton(
+            
+                              assetPath: "assets/icons/android_neutral_rd_na.svg",
+                              semanticsLabel: 'Google logo',
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(child: Divider(thickness: 1, endIndent: 10)),
-                        Text(
-                          "OR CONTINUE WITH",
-                          style: headerTextStyle.copyWith(
-                            fontSize: 10,
-                            color: Colors.grey.withOpacity(0.9),
+                          _LoginButton(
+                            icon: FontAwesomeIcons.github,
+                            iconSize: 24,
+                            semanticsLabel: 'Github logo',
                           ),
-                        ),
-                        SizedBox(height: 20),
-                        Expanded(child: Divider(thickness: 1, indent: 10)),
-                      ],
-                    ),
-                    SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _LoginButton(
-                          assetPath: "assets/icons/android_neutral_rd_na.svg",
-                          semanticsLabel: 'Google logo',
-                        ),
-                        _LoginButton(
-                          icon: FontAwesomeIcons.github,
-                          iconSize: 24,
-                          semanticsLabel: 'Github logo',
-                        ),
-                        _LoginButton(
-                          icon: FontAwesomeIcons.facebook,
-                          iconSize: 24,
-                          iconColor: Colors.blue[700],
-                          semanticsLabel: 'Facebook logo',
-                        ),
-                        _LoginButton(
-                          icon: FontAwesomeIcons.twitter,
-                          iconSize: 24,
-                          iconColor: Colors.blue,
-                          semanticsLabel: 'Twitter logo',
-                        ),
-                      ],
-                    ),
-                  ],
+                          _LoginButton(
+                            icon: FontAwesomeIcons.facebook,
+                            iconSize: 24,
+                            iconColor: Colors.blue[700],
+                            semanticsLabel: 'Facebook logo',
+                          ),
+                          _LoginButton(
+                            icon: FontAwesomeIcons.twitter,
+                            iconSize: 24,
+                            iconColor: Colors.blue,
+                            semanticsLabel: 'Twitter logo',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

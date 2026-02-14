@@ -16,6 +16,12 @@ class FeatureBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    ImageProvider imageProvider;
+    if( backgroundimage != null && backgroundimage!.startsWith('http')) {
+      imageProvider = NetworkImage(backgroundimage!);
+    } else {
+      imageProvider = AssetImage(backgroundimage ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg');
+    }
     return Padding(
       padding: EdgeInsets.only(top: 20.0, bottom: 20, right: 20),
       child: Container(
@@ -30,9 +36,7 @@ class FeatureBanner extends StatelessWidget {
             ),
           ],
           image: DecorationImage(
-            image: AssetImage(
-              backgroundimage ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg',
-            ),
+            image: imageProvider,
             fit: BoxFit.cover,
           ),
 
