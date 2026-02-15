@@ -18,23 +18,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final user = FirebaseAuth.instance.currentUser;
   bool isSwitched = true;
   int _selectedIndex = 3;
-  String _getUserEmail() {
-    // 1. ลองดูอีเมลหลักก่อน
-    if (user?.email != null && user!.email!.isNotEmpty) {
-      return user!.email!;
-    }
 
-    if (user?.providerData != null) {
-      for (var profile in user!.providerData) {
-        if (profile.email != null && profile.email!.isNotEmpty) {
-          return profile.email!;
-        }
-      }
-    }
-
-
-    return 'Cirno_Gensokyo@gmail.com'; 
-  }
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -327,7 +311,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Text(
-                      _getUserEmail(),
+                      user?.email ?? 'Cirno_Gensokyo@gmail.com',
                       style: bodyTextStyle.copyWith(
                         color: isSwitched
                             ? const Color.fromRGBO(45, 146, 208, 1)

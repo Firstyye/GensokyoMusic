@@ -34,10 +34,13 @@ class _LoginScreenState extends State<LoginScreen> {
     
     // 1. เพิ่มการ Initialize ใน initState
 @override
+<<<<<<< HEAD
 void initState() {
   super.initState();
   _googleSignIn.initialize();
 }
+=======
+>>>>>>> 3f03f5b490d02af1d2bb0d1721ee91b77e07cd5c
 
 void showSuccess() {
   return DelightToastBar(
@@ -65,9 +68,13 @@ void showSuccess() {
 
 Future<UserCredential?> signInWithFacebook() async {
     try{
+<<<<<<< HEAD
       final LoginResult loginResult = await FacebookAuth.instance.login(
         permissions: ['public_profile', 'email'],
       );
+=======
+      final LoginResult loginResult = await FacebookAuth.instance.login();
+>>>>>>> 3f03f5b490d02af1d2bb0d1721ee91b77e07cd5c
       final OAuthCredential facebookAuthCredential =
           FacebookAuthProvider.credential(loginResult.accessToken!.tokenString);
 
@@ -126,8 +133,13 @@ Future<UserCredential?> signInWithFacebook() async {
 Future<UserCredential?> signInWithGithub() async{
   try{
     GithubAuthProvider githubProvider = GithubAuthProvider();
+<<<<<<< HEAD
     githubProvider.addScope('user:email');
     await FirebaseAuth.instance.signInWithProvider(githubProvider);
+=======
+
+    final userCredential = await FirebaseAuth.instance.signInWithProvider(githubProvider);
+>>>>>>> 3f03f5b490d02af1d2bb0d1721ee91b77e07cd5c
     showSuccess();
     await Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => HomeScreen()),
@@ -182,7 +194,11 @@ Future<UserCredential?> signInWithGithub() async{
 Future<UserCredential?> signInWithGoogle() async {
   try {
     
+<<<<<<< HEAD
     
+=======
+    _googleSignIn.initialize();
+>>>>>>> 3f03f5b490d02af1d2bb0d1721ee91b77e07cd5c
     final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
 
     if (googleUser == null) {
