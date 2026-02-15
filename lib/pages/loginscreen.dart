@@ -34,10 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
     
     // 1. เพิ่มการ Initialize ใน initState
 @override
-void initState() {
-  super.initState();
-  _googleSignIn.initialize();
-}
+
 
 void showSuccess() {
   return DelightToastBar(
@@ -181,10 +178,8 @@ Future<UserCredential?> signInWithGithub() async{
 
 Future<UserCredential?> signInWithGoogle() async {
   try {
-    
-    
+    _googleSignIn.initialize();
     final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
-
     if (googleUser == null) {
       return null; 
     }
@@ -193,7 +188,6 @@ Future<UserCredential?> signInWithGoogle() async {
 
 
     final credential = GoogleAuthProvider.credential(
-      accessToken: null,
       idToken: googleAuth.idToken,
     );
     await FirebaseAuth.instance.signInWithCredential(credential);
