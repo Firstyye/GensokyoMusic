@@ -34,6 +34,10 @@ class _LoginScreenState extends State<LoginScreen> {
     
     // 1. เพิ่มการ Initialize ใน initState
 @override
+void initState() {
+  super.initState();
+  _googleSignIn.initialize();
+}
 
 void showSuccess() {
   return DelightToastBar(
@@ -61,7 +65,9 @@ void showSuccess() {
 
 Future<UserCredential?> signInWithFacebook() async {
     try{
-      final LoginResult loginResult = await FacebookAuth.instance.login();
+      final LoginResult loginResult = await FacebookAuth.instance.login(
+        permissions: ['public_profile', 'email'],
+      );
       final OAuthCredential facebookAuthCredential =
           FacebookAuthProvider.credential(loginResult.accessToken!.tokenString);
 
@@ -120,8 +126,8 @@ Future<UserCredential?> signInWithFacebook() async {
 Future<UserCredential?> signInWithGithub() async{
   try{
     GithubAuthProvider githubProvider = GithubAuthProvider();
-
-    final userCredential = await FirebaseAuth.instance.signInWithProvider(githubProvider);
+    githubProvider.addScope('user:email');
+    await FirebaseAuth.instance.signInWithProvider(githubProvider);
     showSuccess();
     await Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => HomeScreen()),
@@ -176,7 +182,7 @@ Future<UserCredential?> signInWithGithub() async{
 Future<UserCredential?> signInWithGoogle() async {
   try {
     
-    _googleSignIn.initialize();
+    
     final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
 
     if (googleUser == null) {
