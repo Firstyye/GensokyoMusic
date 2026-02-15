@@ -269,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                           return Text("No albums found");
                         }
-                        final albums = snapshot.data!.take(5).toList();
+                        final albums = snapshot.data!;
 
                         return SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
