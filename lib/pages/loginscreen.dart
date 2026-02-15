@@ -11,6 +11,8 @@ import 'package:wave/wave.dart';
 import 'package:delightful_toast/delight_toast.dart';
 import 'package:quickalert/quickalert.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:yo/data/authService.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 
 class LoginScreen extends StatefulWidget {
@@ -20,37 +22,212 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
+
 class _LoginScreenState extends State<LoginScreen> {
   bool isSwitch = false;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   @override
   Widget build(BuildContext context) {
     
-    Future<void> singInWithGoogle() async {
-      await GoogleSignIn.instance.initialize(
-        clientId: "519148811246-q0gp1aniaalgreq2igsu7umar215tihg.apps.googleusercontent.com"
-      );
-       
-      try{
-        final GoogleSignInAccount? googleUser = await GoogleSignIn.instance.authenticate(
-          
+    // 1. เพิ่มการ Initialize ใน initState
+@override
+
+void showSuccess() {
+  return DelightToastBar(
+          snackbarDuration: Duration(seconds: 4),
+          autoDismiss: true,
+          builder: (context) => ToastCard(
+            color: Colors.green,
+            title: Text(
+              "Login Successful",
+              style: bodyTextStyle.copyWith(color: Colors.white),
+            ),
+
+            leading: Icon(
+              FontAwesomeIcons.circleCheck,
+              color: Colors.white,
+              size: 20,
+            ),
+            trailing: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Icon(Icons.swipe_left, size: 20, color: Colors.white),
+            ),
+          ),
+        ).show(context);
+}
+
+Future<UserCredential?> signInWithFacebook() async {
+    try{
+      final LoginResult loginResult = await FacebookAuth.instance.login();
+      final OAuthCredential facebookAuthCredential =
+          FacebookAuthProvider.credential(loginResult.accessToken!.tokenString);
+
+      await FirebaseAuth.instance.signInWithCredential(facebookAuthCredential);
+      showSuccess();
+      Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => HomeScreen()),
         );
-        if(googleUser == null){
-          throw Exception("Google Sign-In aborted by user");
-        }
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-        final credential = GoogleAuthProvider.credential(
-    
-          idToken: googleAuth.idToken,
-        );
-        final userCred = await FirebaseAuth.instance.signInWithCredential(credential);
-        final user = userCred.user;
-      }on FirebaseAuthException catch(e){
-        print('Failed with error code: ${e.code}');
-        print(e.message);
-      }
+
+    }on FirebaseAuthException catch (e) {
+      QuickAlert.show(
+            context: context,
+            confirmBtnTextStyle: bodyTextStyle,
+            type: QuickAlertType.error,
+            showConfirmBtn: false,
+            title: 'Login Failed', 
+            text : e.code == "account-exists-with-different-credential"
+                ? "An account already exists with the same email address but different sign-in credentials. Please use a different sign-in method."
+                : e.message ?? "An error occurred during GitHub sign-in. Please try again.",
+            widget: Column(
+              children: [
+                const SizedBox(height: 20),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red, width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    foregroundColor: Colors.red, 
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 10,
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Okay',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          );
+      
+      print("Error signing in with Facebook: $e");
+      return null;
+    }catch (e) {
+      print("Unexpected error signing in with Facebook: $e");
+      return null;
+
     }
+  }
+
+Future<UserCredential?> signInWithGithub() async{
+  try{
+    GithubAuthProvider githubProvider = GithubAuthProvider();
+
+    final userCredential = await FirebaseAuth.instance.signInWithProvider(githubProvider);
+    showSuccess();
+    await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+        );
+    
+
+  }on FirebaseAuthException catch (e) {
+    QuickAlert.show(
+            context: context,
+            confirmBtnTextStyle: bodyTextStyle,
+            type: QuickAlertType.error,
+            showConfirmBtn: false,
+            title: 'Login Failed', 
+            text : e.code == "account-exists-with-different-credential"
+                ? "An account already exists with the same email address but different sign-in credentials. Please use a different sign-in method."
+                : e.message ?? "An error occurred during GitHub sign-in. Please try again.",
+            widget: Column(
+              children: [
+                const SizedBox(height: 20),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red, width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    foregroundColor: Colors.red, 
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 10,
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Okay',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          );
+    // print('Firebase Auth Error: ${e.message}');
+    
+    return null;
+  } catch (e) {
+    // print('Error: $e');
+    return null;
+  }
+}
+
+Future<UserCredential?> signInWithGoogle() async {
+  try {
+    
+    _googleSignIn.initialize();
+    final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
+
+    if (googleUser == null) {
+      return null; 
+    }
+
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: null,
+      idToken: googleAuth.idToken,
+    );
+    await FirebaseAuth.instance.signInWithCredential(credential);
+    DelightToastBar(
+          snackbarDuration: Duration(seconds: 4),
+          autoDismiss: true,
+          builder: (context) => ToastCard(
+            color: Colors.green,
+            title: Text(
+              "Login Successful",
+              style: bodyTextStyle.copyWith(color: Colors.white),
+            ),
+
+            leading: Icon(
+              FontAwesomeIcons.circleCheck,
+              color: Colors.white,
+              size: 20,
+            ),
+            trailing: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Icon(Icons.swipe_left, size: 20, color: Colors.white),
+            ),
+          ),
+        ).show(context);
+        
+        Duration(seconds: 5);
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+        );
+   
+    
+
+  } on FirebaseAuthException catch (e) {
+    // print('Firebase Auth Error: ${e.message}');
+    return null;
+  } catch (e) {
+    // print('Error: $e');
+    return null;
+  }
+}
     Future<void> signinWithEmailAndPassword() async {
       try {
         final credential = await FirebaseAuth.instance
@@ -81,14 +258,14 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ).show(context);
-        print("show toast");
+        // print("show toast");
         Duration(seconds: 5);
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => HomeScreen()),
         );
       } on FirebaseAuthException catch (e) {
-        print('Failed with error code: ${e.code}');
-        print(e.message);
+        // print('Failed with error code: ${e.code}');
+        // print(e.message);
         if (e.code == "invalid-email") {
           QuickAlert.show(
             context: context,
@@ -433,22 +610,19 @@ class _LoginScreenState extends State<LoginScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          GestureDetector(
-                            onTap: () {
-                              singInWithGoogle();
-                            },
-                            child: _LoginButton(
-            
-                              assetPath: "assets/icons/android_neutral_rd_na.svg",
-                              semanticsLabel: 'Google logo',
-                            ),
+                          _LoginButton(
+                            onpressed: signInWithGoogle,
+                            assetPath: "assets/icons/android_neutral_rd_na.svg",
+                            semanticsLabel: 'Google logo',
                           ),
                           _LoginButton(
+                            onpressed: signInWithGithub,
                             icon: FontAwesomeIcons.github,
                             iconSize: 24,
                             semanticsLabel: 'Github logo',
                           ),
                           _LoginButton(
+                            onpressed: signInWithFacebook,
                             icon: FontAwesomeIcons.facebook,
                             iconSize: 24,
                             iconColor: Colors.blue[700],
@@ -493,6 +667,7 @@ class _ClipPainter extends CustomPainter {
 }
 
 class _LoginButton extends StatelessWidget {
+  final VoidCallback? onpressed;
   final String? assetPath;
   final String? semanticsLabel;
   final IconData? icon;
@@ -501,6 +676,7 @@ class _LoginButton extends StatelessWidget {
   const _LoginButton({
     super.key,
     this.assetPath,
+    this.onpressed,
     this.semanticsLabel,
     this.icon,
     this.iconSize,
@@ -522,7 +698,7 @@ class _LoginButton extends StatelessWidget {
 
             foregroundColor: Colors.black,
           ),
-          onPressed: () {},
+          onPressed: onpressed ?? (){},
           child: icon != null
               ? Icon(icon, size: iconSize, color: iconColor)
               : SvgPicture.asset(

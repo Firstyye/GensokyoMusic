@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:yo/pages/loginscreen.dart';
 import '../constant/my_constant.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
@@ -76,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             SizedBox(width: 5.0),
-            Center(
+            Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   Text(
+                    overflow: TextOverflow.ellipsis,
                     user?.displayName ?? 'Cirno, The Fairy',
                     style: bodyTextStyle.copyWith(fontSize: 16),
                   ),
@@ -121,6 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
           GestureDetector(
             onTap: () async {
               await FirebaseAuth.instance.signOut();
+              await GoogleSignIn.instance.signOut();
               Navigator.of(
                 context,
               ).push(MaterialPageRoute(builder: (context) => LoginScreen()));
