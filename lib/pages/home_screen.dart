@@ -183,17 +183,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: EdgeInsets.only(top: 20.0, bottom: 20),
                         child: Row(
                           children: [
-                            SongCard(
-                              title: 'Tomboyish Girl in Love',
-                              viewerCount: '128',
-                              backgroundImage: 'lib/pages/images/banner.jpg',
-                            ),
-                            SongCard(
-                              title: 'Ghost flight in the sky',
-                              viewerCount: '82',
-                              backgroundImage:
-                                  'lib/pages/images/SongBanner/TOHO_BOSSNOVA8.jpg',
-                            ),
+                            FutureBuilder(future: _songsFuture, builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return Center(child: CircularProgressIndicator());
+                              } else if (snapshot.hasError) {
+                                return Text("Error loading songs");
+                              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                return Text("No songs found");
+                              }
+                              final songs = snapshot.data!;
+                              return Row(
+                                children: songs.map((song) {
+                                  int viewcount = 426+songs.indexOf(song)*16;
+                                  return SongCard(
+                                    title: song.name,
+                                    viewerCount: viewcount.toString(),
+                                    backgroundImage: song.image,
+                                  );
+                                }).toList(),
+                              );
+                            }),
 
                             Container(
                               alignment: Alignment.center,

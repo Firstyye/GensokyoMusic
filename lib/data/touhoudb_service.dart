@@ -8,28 +8,66 @@ class TouhouDBService {
   final String baseUrl = "https://touhoudb.com/api";
 
   Future<List<customSongList>> fetchSongs() async {
-    final myID = 3515; 
-    final response = await http.get(
-      Uri.parse(
-        "$baseUrl/songLists/${myID}/songs?fields=MainPicture&maxResults=20",
-      ),
-    );
-    if (response.statusCode == 200) {
-      var data = json.decode(response.body);
-      List<dynamic> items = data['items'];
-      return items
-          .map(
-            (song) => customSongList(
-              name: song['song']['defaultName'],
-              artist: song['song']['artistString'],
-              image : song['song']['mainPicture']['urlOriginal'] ?? "",
-            ),
-          )
-          .toList();
-    } else {
-      throw Exception("Failed to load songs");
-    }
+  final myID = 3515;
+  
+  final response = await http.get(
+    Uri.parse(
+      "$baseUrl/songLists/$myID/songs?fields=Albums,MainPicture&maxResults=20",
+    ),
+  );
+
+  if (response.statusCode == 200) {
+    var data = json.decode(response.body);
+    List<dynamic> items = data['items'];
+
+    List<customSongList> songList = await Future.wait(items.map((item) async {
+      
+      var songData = item['song'];
+      String imageUrl = ""; 
+
+      List<dynamic> albums = songData['albums'] ?? [];
+      
+      if (albums.isNotEmpty) {
+
+        int albumId = albums[0]['id'];
+
+        try {
+
+          final albumResponse = await http.get(
+            Uri.parse("$baseUrl/albums/$albumId?fields=MainPicture"),
+          );
+
+          if (albumResponse.statusCode == 200) {
+            var albumData = json.decode(albumResponse.body);
+
+            if (albumData['mainPicture'] != null) {
+              imageUrl = albumData['mainPicture']['urlOriginal'];
+            }
+          }
+        } catch (e) {
+          print("Error fetching album image for ID $albumId: $e");
+        }
+      }
+
+
+      if (imageUrl.isEmpty && songData['mainPicture'] != null) {
+        imageUrl = songData['mainPicture']['urlOriginal'];
+      }
+
+
+      return customSongList(
+        name: songData['defaultName'] ?? songData['name'],
+        artist: songData['artistString'],
+        image: imageUrl, 
+      );
+    }));
+
+    return songList;
+
+  } else {
+    throw Exception("Failed to load songs");
   }
+}
   
 
   Future<List<Albumslist>> fetchAlbum() async {
@@ -41,7 +79,7 @@ class TouhouDBService {
     if (response.statusCode == 200) {
       var data = json.decode(response.body);
       List<dynamic> items = data['items'];
-       // Assuming pvs is a list in the first item
+
       return items.map((item) {
         final albumData = item['album'];
         final List pvs = albumData['pvs'] ?? [];
@@ -64,7 +102,7 @@ class TouhouDBService {
           artist: artistName,
           image: imageUrl.isNotEmpty 
               ? imageUrl 
-              : "", // ใส่ URL รูป Default ถ้าไม่มีรูป
+              : "",
         );
       }).toList();
 
@@ -94,4 +132,64 @@ class TouhouDBService {
       throw Exception("Failed to load songs");
     }
   }
+//   Future<List<TopRatedSongList>> fetchTopRatedSongs() async {
+//   
+//   final response = await http.get(
+//     Uri.parse(
+//       "$baseUrl/songs?sort=RatingScore&maxResults=5&fields=Albums,MainPicture",
+//     ),
+//   );
+
+//   if (response.statusCode == 200) {
+//     var data = json.decode(response.body);
+//     List<dynamic> items = data['items'];
+
+//    
+//     List<TopRatedSongList> resultList = await Future.wait(items.map((song) async {
+      
+//      
+//       String imageUrl = "";
+//       if (song['mainPicture'] != null) {
+//         imageUrl = song['mainPicture']['urlThumb'] ?? "";
+//       }
+
+//     
+//       List<dynamic> albums = song['albums'] ?? [];
+
+//       if (albums.isNotEmpty) {
+//      
+//         int albumId = albums[0]['id'];
+
+//         try {
+//       
+//           final albumResponse = await http.get(
+//             Uri.parse("$baseUrl/albums/$albumId?fields=MainPicture"),
+//           );
+
+//           if (albumResponse.statusCode == 200) {
+//             var albumData = json.decode(albumResponse.body);
+//        
+//             if (albumData['mainPicture'] != null) {
+//               imageUrl = albumData['mainPicture']['urlOriginal']; // หรือ urlThumb ก็ได้
+//             }
+//           }
+//         } catch (e) {
+//           print("Error fetching album image for song ${song['name']}: $e");
+//         }
+//       }
+
+//     
+//       return TopRatedSongList(
+//         name: song['defaultName'] ?? song['name'] ?? "Unknown Song",
+//         artist: song['artistString'] ?? "Unknown Artist",
+//         image: imageUrl, 
+//       );
+//     }));
+
+//     return resultList;
+
+//   } else {
+//     throw Exception("Failed to load songs: ${response.statusCode}");
+//   }
+// }
 }

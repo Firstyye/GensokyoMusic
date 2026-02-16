@@ -15,6 +15,12 @@ class SongCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    ImageProvider imageProvider;
+    if( backgroundImage != null && backgroundImage!.startsWith('http')) {
+      imageProvider = NetworkImage(backgroundImage!);
+    } else {
+      imageProvider = AssetImage(backgroundImage ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg');
+    }
     return Container(
       margin: const EdgeInsets.only(right: 15.0),
       width: 150,
@@ -22,7 +28,7 @@ class SongCard extends StatelessWidget {
       decoration: BoxDecoration(
         image: DecorationImage(
           // ถ้าไม่มีการส่งรูปมา จะใช้รูป Default นี้แทน
-          image: AssetImage(backgroundImage ?? 'lib/pages/images/banner.jpg'),
+          image: imageProvider,
           fit: BoxFit.cover,
         ),
         color: Colors.grey.withOpacity(0.2),
