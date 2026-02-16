@@ -59,7 +59,58 @@ void showSuccess() {
           ),
         ).show(context);
 }
+ Future<User?> signInWithTwitter() async {
+    try {
+      final TwitterAuthProvider twitterProvider = TwitterAuthProvider();
+      await FirebaseAuth.instance.signInWithProvider(twitterProvider);
 
+      showSuccess();
+      Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+        );
+      
+      
+    } on FirebaseAuthException catch (e) {
+      QuickAlert.show(
+            context: context,
+            confirmBtnTextStyle: bodyTextStyle,
+            type: QuickAlertType.error,
+            showConfirmBtn: false,
+            title: 'Login Failed', 
+            text : "error code: ${e.code}\n${e.message}",
+            widget: Column(
+              children: [
+                const SizedBox(height: 20),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red, width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    foregroundColor: Colors.red, 
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 10,
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Okay',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          );
+      print("Error signing in with Twitter: $e");
+      return null;
+    } catch (e) {
+      print("Unexpected error signing in with Twitter: $e");
+      return null;
+    }
+  }
 Future<UserCredential?> signInWithFacebook() async {
     try{
       final LoginResult loginResult = await FacebookAuth.instance.login(
@@ -629,6 +680,7 @@ Future<UserCredential?> signInWithGoogle() async {
                             semanticsLabel: 'Facebook logo',
                           ),
                           _LoginButton(
+                            onpressed: signInWithTwitter,
                             icon: FontAwesomeIcons.twitter,
                             iconSize: 24,
                             iconColor: Colors.blue,

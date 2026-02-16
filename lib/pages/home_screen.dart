@@ -71,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 backgroundColor: Colors.blueAccent,
                 radius: 22,
                 child: CircleAvatar(
-                  backgroundImage: AssetImage('lib/pages/images/avatar.jpg'),
+                  backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : AssetImage('lib/pages/images/avatar.jpg'),
                   radius: 20,
                 ),
               ),

@@ -59,5 +59,20 @@ class AuthService {
 
     }
   }
+  
+  Future<User?> signInWithTwitter() async {
+    try {
+      final TwitterAuthProvider twitterProvider = TwitterAuthProvider();
+      final UserCredential userCredential =
+          await _auth.signInWithProvider(twitterProvider);
+      return userCredential.user;
+    } on FirebaseAuthException catch (e) {
+      print("Error signing in with Twitter: $e");
+      return null;
+    } catch (e) {
+      print("Unexpected error signing in with Twitter: $e");
+      return null;
+    }
+  }
 
 }

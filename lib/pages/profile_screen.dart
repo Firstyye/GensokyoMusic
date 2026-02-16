@@ -244,7 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     : darkModeBackgroundColor,
                                 child: CircleAvatar(
                                   radius: 100,
-                                  backgroundImage: AssetImage(
+                                  backgroundImage: (user?.photoURL != null) ? NetworkImage(user!.photoURL!) : AssetImage(
                                     'lib/pages/images/avatar.jpg',
                                   ),
                                 ),
