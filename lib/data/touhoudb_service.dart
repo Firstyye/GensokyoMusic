@@ -15,7 +15,7 @@ class TouhouDBService {
       ),
     );
     if (response.statusCode == 200) {
-      Map<String, dynamic> data = json.decode(response.body);
+      var data = json.decode(response.body);
       List<dynamic> items = data['items'];
       return items
           .map(
@@ -39,7 +39,7 @@ class TouhouDBService {
       ),
     );
     if (response.statusCode == 200) {
-      Map<String, dynamic> data = json.decode(response.body);
+      var data = json.decode(response.body);
       List<dynamic> items = data['items'];
        // Assuming pvs is a list in the first item
       return items.map((item) {
@@ -79,7 +79,7 @@ class TouhouDBService {
       ),
     );
     if (response.statusCode == 200) {
-      Map<String, dynamic> data = json.decode(response.body);
+      var data = json.decode(response.body);
       List<dynamic> items = data['items'];
       return items
           .map(
