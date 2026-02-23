@@ -1,0 +1,330 @@
+import 'package:delightful_toast/delight_toast.dart';
+import 'package:delightful_toast/toast/components/toast_card.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:quickalert/quickalert.dart';
+import 'package:yo/constant/my_constant.dart';
+import '../components/animated_bg.dart';
+
+class ForgetPasswordScreen extends StatefulWidget {
+  const ForgetPasswordScreen({super.key});
+
+  @override
+  State<ForgetPasswordScreen> createState() => _ForgetPasswordScreenState();
+}
+
+class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
+  final TextEditingController _emailController = TextEditingController();
+
+  Future<void> sendPasswordResetEmail() async {
+    final email = _emailController.text.trim();
+
+    if (email.isEmpty) {
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.error,
+        title: 'Reset Failed',
+        text: 'Please enter your email address.',
+        showConfirmBtn: false,
+        widget: Column(
+          children: [
+            const SizedBox(height: 20),
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red, width: 2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                foregroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 10,
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text(
+                'Okay',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+
+      if (!mounted) return;
+      DelightToastBar(
+        snackbarDuration: Duration(seconds: 4),
+        autoDismiss: true,
+        builder: (context) => ToastCard(
+          color: Colors.green,
+          title: Text(
+            "Password reset link sent to your email!",
+            style: bodyTextStyle.copyWith(color: Colors.white, fontSize: 14),
+          ),
+          leading: Icon(
+            FontAwesomeIcons.circleCheck,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+      ).show(context);
+
+      // Go back to login screen after 3 seconds
+      Future.delayed(Duration(seconds: 3), () {
+        if (mounted) Navigator.pop(context);
+      });
+    } on FirebaseAuthException catch (e) {
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.error,
+        title: 'Reset Failed',
+        text: e.message ?? 'An unknown error occurred.',
+        showConfirmBtn: false,
+        widget: Column(
+          children: [
+            const SizedBox(height: 20),
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red, width: 2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                foregroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 10,
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text(
+                'Okay',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: Builder(
+          builder: (BuildContext context) {
+            return IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.blueAccent,
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+            );
+          },
+        ),
+      ),
+      body: AnimatedBackground(
+        child: Center(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 40.0,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.65), // Frosted glass effect
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.5),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.blueAccent.withOpacity(0.05),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SafeArea(
+                        bottom: false,
+                        child: Flexible(
+                          child: FractionallySizedBox(
+                            widthFactor: 0.9,
+                            child: Image(
+                              image: AssetImage('assets/images/forgetpass.png'),
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+
+                      Text(
+                        "Reset Password",
+                        style: headerTextStyle.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 24,
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        "Enter the email associated with your account\nand we'll send an email with instructions\nto reset your password.",
+                        textAlign: TextAlign.center,
+                        style: bodyTextStyle.copyWith(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.grey.withOpacity(0.9),
+                          height: 1.5,
+                        ),
+                      ),
+                      SizedBox(height: 40),
+
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8.0,
+                          vertical: 10.0,
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.blueAccent.withOpacity(0.08),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: TextField(
+                            controller: _emailController,
+                            style: bodyTextStyle.copyWith(fontSize: 14),
+                            decoration: InputDecoration(
+                              floatingLabelStyle: TextStyle(
+                                color: Colors.blueAccent,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: 20,
+                                horizontal: 20,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide(
+                                  color: Colors.blueAccent.withOpacity(0.5),
+                                  width: 1.5,
+                                ),
+                              ),
+                              fillColor: Colors.white,
+                              filled: true,
+                              prefixIcon: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12.0,
+                                ),
+                                child: Icon(
+                                  Icons.email_outlined,
+                                  color: Colors.blueAccent.withOpacity(0.8),
+                                ),
+                              ),
+                              labelText: "Email",
+                              labelStyle: bodyTextStyle.copyWith(
+                                fontSize: 14,
+                                color: Colors.grey.withOpacity(0.7),
+                              ),
+                            ),
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                        ),
+                      ),
+
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8.0,
+                          vertical: 25.0,
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(15),
+                            gradient: LinearGradient(
+                              colors: [Colors.blueAccent, Colors.lightBlue],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.blueAccent.withOpacity(0.4),
+                                spreadRadius: 1,
+                                blurRadius: 8,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton(
+                            onPressed: () {
+                              sendPasswordResetEmail();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: Size(double.infinity, 55),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              backgroundColor:
+                                  Colors.transparent, // Let gradient show
+                              shadowColor:
+                                  Colors.transparent, // Disable default shadow
+                              foregroundColor: Colors.white,
+                            ),
+                            child: Text(
+                              "SEND RESET LINK",
+                              style: bodyTextStyle.copyWith(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
