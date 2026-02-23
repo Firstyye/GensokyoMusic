@@ -10,7 +10,6 @@ import '../pages/forgetpass.dart';
 import '../pages/introscreen.dart';
 import '../components/animated_bg.dart';
 import 'package:delightful_toast/delight_toast.dart';
-import 'package:quickalert/quickalert.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:yo/data/authService.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
@@ -47,83 +46,52 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // 1. เพิ่มการ Initialize ใน initState
-    @override
-    void showSuccess() {
-      return DelightToastBar(
-        snackbarDuration: Duration(seconds: 4),
-        autoDismiss: true,
-        builder: (context) => ToastCard(
-          color: Colors.green,
-          title: Text(
-            "Login Successful",
-            style: bodyTextStyle.copyWith(color: Colors.white),
-          ),
-
-          leading: Icon(
-            FontAwesomeIcons.circleCheck,
+  void showGlassToast(String message, {bool isError = true}) {
+    DelightToastBar(
+      snackbarDuration: const Duration(seconds: 4),
+      builder: (context) => ToastCard(
+        color: isError
+            ? Colors.redAccent.withValues(alpha: 0.9)
+            : Colors.green.withValues(alpha: 0.9),
+        title: Text(
+          message,
+          style: bodyTextStyle.copyWith(
             color: Colors.white,
-            size: 20,
-          ),
-          trailing: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Icon(Icons.swipe_left, size: 20, color: Colors.white),
+            fontWeight: FontWeight.bold,
           ),
         ),
-      ).show(context);
-    }
+        leading: Icon(
+          isError
+              ? FontAwesomeIcons.circleExclamation
+              : FontAwesomeIcons.circleCheck,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
+    ).show(context);
+  }
 
+  @override
+  Widget build(BuildContext context) {
     Future<User?> signInWithTwitter() async {
       try {
         final TwitterAuthProvider twitterProvider = TwitterAuthProvider();
         await FirebaseAuth.instance.signInWithProvider(twitterProvider);
 
-        showSuccess();
+        showGlassToast("Login Successful", isError: false);
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => HomeScreen()),
         );
       } on FirebaseAuthException catch (e) {
-        QuickAlert.show(
-          context: context,
-          confirmBtnTextStyle: bodyTextStyle,
-          type: QuickAlertType.error,
-          showConfirmBtn: false,
-          title: 'Login Failed',
-          text: "error code: ${e.code}\n${e.message}",
-          widget: Column(
-            children: [
-              const SizedBox(height: 20),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red, width: 2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  foregroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 10,
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: const Text(
-                  'Okay',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
+        showGlassToast(
+          "Twitter Login Failed: \n${e.message ?? 'Unknown error'}",
         );
-        print("Error signing in with Twitter: $e");
         return null;
       } catch (e) {
-        print("Unexpected error signing in with Twitter: $e");
+        showGlassToast("Unexpected error occurred.");
         return null;
       }
+      return null;
     }
 
     Future<UserCredential?> signInWithFacebook() async {
@@ -131,6 +99,12 @@ class _LoginScreenState extends State<LoginScreen> {
         final LoginResult loginResult = await FacebookAuth.instance.login(
           permissions: ['public_profile', 'email'],
         );
+
+        if (loginResult.status == LoginStatus.cancelled) {
+          showGlassToast("Facebook login cancelled.");
+          return null;
+        }
+
         final OAuthCredential facebookAuthCredential =
             FacebookAuthProvider.credential(
               loginResult.accessToken!.tokenString,
@@ -139,54 +113,21 @@ class _LoginScreenState extends State<LoginScreen> {
         await FirebaseAuth.instance.signInWithCredential(
           facebookAuthCredential,
         );
-        showSuccess();
+        showGlassToast("Login Successful", isError: false);
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => HomeScreen()),
         );
       } on FirebaseAuthException catch (e) {
-        QuickAlert.show(
-          context: context,
-          confirmBtnTextStyle: bodyTextStyle,
-          type: QuickAlertType.error,
-          showConfirmBtn: false,
-          title: 'Login Failed',
-          text: e.code == "account-exists-with-different-credential"
-              ? "An account already exists with the same email address but different sign-in credentials. Please use a different sign-in method."
-              : e.message ??
-                    "An error occurred during GitHub sign-in. Please try again.",
-          widget: Column(
-            children: [
-              const SizedBox(height: 20),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red, width: 2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  foregroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 10,
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: const Text(
-                  'Okay',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        );
-
-        print("Error signing in with Facebook: $e");
+        final message = e.code == "account-exists-with-different-credential"
+            ? "An account already exists with the same email but different sign-in credentials."
+            : e.message ?? "An error occurred during Facebook sign-in.";
+        showGlassToast("Facebook Login Failed: \n$message");
         return null;
       } catch (e) {
-        print("Unexpected error signing in with Facebook: $e");
+        showGlassToast("Unexpected error occurred.");
         return null;
       }
+      return null;
     }
 
     Future<UserCredential?> signInWithGithub() async {
@@ -194,52 +135,19 @@ class _LoginScreenState extends State<LoginScreen> {
         GithubAuthProvider githubProvider = GithubAuthProvider();
         githubProvider.addScope('user:email');
         await FirebaseAuth.instance.signInWithProvider(githubProvider);
-        showSuccess();
+        showGlassToast("Login Successful", isError: false);
         _handleLoginSuccess();
       } on FirebaseAuthException catch (e) {
-        QuickAlert.show(
-          context: context,
-          confirmBtnTextStyle: bodyTextStyle,
-          type: QuickAlertType.error,
-          showConfirmBtn: false,
-          title: 'Login Failed',
-          text: e.code == "account-exists-with-different-credential"
-              ? "An account already exists with the same email address but different sign-in credentials. Please use a different sign-in method."
-              : e.message ??
-                    "An error occurred during GitHub sign-in. Please try again.",
-          widget: Column(
-            children: [
-              const SizedBox(height: 20),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red, width: 2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  foregroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 10,
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: const Text(
-                  'Okay',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        );
-        // print('Firebase Auth Error: ${e.message}');
-
+        final message = e.code == "account-exists-with-different-credential"
+            ? "An account already exists with the same email but different sign-in credentials."
+            : e.message ?? "An error occurred during GitHub sign-in.";
+        showGlassToast("GitHub Login Failed: \n$message");
         return null;
       } catch (e) {
-        // print('Error: $e');
+        showGlassToast("Unexpected error occurred.");
         return null;
       }
+      return null;
     }
 
     Future<UserCredential?> signInWithGoogle() async {
@@ -248,6 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final GoogleSignInAccount? googleUser = await _googleSignIn
             .authenticate();
         if (googleUser == null) {
+          showGlassToast("Google login cancelled.");
           return null;
         }
 
@@ -257,146 +166,59 @@ class _LoginScreenState extends State<LoginScreen> {
         final credential = GoogleAuthProvider.credential(
           idToken: googleAuth.idToken,
         );
-        await FirebaseAuth.instance.signInWithCredential(credential);
-        DelightToastBar(
-          snackbarDuration: Duration(seconds: 4),
-          autoDismiss: true,
-          builder: (context) => ToastCard(
-            color: Colors.green,
-            title: Text(
-              "Login Successful",
-              style: bodyTextStyle.copyWith(color: Colors.white),
-            ),
+        UserCredential userCredential = await FirebaseAuth.instance
+            .signInWithCredential(credential);
 
-            leading: Icon(
-              FontAwesomeIcons.circleCheck,
-              color: Colors.white,
-              size: 20,
-            ),
-            trailing: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Icon(Icons.swipe_left, size: 20, color: Colors.white),
-            ),
-          ),
-        ).show(context);
-
-        Duration(seconds: 5);
+        showGlassToast("Login Successful", isError: false);
+        await Future.delayed(const Duration(seconds: 2));
         _handleLoginSuccess();
+        return userCredential;
       } on FirebaseAuthException catch (e) {
-        // print('Firebase Auth Error: ${e.message}');
+        showGlassToast(
+          "Google Login Failed: \n${e.message ?? 'Unknown error'}",
+        );
         return null;
       } catch (e) {
-        // print('Error: $e');
+        showGlassToast("Unexpected error occurred.");
         return null;
       }
     }
 
     Future<void> signinWithEmailAndPassword() async {
+      if (_emailController.text.trim().isEmpty) {
+        showGlassToast("Please enter your email.");
+        return;
+      }
+      if (_passwordController.text.trim().isEmpty) {
+        showGlassToast("Please enter your password.");
+        return;
+      }
+
       try {
-        final credential = await FirebaseAuth.instance
-            .signInWithEmailAndPassword(
-              email: _emailController.text,
-              password: _passwordController.text,
-            );
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
 
-        Duration(seconds: 2);
-        DelightToastBar(
-          snackbarDuration: Duration(seconds: 4),
-          autoDismiss: true,
-          builder: (context) => ToastCard(
-            color: Colors.green,
-            title: Text(
-              "Login Successful",
-              style: bodyTextStyle.copyWith(color: Colors.white),
-            ),
-
-            leading: Icon(
-              FontAwesomeIcons.circleCheck,
-              color: Colors.white,
-              size: 20,
-            ),
-            trailing: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Icon(Icons.swipe_left, size: 20, color: Colors.white),
-            ),
-          ),
-        ).show(context);
-        // print("show toast");
-        Duration(seconds: 5);
+        showGlassToast("Login Successful", isError: false);
+        await Future.delayed(const Duration(seconds: 2));
         _handleLoginSuccess();
       } on FirebaseAuthException catch (e) {
-        // print('Failed with error code: ${e.code}');
-        // print(e.message);
         if (e.code == "invalid-email") {
-          QuickAlert.show(
-            context: context,
-            confirmBtnTextStyle: bodyTextStyle,
-            type: QuickAlertType.error,
-            showConfirmBtn: false,
-            title: 'Login Failed',
-            text: "Invalid email format. Please enter a valid email address.",
-            widget: Column(
-              children: [
-                const SizedBox(height: 20),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red, width: 2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    foregroundColor: Colors.red,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 30,
-                      vertical: 10,
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: const Text(
-                    'Okay',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          );
-          print("no user found for that email");
-        } else if (e.code == 'invalid-credential') {
-          QuickAlert.show(
-            context: context,
-            type: QuickAlertType.error,
-            showConfirmBtn: false,
-            title: 'Login Failed',
-            text: 'Wrong password. Please try again.',
-            widget: Column(
-              children: [
-                const SizedBox(height: 20),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red, width: 2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    foregroundColor: Colors.red,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 30,
-                      vertical: 10,
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: const Text(
-                    'Okay',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          );
-          print("wrong password for that user");
+          showGlassToast("Invalid email format. Please try again.");
+        } else if (e.code == 'invalid-credential' ||
+            e.code == 'wrong-password' ||
+            e.code == 'user-not-found') {
+          showGlassToast("Incorrect email or password.");
+        } else if (e.code == 'user-disabled') {
+          showGlassToast("This account has been disabled.");
+        } else if (e.code == 'too-many-requests') {
+          showGlassToast("Too many attempts. Please try again later.");
+        } else {
+          showGlassToast(e.message ?? "An error occurred during login.");
         }
+      } catch (e) {
+        showGlassToast("An unexpected error occurred.");
       }
     }
 

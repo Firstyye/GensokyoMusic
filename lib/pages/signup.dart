@@ -6,9 +6,12 @@ import 'package:delightful_toast/toast/components/toast_card.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:yo/pages/home_screen.dart';
 import 'package:delightful_toast/delight_toast.dart';
-import 'package:quickalert/quickalert.dart';
 import 'package:yo/pages/loginscreen.dart';
 import '../components/animated_bg.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../pages/introscreen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -24,139 +27,201 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _confirmpasswordController =
       TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
-  Future<void> createUserWithEmailAndPassword() async {
-    try {
-      final credential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: _emailController.text,
-            password: _passwordController.text,
-          );
-      if (!mounted) return;
-      DelightToastBar(
-        snackbarDuration: Duration(seconds: 4),
-        autoDismiss: true,
-        builder: (context) => ToastCard(
-          color: Colors.green,
-          title: Text(
-            "Register Successful",
-            style: bodyTextStyle.copyWith(color: Colors.white),
-          ),
+  Future<void> _handleLoginSuccess() async {
+    final prefs = await SharedPreferences.getInstance();
+    bool seen = prefs.getBool('seen') ?? false;
 
-          leading: Icon(
-            FontAwesomeIcons.circleCheck,
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-      ).show(context);
-      FirebaseAuth.instance.currentUser!.updateDisplayName(
-        _usernameController.text,
+    if (!mounted) return;
+
+    if (seen) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
-      FirebaseAuth.instance.signOut();
-      await Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (context) => LoginScreen()));
-    } on FirebaseAuthException catch (e) {
-      if (e.code == "weak-password") {
-        QuickAlert.show(
-          context: context,
-          confirmBtnTextStyle: bodyTextStyle,
-          type: QuickAlertType.error,
-          title: 'Register Failed',
-          text: 'Password is too weak',
-          showConfirmBtn: false,
-          widget: Column(
-            children: [
-              const SizedBox(height: 20),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red, width: 2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  foregroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 10,
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: const Text(
-                  'Okay',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        );
-        print("weak password");
-      } else if (e.code == "email-already-in-use") {
-        QuickAlert.show(
-          context: context,
-          type: QuickAlertType.error,
-          confirmBtnTextStyle: bodyTextStyle,
-          title: 'Register Failed',
-          text: 'Email is already in use',
-          showConfirmBtn: false,
-          widget: Column(
-            children: [
-              const SizedBox(height: 20),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red, width: 2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  foregroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 10,
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: const Text(
-                  'Okay',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        );
-        print("email already in use");
-      }
-    } catch (e) {
-      print(e);
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const IntroScreen()),
+      );
     }
   }
 
-  void _showMyDialog(String txtMsg) async {
-    return showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Expanded(
-          child: AlertDialog(
-            backgroundColor: Colors.blueAccent.shade100,
-            title: const Text('Register Failed'),
-            content: Text(txtMsg),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.pop(context, 'Cancel'),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, 'OK'),
-                child: const Text('OK'),
-              ),
-            ],
+  void showGlassToast(String message, {bool isError = true}) {
+    DelightToastBar(
+      snackbarDuration: const Duration(seconds: 4),
+      builder: (context) => ToastCard(
+        color: isError
+            ? Colors.redAccent.withValues(alpha: 0.9)
+            : Colors.green.withValues(alpha: 0.9),
+        title: Text(
+          message,
+          style: bodyTextStyle.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
           ),
+        ),
+        leading: Icon(
+          isError
+              ? FontAwesomeIcons.circleExclamation
+              : FontAwesomeIcons.circleCheck,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
+    ).show(context);
+  }
+
+  Future<User?> signInWithTwitter() async {
+    try {
+      final TwitterAuthProvider twitterProvider = TwitterAuthProvider();
+      await FirebaseAuth.instance.signInWithProvider(twitterProvider);
+
+      showGlassToast("Login Successful", isError: false);
+      _handleLoginSuccess();
+    } on FirebaseAuthException catch (e) {
+      showGlassToast("Twitter Login Failed: \n${e.message ?? 'Unknown error'}");
+      return null;
+    } catch (e) {
+      showGlassToast("Unexpected error occurred.");
+      return null;
+    }
+    return null;
+  }
+
+  Future<UserCredential?> signInWithFacebook() async {
+    try {
+      final LoginResult loginResult = await FacebookAuth.instance.login(
+        permissions: ['public_profile', 'email'],
+      );
+
+      if (loginResult.status == LoginStatus.cancelled) {
+        showGlassToast("Facebook login cancelled.");
+        return null;
+      }
+
+      final OAuthCredential facebookAuthCredential =
+          FacebookAuthProvider.credential(loginResult.accessToken!.tokenString);
+
+      await FirebaseAuth.instance.signInWithCredential(facebookAuthCredential);
+      showGlassToast("Login Successful", isError: false);
+      _handleLoginSuccess();
+    } on FirebaseAuthException catch (e) {
+      final message = e.code == "account-exists-with-different-credential"
+          ? "An account already exists with the same email but different sign-in credentials."
+          : e.message ?? "An error occurred during Facebook sign-in.";
+      showGlassToast("Facebook Login Failed: \n$message");
+      return null;
+    } catch (e) {
+      showGlassToast("Unexpected error occurred.");
+      return null;
+    }
+    return null;
+  }
+
+  Future<UserCredential?> signInWithGithub() async {
+    try {
+      GithubAuthProvider githubProvider = GithubAuthProvider();
+      githubProvider.addScope('user:email');
+      await FirebaseAuth.instance.signInWithProvider(githubProvider);
+      showGlassToast("Login Successful", isError: false);
+      _handleLoginSuccess();
+    } on FirebaseAuthException catch (e) {
+      final message = e.code == "account-exists-with-different-credential"
+          ? "An account already exists with the same email but different sign-in credentials."
+          : e.message ?? "An error occurred during GitHub sign-in.";
+      showGlassToast("GitHub Login Failed: \n$message");
+      return null;
+    } catch (e) {
+      showGlassToast("Unexpected error occurred.");
+      return null;
+    }
+    return null;
+  }
+
+  Future<UserCredential?> signInWithGoogle() async {
+    try {
+      _googleSignIn.initialize();
+      final GoogleSignInAccount? googleUser = await _googleSignIn
+          .authenticate();
+      if (googleUser == null) {
+        showGlassToast("Google login cancelled.");
+        return null;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+      );
+      UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithCredential(credential);
+      showGlassToast("Login Successful", isError: false);
+
+      await Future.delayed(const Duration(seconds: 2));
+      _handleLoginSuccess();
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      showGlassToast("Google Login Failed: \n${e.message ?? 'Unknown error'}");
+      return null;
+    } catch (e) {
+      showGlassToast("Unexpected error occurred.");
+      return null;
+    }
+  }
+
+  Future<void> createUserWithEmailAndPassword() async {
+    if (_usernameController.text.trim().isEmpty) {
+      showGlassToast("Please enter a username.");
+      return;
+    }
+    if (_emailController.text.trim().isEmpty) {
+      showGlassToast("Please enter an email address.");
+      return;
+    }
+    if (_passwordController.text.isEmpty ||
+        _confirmpasswordController.text.isEmpty) {
+      showGlassToast("Please fill out both password fields.");
+      return;
+    }
+    if (_passwordController.text != _confirmpasswordController.text) {
+      showGlassToast("Passwords do not match.");
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (!mounted) return;
+      showGlassToast("Register Successful", isError: false);
+
+      FirebaseAuth.instance.currentUser!.updateDisplayName(
+        _usernameController.text.trim(),
+      );
+      FirebaseAuth.instance.signOut();
+
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (e.code == "weak-password") {
+        showGlassToast(
+          "Your password is too weak. Please use at least 6 characters.",
         );
-      },
-    );
+      } else if (e.code == "email-already-in-use") {
+        showGlassToast("An account already exists for that email.");
+      } else if (e.code == "invalid-email") {
+        showGlassToast("Invalid email format. Please try again.");
+      } else {
+        showGlassToast(e.message ?? "An error occurred during registration.");
+      }
+    } catch (e) {
+      showGlassToast("An unexpected error occurred.");
+    }
   }
 
   @override
@@ -283,136 +348,6 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                           child: ElevatedButton(
                             onPressed: () {
-                              if (_usernameController.text.isEmpty) {
-                                QuickAlert.show(
-                                  context: context,
-                                  type: QuickAlertType.error,
-                                  title: 'Register Failed',
-                                  text: 'Invalid Username',
-                                  showConfirmBtn: false,
-                                  widget: Column(
-                                    children: [
-                                      const SizedBox(height: 20),
-                                      OutlinedButton(
-                                        style: OutlinedButton.styleFrom(
-                                          side: const BorderSide(
-                                            color: Colors.red,
-                                            width: 2,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
-                                          ),
-                                          foregroundColor: Colors.red,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 30,
-                                            vertical: 10,
-                                          ),
-                                        ),
-                                        onPressed: () {
-                                          Navigator.pop(context);
-                                        },
-                                        child: const Text(
-                                          'Okay',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                print("Invalid Username");
-                              } else if (_emailController.text.isEmpty) {
-                                QuickAlert.show(
-                                  context: context,
-                                  type: QuickAlertType.error,
-                                  title: 'Register Failed',
-                                  text: 'Invalid Email',
-                                  showConfirmBtn: false,
-                                  widget: Column(
-                                    children: [
-                                      const SizedBox(height: 20),
-                                      OutlinedButton(
-                                        style: OutlinedButton.styleFrom(
-                                          side: const BorderSide(
-                                            color: Colors.red,
-                                            width: 2,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
-                                          ),
-                                          foregroundColor: Colors.red,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 30,
-                                            vertical: 10,
-                                          ),
-                                        ),
-                                        onPressed: () {
-                                          Navigator.pop(context);
-                                        },
-                                        child: const Text(
-                                          'Okay',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                print("Invalid Email");
-                              } else if (_passwordController.text !=
-                                      _confirmpasswordController.text ||
-                                  _passwordController.text.isEmpty) {
-                                QuickAlert.show(
-                                  context: context,
-                                  type: QuickAlertType.error,
-                                  title: 'Register Failed',
-                                  text: 'Password does not match',
-                                  showConfirmBtn: false,
-                                  widget: Column(
-                                    children: [
-                                      const SizedBox(height: 20),
-                                      OutlinedButton(
-                                        style: OutlinedButton.styleFrom(
-                                          side: const BorderSide(
-                                            color: Colors.red,
-                                            width: 2,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
-                                          ),
-                                          foregroundColor: Colors.red,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 30,
-                                            vertical: 10,
-                                          ),
-                                        ),
-                                        onPressed: () {
-                                          Navigator.pop(context);
-                                        },
-                                        child: const Text(
-                                          'Okay',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                print("password does not match");
-                                return;
-                              }
                               createUserWithEmailAndPassword();
                             },
                             style: ElevatedButton.styleFrom(
@@ -495,12 +430,14 @@ class _SignupScreenState extends State<SignupScreen> {
                           _LoginButton(
                             assetPath: "assets/icons/android_neutral_rd_na.svg",
                             semanticsLabel: 'Google logo',
+                            onTap: signInWithGoogle,
                           ),
                           SizedBox(width: 15),
                           _LoginButton(
                             icon: FontAwesomeIcons.github,
                             iconSize: 28,
                             semanticsLabel: 'Github logo',
+                            onTap: signInWithGithub,
                           ),
                           SizedBox(width: 15),
                           _LoginButton(
@@ -508,6 +445,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             iconSize: 28,
                             iconColor: Colors.blue[700],
                             semanticsLabel: 'Facebook logo',
+                            onTap: signInWithFacebook,
                           ),
                           SizedBox(width: 15),
                           _LoginButton(
@@ -515,6 +453,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             iconSize: 28,
                             iconColor: Colors.lightBlue,
                             semanticsLabel: 'Twitter logo',
+                            onTap: signInWithTwitter,
                           ),
                         ],
                       ),
@@ -537,6 +476,8 @@ class _LoginButton extends StatelessWidget {
   final IconData? icon;
   final double? iconSize;
   final Color? iconColor;
+  final VoidCallback? onTap;
+
   const _LoginButton({
     super.key,
     this.assetPath,
@@ -544,6 +485,7 @@ class _LoginButton extends StatelessWidget {
     this.icon,
     this.iconSize,
     this.iconColor,
+    this.onTap,
   });
 
   @override
@@ -565,7 +507,7 @@ class _LoginButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           customBorder: CircleBorder(),
-          onTap: () {},
+          onTap: onTap,
           child: Container(
             width: 60,
             height: 60,

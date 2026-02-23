@@ -3,7 +3,6 @@ import 'package:delightful_toast/toast/components/toast_card.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:quickalert/quickalert.dart';
 import 'package:yo/constant/my_constant.dart';
 import '../components/animated_bg.dart';
 
@@ -16,43 +15,36 @@ class ForgetPasswordScreen extends StatefulWidget {
 
 class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
   final TextEditingController _emailController = TextEditingController();
+  void showGlassToast(String message, {bool isError = true}) {
+    DelightToastBar(
+      snackbarDuration: const Duration(seconds: 4),
+      builder: (context) => ToastCard(
+        color: isError
+            ? Colors.redAccent.withValues(alpha: 0.9)
+            : Colors.green.withValues(alpha: 0.9),
+        title: Text(
+          message,
+          style: bodyTextStyle.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        leading: Icon(
+          isError
+              ? FontAwesomeIcons.circleExclamation
+              : FontAwesomeIcons.circleCheck,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
+    ).show(context);
+  }
 
   Future<void> sendPasswordResetEmail() async {
     final email = _emailController.text.trim();
 
     if (email.isEmpty) {
-      QuickAlert.show(
-        context: context,
-        type: QuickAlertType.error,
-        title: 'Reset Failed',
-        text: 'Please enter your email address.',
-        showConfirmBtn: false,
-        widget: Column(
-          children: [
-            const SizedBox(height: 20),
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red, width: 2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                foregroundColor: Colors.red,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 30,
-                  vertical: 10,
-                ),
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text(
-                'Okay',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-      );
+      showGlassToast("Please enter your email address.");
       return;
     }
 
@@ -60,60 +52,22 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
 
       if (!mounted) return;
-      DelightToastBar(
-        snackbarDuration: Duration(seconds: 4),
-        autoDismiss: true,
-        builder: (context) => ToastCard(
-          color: Colors.green,
-          title: Text(
-            "Password reset link sent to your email!",
-            style: bodyTextStyle.copyWith(color: Colors.white, fontSize: 14),
-          ),
-          leading: Icon(
-            FontAwesomeIcons.circleCheck,
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-      ).show(context);
+      showGlassToast("Password reset link sent to your email!", isError: false);
 
       // Go back to login screen after 3 seconds
-      Future.delayed(Duration(seconds: 3), () {
+      Future.delayed(const Duration(seconds: 3), () {
         if (mounted) Navigator.pop(context);
       });
     } on FirebaseAuthException catch (e) {
-      QuickAlert.show(
-        context: context,
-        type: QuickAlertType.error,
-        title: 'Reset Failed',
-        text: e.message ?? 'An unknown error occurred.',
-        showConfirmBtn: false,
-        widget: Column(
-          children: [
-            const SizedBox(height: 20),
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red, width: 2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                foregroundColor: Colors.red,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 30,
-                  vertical: 10,
-                ),
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text(
-                'Okay',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-      );
+      if (e.code == "invalid-email") {
+        showGlassToast("Invalid email format. Please try again.");
+      } else if (e.code == "user-not-found") {
+        showGlassToast("No user found for that email.");
+      } else {
+        showGlassToast("Failed: ${e.message ?? 'An unknown error occurred.'}");
+      }
+    } catch (e) {
+      showGlassToast("An unexpected error occurred.");
     }
   }
 
