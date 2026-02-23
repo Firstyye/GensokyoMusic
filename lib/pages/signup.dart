@@ -29,6 +29,49 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
+  double _passwordStrength = 0.0;
+  String _strengthLabel = '';
+  Color _strengthColor = Colors.transparent;
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(() {
+      _checkPasswordStrength(_passwordController.text);
+    });
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmpasswordController.dispose();
+    _usernameController.dispose();
+    super.dispose();
+  }
+
+  void _checkPasswordStrength(String password) {
+    setState(() {
+      if (password.isEmpty) {
+        _passwordStrength = 0.0;
+        _strengthLabel = '';
+        _strengthColor = Colors.transparent;
+      } else if (password.length < 6) {
+        _passwordStrength = 0.33;
+        _strengthLabel = 'Weak';
+        _strengthColor = Colors.redAccent;
+      } else if (password.length < 8 || !password.contains(RegExp(r'[0-9]'))) {
+        _passwordStrength = 0.66;
+        _strengthLabel = 'Medium';
+        _strengthColor = Colors.orangeAccent;
+      } else {
+        _passwordStrength = 1.0;
+        _strengthLabel = 'Strong';
+        _strengthColor = Colors.greenAccent;
+      }
+    });
+  }
+
   Future<void> _handleLoginSuccess() async {
     final prefs = await SharedPreferences.getInstance();
     bool seen = prefs.getBool('seen') ?? false;
@@ -316,12 +359,98 @@ class _SignupScreenState extends State<SignupScreen> {
                         isPassword: true,
                         icon: Icons.lock_outline,
                       ),
+
                       _BuildTextField(
                         controller: _confirmpasswordController,
                         labelText: "Confirm Password",
                         isObscureText: true,
                         isPassword: true,
                         icon: Icons.lock_reset_outlined,
+                      ),
+
+                      // Password Strength Indicator
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeInOut,
+                        child: _passwordController.text.isNotEmpty
+                            ? Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 8.0,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          "Password Strength",
+                                          style: bodyTextStyle.copyWith(
+                                            fontSize: 10,
+                                            color: Colors.grey.shade600,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        AnimatedOpacity(
+                                          opacity: _passwordStrength > 0
+                                              ? 1.0
+                                              : 0.0,
+                                          duration: const Duration(
+                                            milliseconds: 300,
+                                          ),
+                                          child: Text(
+                                            _strengthLabel,
+                                            style: bodyTextStyle.copyWith(
+                                              fontSize: 10,
+                                              color: _strengthColor,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Stack(
+                                      children: [
+                                        Container(
+                                          height: 4,
+                                          width: double.infinity,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.withValues(
+                                              alpha: 0.2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              2,
+                                            ),
+                                          ),
+                                        ),
+                                        AnimatedContainer(
+                                          duration: const Duration(
+                                            milliseconds: 300,
+                                          ),
+                                          curve: Curves.easeOutCubic,
+                                          height: 4,
+                                          width:
+                                              MediaQuery.of(
+                                                context,
+                                              ).size.width *
+                                              0.7 *
+                                              _passwordStrength,
+                                          decoration: BoxDecoration(
+                                            color: _strengthColor,
+                                            borderRadius: BorderRadius.circular(
+                                              2,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : const SizedBox.shrink(),
                       ),
 
                       Padding(
