@@ -48,7 +48,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void showGlassToast(String message, {bool isError = true}) {
     DelightToastBar(
-      snackbarDuration: const Duration(seconds: 4),
+      snackbarDuration: const Duration(seconds: 2),
+      autoDismiss: true,
       builder: (context) => ToastCard(
         color: isError
             ? Colors.redAccent.withValues(alpha: 0.9)
