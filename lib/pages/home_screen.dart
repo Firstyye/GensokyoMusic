@@ -194,7 +194,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               final songs = snapshot.data!;
                               return Row(
                                 children: songs.map((song) {
-                                  int viewcount = 426+songs.indexOf(song)*16;
+                                  int viewcount = 556-songs.indexOf(song)*16;
                                   return SongCard(
                                     title: song.name,
                                     viewerCount: viewcount.toString(),
