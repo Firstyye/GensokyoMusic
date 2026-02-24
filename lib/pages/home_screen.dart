@@ -1,380 +1,407 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:yo/pages/loginscreen.dart';
+
+import 'dart:ui';
 import '../constant/my_constant.dart';
-import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:mobkit_dashed_border/mobkit_dashed_border.dart';
-import '../constant/my_constant.dart';
-import '../pages/profile_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../widgets/_buildSongMenu.dart';
-import '../widgets/_FeatureBanner.dart';
-import '../widgets/_buildMiniPlayer.dart';
-import '../widgets/_SongCard.dart';
+// NEW WIDGET IMPORTS
+import '../widgets/modern_song_list_tile.dart';
+import '../widgets/modern_feature_banner.dart';
+import '../widgets/modern_song_card.dart';
+
 import 'package:yo/data/touhoudb_service.dart';
 import 'package:yo/data/customSongsList.dart';
 import 'package:yo/data/albumsList.dart';
 import 'package:yo/data/toprateSong.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
-  const HomeScreen({super.key});
 }
 
 class _HomeScreenState extends State<HomeScreen> {
   final user = FirebaseAuth.instance.currentUser;
-  bool isSwitched = true;
-  int _selectedIndex = 0;
   final TouhouDBService _service = TouhouDBService();
   late Future<List<customSongList>> _songsFuture;
   late Future<List<Albumslist>> _albumsFuture;
   late Future<List<TopRatedSongList>> _topRatedSongsFuture;
-  bool isLoading = true;
+  int _selectedChip = 0;
+
+  final List<String> _chipLabels = [
+    'All',
+    'Touhou',
+    'Rock',
+    'Jazz',
+    'Electronic',
+    'Vocal',
+  ];
+
   @override
   void initState() {
     super.initState();
     _songsFuture = _service.fetchSongs();
     _albumsFuture = _service.fetchAlbum();
     _topRatedSongsFuture = _service.fetchTopRatedSongs();
-    isLoading = false;
-  }
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-      switch (index) {
-        case 3:
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (context) => ProfileScreen()));
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        scrolledUnderElevation: 0.0,
-        shape: Border(
-          bottom: BorderSide(color: Colors.grey.withOpacity(0.2), width: 1.0),
-        ),
-        leadingWidth: 200,
-        leading: Row(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 8.0),
-              child: CircleAvatar(
-                backgroundColor: Colors.blueAccent,
-                radius: 22,
-                child: CircleAvatar(
-                  backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : AssetImage('lib/pages/images/avatar.jpg'),
-                  radius: 20,
-                ),
-              ),
-            ),
-            SizedBox(width: 5.0),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.only(
-                      left: 5,
-                      right: 5,
-                      top: 2,
-                      bottom: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.blueAccent, width: 1),
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'MEMBER',
-                      style: bodyTextStyle.copyWith(
-                        fontSize: 8,
-                        color: Colors.blueAccent,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    overflow: TextOverflow.ellipsis,
-                    user?.displayName ?? 'Cirno, The Fairy',
-                    style: bodyTextStyle.copyWith(fontSize: 16),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          CircleAvatar(
-            backgroundColor: Colors.grey.withOpacity(0.2),
-            radius: 20,
-            child: Icon(Icons.search, color: Colors.blue, size: 24.0),
-          ),
-          SizedBox(width: 16.0),
-
-          GestureDetector(
-            onTap: () async {
-              await FirebaseAuth.instance.signOut();
-              await GoogleSignIn.instance.signOut();
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (context) => LoginScreen()));
-            },
-            child: CircleAvatar(
-              backgroundColor: Colors.grey.withOpacity(0.2),
-              radius: 20,
-              child: Icon(Icons.exit_to_app, color: dangerColor, size: 24.0),
-            ),
-          ),
-          SizedBox(width: 16.0),
-        ],
-      ),
-
-      body: Stack(
+      backgroundColor: Colors
+          .transparent, // Let the AnimatedBackground pass through, but child elements will be darker
+      body: ListView(
+        padding: EdgeInsets.only(top: kToolbarHeight + 16, bottom: 140),
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20.0, 20.0, 20.0, 0.0),
-            child: Stack(
-              children: [
-                ListView(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              'Live Parties',
-                              style: headerTextStyle.copyWith(fontSize: 20),
-                            ),
-                            SizedBox(width: 5),
-                            Icon(
-                              Icons.play_circle_fill,
-                              color: Colors.red,
-                              size: 30,
-                            ),
-                          ],
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey.withOpacity(0.2),
-                            elevation: 0,
-                            shadowColor: Colors.transparent,
-                          ),
-                          onPressed: () {},
-                          child: Text(
-                            'View All',
-                            style: bodyTextStyle.copyWith(color: Colors.blue),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Padding(
-                        padding: EdgeInsets.only(top: 20.0, bottom: 20),
-                        child: Row(
-                          children: [
-                            FutureBuilder(future: _songsFuture, builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return Center(child: CircularProgressIndicator());
-                              } else if (snapshot.hasError) {
-                                return Text("Error loading songs");
-                              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                                return Text("No songs found");
-                              }
-                              final songs = snapshot.data!;
-                              return Row(
-                                children: songs.map((song) {
-                                  int viewcount = 556-songs.indexOf(song)*16;
-                                  return SongCard(
-                                    title: song.name,
-                                    viewerCount: viewcount.toString(),
-                                    backgroundImage: song.image,
-                                  );
-                                }).toList(),
-                              );
-                            }),
+          const SizedBox(height: 24),
 
-                            Container(
-                              alignment: Alignment.center,
-                              margin: EdgeInsets.only(right: 15.0),
-                              width: 150,
-                              height: 150,
-                              decoration: BoxDecoration(
-                                border: DashedBorder.all(
-                                  dashLength: 5,
-                                  color: Colors.blueAccent,
-                                ),
-                                color: Colors.grey.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Stack(
-                                    children: [
-                                      CircleAvatar(
-                                        backgroundColor: Colors.blueAccent
-                                            .withOpacity(0.2),
-                                        radius: 20,
-                                        child: Icon(
-                                          CupertinoIcons.sparkles,
-                                          color: Colors.blueAccent,
-                                          size: 20,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: 10),
-                                  Text(
-                                    'Start a Party',
-                                    style: bodyTextStyle.copyWith(
-                                      color: Colors.blueAccent,
-                                      fontWeight: FontWeight.w300,
-                                    ),
-                                  ),
-                                  Text(
-                                    "(Tap here)",
-                                    style: bodyTextStyle.copyWith(
-                                      fontSize: 10,
-                                      color: Colors.black.withOpacity(0.35),
-                                      fontWeight: FontWeight.w100,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          "Feature Circle",
-                          style: headerTextStyle.copyWith(fontSize: 20),
-                        ),
-                        SizedBox(width: 5),
-                        Icon(
-                          CupertinoIcons.sparkles,
-                          color: Colors.blueAccent,
-                          size: 30,
-                        ),
-                      ],
-                    ),
-                    FutureBuilder(
-                      future: _albumsFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return Center(child: CircularProgressIndicator());
-                        } else if (snapshot.hasError) {
-                          return Text("Error loading albums");
-                        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return Text("No albums found");
-                        }
-                        final albums = snapshot.data!;
+          // ─── QUICK CHIPS ───
+          _buildChips()
+              .animate()
+              .fade(duration: 400.ms, delay: 100.ms)
+              .slideX(begin: 0.05),
 
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: albums.map((album) {
-                              return FeatureBanner(
-                                titlename: album.name,
-                                circlename: album.artist,
-                                buttonname: "NEW ALBUM",
-                                backgroundimage: album.image,
-                              );
-                            }).toList(),
-                          ),
-                        );
-                      },
-                    ),
+          const SizedBox(height: 36),
 
-                    Row(
-                      children: [
-                        Text(
-                          "Top 5 in Gensokyo's Radio",
-                          style: headerTextStyle.copyWith(fontSize: 20),
-                        ),
-                        SizedBox(width: 5),
-                        Icon(
-                          Icons.emoji_events,
-                          color: Colors.amberAccent,
-                          size: 30,
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 20),
-                    FutureBuilder(future: _topRatedSongsFuture, builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(child: CircularProgressIndicator());
-                      } else if (snapshot.hasError) {
-                        return Text("Error loading songs");
-                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return Text("No songs found");
-                      }
-                      final songs = snapshot.data!;
-                      return Column(
-                        children: songs.map((song) {
-                          String index = (songs.indexOf(song) + 1).toString();
-                          
-                          return SongMenu(
-                            title: song.name,
-                            artist: song.artist,
-                            image: song.image,
-                            number: index,
-                          );
-                        }).toList(),
-                      );
-                    }),
-                    Padding(padding: EdgeInsets.only(bottom: 95)),
-                  ],
+          // ─── LIVE PARTIES ───
+          _buildSectionTitle(
+            'Live Parties',
+            Icons.play_circle_fill,
+            dangerDarkColor,
+          ).animate().fade(duration: 400.ms, delay: 150.ms).slideX(begin: 0.05),
+          const SizedBox(height: 16),
+          _buildLiveParties()
+              .animate()
+              .fade(duration: 500.ms, delay: 200.ms)
+              .slideY(begin: 0.08),
+
+          const SizedBox(height: 48),
+
+          // ─── FEATURE CIRCLE ───
+          _buildSectionTitle(
+            'Feature Circle',
+            CupertinoIcons.sparkles,
+            cyanAccent,
+          ).animate().fade(duration: 400.ms, delay: 300.ms).slideX(begin: 0.05),
+          const SizedBox(height: 16),
+          _buildFeatureCircle()
+              .animate()
+              .fade(duration: 500.ms, delay: 350.ms)
+              .slideY(begin: 0.08),
+
+          const SizedBox(height: 48),
+
+          // ─── TOP 5 SONGS ───
+          _buildSectionTitle(
+            "Top 5 in Gensokyo's Radio",
+            Icons.emoji_events,
+            Colors.amberAccent,
+          ).animate().fade(duration: 400.ms, delay: 450.ms).slideX(begin: 0.05),
+          const SizedBox(height: 16),
+          _buildTopSongs()
+              .animate()
+              .fade(duration: 500.ms, delay: 500.ms)
+              .slideY(begin: 0.08),
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════
+  //  CHIPS
+  // ══════════════════════════════════════════
+  Widget _buildChips() {
+    return SizedBox(
+      height: 40,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _chipLabels.length,
+        itemBuilder: (context, index) {
+          final isSelected = _selectedChip == index;
+          return Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedChip = index),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
                 ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? darkThemeTextColor
+                      : darkThemeSecondaryColor.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: isSelected
+                        ? darkThemeTextColor
+                        : Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _chipLabels[index],
+                  style: bodyTextStyle.copyWith(
+                    color: isSelected
+                        ? darkModeBackgroundColor
+                        : darkThemeTextColor,
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
-                Positioned(bottom: 20, left: 0, right: 0, child: MiniPlayer()),
-              ],
+  // ══════════════════════════════════════════
+  //  SECTION TITLE
+  // ══════════════════════════════════════════
+  Widget _buildSectionTitle(String title, IconData icon, Color iconColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 26),
+          const SizedBox(width: 10),
+          Text(
+            title,
+            style: headerTextStyle.copyWith(
+              color: darkThemeTextColor,
+              fontSize: 22,
             ),
           ),
         ],
       ),
+    );
+  }
 
-      bottomNavigationBar: CurvedNavigationBar(
-        height: 75,
-        index: _selectedIndex,
-        backgroundColor: Colors.transparent,
-        color: isSwitched ? Colors.blueAccent : darkThemeColor,
-        onTap: _onItemTapped,
-        items: [
-          Icon(
-            Icons.home,
-            size: 30,
-            color: isSwitched ? Colors.white : bottomNavigationBarIcon,
+  // ══════════════════════════════════════════
+  //  LIVE PARTIES
+  // ══════════════════════════════════════════
+  Widget _buildLiveParties() {
+    return SizedBox(
+      height: 200, // Adjusted for the taller ModernSongCard profile
+      child: FutureBuilder<List<customSongList>>(
+        future: _songsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return _buildShimmerRow(height: 200, width: 140);
+          } else if (snapshot.hasError ||
+              !snapshot.hasData ||
+              snapshot.data!.isEmpty) {
+            return Center(
+              child: Text(
+                'No live parties',
+                style: bodyTextStyle.copyWith(color: Colors.grey),
+              ),
+            );
+          }
+          final songs = snapshot.data!;
+          return ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: songs.length + 1,
+            itemBuilder: (context, index) {
+              if (index == songs.length) {
+                return _buildStartPartyCard();
+              }
+              final song = songs[index];
+              int viewcount = 556 - index * 16;
+              return ModernSongCard(
+                title: song.name,
+                viewerCount: viewcount.toString(),
+                imageUrl: song.image,
+                onTap: () {},
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildStartPartyCard() {
+    return Container(
+      alignment: Alignment.center,
+      margin: const EdgeInsets.only(right: 16),
+      width: 140,
+      height: 140, // Match the square aspect ratio of ModernSongCard's image
+      decoration: BoxDecoration(
+        border: DashedBorder.all(
+          dashLength: 6,
+          color: darkThemeTextColor.withValues(alpha: 0.4),
+        ),
+        color: darkThemeSecondaryColor.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            backgroundColor: darkThemeTextColor.withValues(alpha: 0.1),
+            radius: 24,
+            child: Icon(
+              CupertinoIcons.sparkles,
+              color: darkThemeTextColor,
+              size: 24,
+            ),
           ),
-          Icon(
-            Icons.search,
-            size: 30,
-            color: isSwitched ? Colors.white : bottomNavigationBarIcon,
-          ),
-          Icon(
-            Icons.play_circle_fill,
-            size: 30,
-            color: isSwitched ? Colors.white : bottomNavigationBarIcon,
-          ),
-          Icon(
-            Icons.people,
-            size: 30,
-            color: isSwitched ? Colors.white : bottomNavigationBarIcon,
+          const SizedBox(height: 12),
+          Text(
+            'Start Party',
+            style: bodyTextStyle.copyWith(
+              color: darkThemeTextColor,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════
+  //  FEATURE CIRCLE
+  // ══════════════════════════════════════════
+  Widget _buildFeatureCircle() {
+    return FutureBuilder<List<Albumslist>>(
+      future: _albumsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildShimmerRow(height: 200, width: 340);
+        } else if (snapshot.hasError ||
+            !snapshot.hasData ||
+            snapshot.data!.isEmpty) {
+          return Center(
+            child: Text(
+              'No albums found',
+              style: bodyTextStyle.copyWith(color: Colors.grey),
+            ),
+          );
+        }
+        final albums = snapshot.data!;
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: albums.map((album) {
+              return ModernFeatureBanner(
+                title: album.name,
+                subtitle: album.artist,
+                badgeText: "NEW ALBUM",
+                imageUrl: album.image,
+                onPlay: () {},
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  // ══════════════════════════════════════════
+  //  TOP 5 SONGS
+  // ══════════════════════════════════════════
+  Widget _buildTopSongs() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 0,
+      ), // ModernSongListTile has its own padding
+      child: FutureBuilder<List<TopRatedSongList>>(
+        future: _topRatedSongsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return _buildShimmerList();
+          } else if (snapshot.hasError ||
+              !snapshot.hasData ||
+              snapshot.data!.isEmpty) {
+            return Center(
+              child: Text(
+                'No songs found',
+                style: bodyTextStyle.copyWith(color: Colors.grey),
+              ),
+            );
+          }
+          final songs = snapshot.data!;
+          return Column(
+            children: songs.asMap().entries.map((entry) {
+              final index = entry.key;
+              final song = entry.value;
+              return ModernSongListTile(
+                    title: song.name,
+                    artist: song.artist,
+                    imageUrl: song.image,
+                    indexNumber: (index + 1).toString(),
+                    onTap: () {},
+                  )
+                  .animate()
+                  .fade(duration: 300.ms, delay: (550 + index * 80).ms)
+                  .slideX(begin: 0.05);
+            }).toList(),
+          );
+        },
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════
+  //  SHIMMER PLACEHOLDERS
+  // ══════════════════════════════════════════
+  Widget _buildShimmerRow({required double height, required double width}) {
+    return SizedBox(
+      height: height,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: 4,
+        itemBuilder: (_, __) =>
+            Container(
+                  width: width,
+                  height: height,
+                  margin: const EdgeInsets.only(right: 16),
+                  decoration: BoxDecoration(
+                    color: darkThemeSecondaryColor,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                )
+                .animate(onPlay: (c) => c.repeat())
+                .shimmer(
+                  duration: 1200.ms,
+                  color: Colors.white.withValues(alpha: 0.05),
+                ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerList() {
+    return Column(
+      children: List.generate(
+        5,
+        (_) =>
+            Container(
+                  height: 72, // Match ModernSongListTile rough height
+                  margin: const EdgeInsets.only(bottom: 8, left: 16, right: 16),
+                  decoration: BoxDecoration(
+                    color: darkThemeSecondaryColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                )
+                .animate(onPlay: (c) => c.repeat())
+                .shimmer(
+                  duration: 1200.ms,
+                  color: Colors.white.withValues(alpha: 0.05),
+                ),
       ),
     );
   }

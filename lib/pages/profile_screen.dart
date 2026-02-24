@@ -1,11 +1,13 @@
-import 'package:curved_navigation_bar/curved_navigation_bar.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:yo/pages/loginscreen.dart';
+import 'dart:ui';
+import '../pages/loginscreen.dart';
 import '../constant/my_constant.dart';
-import '../widgets/_buildMenuItem.dart';
-import '../pages/home_screen.dart';
+
+// NEW WIDGET IMPORTS
+import '../widgets/modern_settings_tile.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,15 +18,12 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final user = FirebaseAuth.instance.currentUser;
-  bool isSwitched = true;
-  int _selectedIndex = 3;
-  String _getUserEmail() {
+  bool isSwitched = true; // Still tracking theme for future if needed
 
+  String _getUserEmail() {
     if (user?.email != null && user!.email!.isNotEmpty) {
       return user!.email!;
     }
-
- 
     if (user?.providerData != null) {
       for (var profile in user!.providerData) {
         if (profile.email != null && profile.email!.isNotEmpty) {
@@ -32,422 +31,410 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     }
-
-    
     return 'Cirno_Gensokyo@gmail.com';
-  }
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-      switch (index) {
-        case 0:
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (context) => HomeScreen()));
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    // 1. Get screen width to make dynamic decisions if needed
-    double screenWidth = MediaQuery.of(context).size.width;
-
     return Scaffold(
-      backgroundColor: isSwitched ? backgroundColor : darkModeBackgroundColor,
+      backgroundColor: Colors.transparent, // AnimatedBackground pass through
+      body: ListView(
+        padding: const EdgeInsets.only(top: 0, bottom: 140),
+        children: [
+          // ─── PROFILE HEADER WITH GRADIENT ───
+          _buildProfileHeader(),
 
-      appBar: AppBar(
-        scrolledUnderElevation: 0.0,
-        backgroundColor: isSwitched ? backgroundColor : darkModeBackgroundColor,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16.0),
-          child: CircleAvatar(
-            backgroundColor: Colors.grey.withOpacity(0.2),
-            radius: 20,
-            child: Icon(
-              Icons.arrow_back_ios_outlined,
-              color: isSwitched ? Colors.blueAccent : darkThemeColor,
-              size: 24,
+          const SizedBox(height: 24),
+
+          // ─── STATS ROW ───
+          _buildStatsRow()
+              .animate()
+              .fade(duration: 400.ms, delay: 200.ms)
+              .slideY(begin: 0.08),
+
+          const SizedBox(height: 32),
+
+          // ─── ACTION BUTTONS ───
+          _buildActionButtons()
+              .animate()
+              .fade(duration: 400.ms, delay: 300.ms)
+              .slideY(begin: 0.08),
+
+          const SizedBox(height: 40),
+
+          // ─── SETTINGS MENU ───
+          _buildSettingsMenu()
+              .animate()
+              .fade(duration: 500.ms, delay: 400.ms)
+              .slideY(begin: 0.1),
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════
+  //  PROFILE HEADER
+  // ══════════════════════════════════════════
+  Widget _buildProfileHeader() {
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        // Banner image with Deep Midnight gradient overlay
+        SizedBox(
+          height: 280, // Increased from 220 to prevent text cutoff
+          width: double.infinity,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset('lib/pages/images/banner.jpg', fit: BoxFit.cover),
+              // Gradient overlay matching Deep Midnight theme
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      darkModeBackgroundColor.withValues(alpha: 0.2),
+                      darkModeBackgroundColor.withValues(alpha: 0.8),
+                      darkModeBackgroundColor, // Solid at the bottom to blend with Scaffold
+                    ],
+                    stops: const [0.0, 0.6, 1.0],
+                  ),
+                ),
+              ),
+              // Blur effect
+              ClipRRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+                  child: Container(color: Colors.transparent),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Content overlaid on the banner
+        Padding(
+          padding: EdgeInsets.only(
+            top:
+                MediaQuery.of(context).padding.top + 32, // Pushed down slightly
+          ),
+          child: Column(
+            children: [
+              // Avatar with Light Blue glow ring
+              Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: cyanAccent.withValues(
+                            alpha: 0.4,
+                          ), // Using new Light Blue accent
+                          blurRadius: 36,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 56,
+                      backgroundColor: darkThemeSecondaryColor,
+                      child: CircleAvatar(
+                        radius: 52,
+                        backgroundImage: (user?.photoURL != null)
+                            ? NetworkImage(user!.photoURL!)
+                            : const AssetImage('lib/pages/images/avatar.jpg')
+                                  as ImageProvider,
+                      ),
+                    ),
+                  )
+                  .animate()
+                  .fade(duration: 500.ms)
+                  .scale(
+                    begin: const Offset(0.8, 0.8),
+                    duration: 500.ms,
+                    curve: Curves.easeOutBack,
+                  ),
+
+              const SizedBox(height: 16),
+
+              // Name
+              Text(
+                user?.displayName ?? 'Cirno, The Fairy',
+                style: headerTextStyle.copyWith(
+                  color: darkThemeTextColor,
+                  fontSize: 28,
+                  letterSpacing: -0.5,
+                ),
+              ).animate().fade(duration: 400.ms, delay: 100.ms),
+
+              const SizedBox(height: 4),
+
+              // Email
+              Text(
+                _getUserEmail(),
+                style: bodyTextStyle.copyWith(
+                  color: darkThemeTextColor.withValues(
+                    alpha: 0.8,
+                  ), // Better contrast for Light Blue theme
+                  fontSize: 14,
+                ),
+              ).animate().fade(duration: 400.ms, delay: 150.ms),
+
+              const SizedBox(height: 8),
+
+              // Join date
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.calendar_month_rounded,
+                    size: 14,
+                    color: cyanAccent, // Light Blue accent icon
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Joined 5 January 2023',
+                    style: bodyTextStyle.copyWith(
+                      color: darkThemeTextColor.withValues(alpha: 0.7),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ).animate().fade(duration: 400.ms, delay: 180.ms),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ══════════════════════════════════════════
+  //  STATS ROW
+  // ══════════════════════════════════════════
+  Widget _buildStatsRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: darkThemeSecondaryColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.4),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildStatItem('1.2K', 'Followers'),
+            _buildDivider(),
+            _buildStatItem('345', 'Following'),
+            _buildDivider(),
+            _buildStatItem('12', 'Playlists'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String value, String label) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: headerTextStyle.copyWith(
+            color: darkThemeTextColor,
+            fontSize: 22,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: bodyTextStyle.copyWith(
+            color: darkThemeTextColor.withValues(alpha: 0.6),
+            fontSize: 12,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(
+      height: 32,
+      width: 1,
+      color: Colors.white.withValues(alpha: 0.1),
+    );
+  }
+
+  // ══════════════════════════════════════════
+  //  ACTION BUTTONS
+  // ══════════════════════════════════════════
+  Widget _buildActionButtons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildActionBtn(
+              icon: Icons.edit_rounded,
+              label: 'Edit Profile',
+              color: cyanAccent,
+              textColor: Colors.black,
+              onTap: () {},
             ),
           ),
-        ),
-        title: Text(
-          'Profile',
-          style: bodyTextStyle.copyWith(
-            color: isSwitched ? Colors.black : darkThemeTextColor,
-            fontSize: 24,
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildActionBtn(
+              icon: Icons.share_rounded,
+              label: 'Share',
+              color: Colors.transparent,
+              textColor: darkThemeTextColor,
+              outlined: true,
+              onTap: () {},
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionBtn({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required Color textColor,
+    bool outlined = false,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(24), // Pill shape for modern look
+          border: Border.all(
+            color: outlined
+                ? Colors.white.withValues(alpha: 0.2)
+                : Colors.transparent,
+            width: 1.5,
           ),
         ),
-        centerTitle: true,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: CircleAvatar(
-              backgroundColor: Colors.grey.withOpacity(0.2),
-              radius: 20,
-              child: Icon(
-                Icons.notifications_active_rounded,
-                color: isSwitched ? Colors.blueAccent : darkThemeColor,
-                size: 24,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: textColor),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: bodyTextStyle.copyWith(
+                color: textColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
 
-      // 2. Wrap in SingleChildScrollView to prevent overflow on small screens
-      body: SingleChildScrollView(
-        child: Center(
-          // 3. ConstrainedBox ensures it doesn't get too wide on tablets/web
-          // but shrinks to fit on mobile.
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                // Profile Picture Stack
-                SizedBox(
-                  height: 250,
-                  width: double.infinity,
-                  child: Stack(
-                    alignment: Alignment.bottomCenter,
-                    children: [
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: 160,
-                        child: GestureDetector(
-                          onTap: () {
-                            print("Show Banner");
-                            showDialog(
-                              context: context,
-                              builder: (context) => GestureDetector(
-                                onTap: () {
-                                  Navigator.of(context).pop();
-                                },
-                                child: Dialog(
-                                  backgroundColor: Colors.transparent,
-                                  elevation: 0,
-                                  child: Container(
-                                    padding: EdgeInsets.all(5),
-
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(10),
-                                      color: isSwitched
-                                          ? backgroundColor
-                                          : darkThemeColor,
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: Image.asset(
-                                        'lib/pages/images/banner.jpg',
-                                        fit: BoxFit.contain,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.blueAccent,
-                              image: DecorationImage(
-                                image: AssetImage(
-                                  'lib/pages/images/banner.jpg',
-                                ),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      Positioned(
-                        top: 10,
-                        left: 10,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            padding: EdgeInsets.all(10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            backgroundColor: Colors.transparent,
-                          ),
-                          onPressed: () {
-                            // showDialog(context: context, builder: (context) => Dialog(
-                            //   backgroundColor: backgroundColor,
-                            //   shape: RoundedRectangleBorder(
-                            //     borderRadius: BorderRadius.circular(10),
-                            //   ),
-                            //   child: Padding(
-                            //     padding: const EdgeInsets.all(8.0),
-                            //     child: Column(
-                            //       crossAxisAlignment: CrossAxisAlignment.center,
-                            //       mainAxisSize: MainAxisSize.min,
-                            //       mainAxisAlignment: MainAxisAlignment.center,
-                            //       children: [
-                            //         Text('Change Banner', style: bodyTextStyle.copyWith(
-                            //           color: const Color.fromARGB(255, 0, 0, 0),
-                            //           fontSize: screenWidth >= 600 ? 16 : screenWidth < 600 && screenWidth >= 400 ? 12 : 10,
-                            //         ),),
-
-                            //       ],
-                            //       ),
-                            //   ),
-                            // ));
-                          },
-
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.palette_outlined,
-                                  color: isSwitched
-                                      ? Colors.blueAccent
-                                      : darkThemeColor,
-                                ),
-                                SizedBox(width: 5),
-                                Text(
-                                  "Edit Banner",
-                                  style: bodyTextStyle.copyWith(
-                                    color: Colors.white,
-                                    fontSize: screenWidth >= 600
-                                        ? 16
-                                        : screenWidth < 600 &&
-                                              screenWidth >= 400
-                                        ? 12
-                                        : 10,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      Positioned(
-                        bottom: 0,
-                        child: Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 110,
-                              backgroundColor: isSwitched
-                                  ? Colors.blueAccent
-                                  : darkThemeColor,
-                              child: CircleAvatar(
-                                radius: 105,
-                                backgroundColor: isSwitched
-                                    ? backgroundColor
-                                    : darkModeBackgroundColor,
-                                child: CircleAvatar(
-                                  radius: 100,
-                                  backgroundImage: (user?.photoURL != null) ? NetworkImage(user!.photoURL!) : AssetImage(
-                                    'lib/pages/images/avatar.jpg',
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            Positioned(
-                              bottom: 5,
-                              right: 5,
-                              child: CircleAvatar(
-                                radius: 30,
-                                backgroundColor: isSwitched
-                                    ? lightBackgroundColor
-                                    : darkThemeColor,
-                                child: Icon(
-                                  Icons.edit,
-                                  color: isSwitched
-                                      ? Colors.white
-                                      : Colors.black,
-                                  size: 30,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                Text(
-                  user?.displayName ?? 'Cirno, The Fairy',
-                  style: headerTextStyle.copyWith(
-                    color: isSwitched ? Colors.black : darkThemeTextColor,
-                    fontSize: 30,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                const SizedBox(height: 5),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.calendar_month,
-                      size: 24,
-                      color: isSwitched ? Colors.black : darkThemeTextColor,
-                    ),
-                    SizedBox(width: 5),
-                    Text(
-                      'Joined since : 5 January 2023',
-                      style: bodyTextStyle.copyWith(
-                        color: isSwitched ? Colors.black : darkThemeTextColor,
-                        fontWeight: FontWeight.w100,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Email Button
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    shadowColor: Colors.transparent,
-                    side: BorderSide(
-                      color: isSwitched
-                          ? Color.fromRGBO(45, 146, 208, 1)
-                          : darkThemeColor,
-                    ),
-                    backgroundColor: isSwitched
-                        ? const Color.fromARGB(255, 214, 235, 255)
-                        : darkElevatedButtonColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  onPressed: () {},
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      _getUserEmail(),
-                      style: bodyTextStyle.copyWith(
-                        color: isSwitched
-                            ? const Color.fromRGBO(45, 146, 208, 1)
-                            : darkElevatedButtonTextColor,
-                        // Make font smaller on very small screens if needed
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 25),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Text("Settings"),
-                      // Divider(color: Colors.blueAccent),
-                      // Top Item (Rounded Top)
-                      MenuItemWidget(
-                        icon: Icons.edit,
-                        text: "Edit Profile",
-                        isTop: true,
-                        isSwitched: isSwitched,
-                      ),
-
-                      // Middle Items (No Rounded Corners)
-                      MenuItemWidget(
-                        icon: Icons.lock,
-                        text: "Add Pin",
-                        isSwitched: isSwitched,
-                      ),
-                      MenuItemWidget(
-                        icon: Icons.settings,
-                        text: "Settings",
-                        isSwitched: isSwitched,
-                      ),
-
-                      MenuItemWidget(
-                        icon: Icons.group_add_sharp,
-                        text: "Invite a friend",
-                        isSwitched: isSwitched,
-                      ),
-                      MenuItemWidget(
-                        icon: Icons.help,
-                        text: "Help & Support",
-                        isSwitched: isSwitched,
-                      ),
-                      MenuItemWidget(
-                        icon: isSwitched ? Icons.light_mode : Icons.dark_mode,
-                        text: "Change Theme",
-                        isChangeTheme: true,
-                        isSwitched: isSwitched,
-                        onThemeChanged: (value) {
-                          setState(() {
-                            isSwitched = value;
-                          });
-                        },
-                      ),
-
-                      // Bottom Item (Rounded Bottom + Logout Color)\
-                      MenuItemWidget(
-                        icon: Icons.logout,
-                        text: "Logout",
-                        isBottom: true,
-                        isDestructive: true,
-                        isSwitched: isSwitched,
-                        onTap: () async {
-                          await FirebaseAuth.instance.signOut();
-                          await GoogleSignIn.instance.signOut();
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => LoginScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Extra space at bottom for scrolling
-                const SizedBox(height: 30),
-              ],
+  // ══════════════════════════════════════════
+  //  SETTINGS MENU
+  // ══════════════════════════════════════════
+  Widget _buildSettingsMenu() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        decoration: BoxDecoration(
+          color: darkThemeSecondaryColor,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Column(
+            children: [
+              ModernSettingsTile(
+                icon: Icons.person_outline_rounded,
+                title: "Account Details",
+                onTap: () {},
+              ),
+              _menuDivider(),
+              ModernSettingsTile(
+                icon: Icons.lock_outline_rounded,
+                title: "Privacy & Security",
+                onTap: () {},
+              ),
+              _menuDivider(),
+              ModernSettingsTile(
+                icon: Icons.palette_outlined,
+                title: "Appearance",
+                onTap: () {},
+                trailing: Switch(
+                  value: isSwitched,
+                  onChanged: (val) {
+                    setState(() => isSwitched = val);
+                  },
+                  activeColor: cyanAccent,
+                  activeTrackColor: cyanAccent.withValues(alpha: 0.3),
+                ),
+              ),
+              _menuDivider(),
+              ModernSettingsTile(
+                icon: Icons.notifications_none_rounded,
+                title: "Notifications",
+                onTap: () {},
+              ),
+              _menuDivider(),
+              ModernSettingsTile(
+                icon: Icons.help_outline_rounded,
+                title: "Help & Support",
+                onTap: () {},
+              ),
+              _menuDivider(),
+              ModernSettingsTile(
+                icon: Icons.logout_rounded,
+                title: "Log Out",
+                isDestructive: true,
+                onTap: () async {
+                  await FirebaseAuth.instance.signOut();
+                  await GoogleSignIn.instance.signOut();
+                  if (mounted) {
+                    Navigator.of(
+                      context,
+                    ).push(MaterialPageRoute(builder: (_) => LoginScreen()));
+                  }
+                },
+              ),
+            ],
           ),
         ),
       ),
-      bottomNavigationBar: CurvedNavigationBar(
-        height: 75,
-        index: _selectedIndex,
-        backgroundColor: Colors.transparent,
-        color: isSwitched ? Colors.blueAccent : darkThemeColor,
-        onTap: _onItemTapped,
-        items: [
-          Icon(
-            Icons.home,
-            size: 30,
-            color: isSwitched ? Colors.white : bottomNavigationBarIcon,
-          ),
-          Icon(
-            Icons.search,
-            size: 30,
-            color: isSwitched ? Colors.white : bottomNavigationBarIcon,
-          ),
-          Icon(
-            Icons.play_circle_fill,
-            size: 30,
-            color: isSwitched ? Colors.white : bottomNavigationBarIcon,
-          ),
-          Icon(
-            Icons.people,
-            size: 30,
-            color: isSwitched ? Colors.white : bottomNavigationBarIcon,
-          ),
-        ],
-      ),
+    );
+  }
+
+  Widget _menuDivider() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      height: 1,
+      color: Colors.white.withValues(alpha: 0.05),
     );
   }
 }

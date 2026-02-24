@@ -82,10 +82,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
         leading: Builder(
           builder: (BuildContext context) {
             return IconButton(
-              icon: const Icon(
-                Icons.arrow_back_ios_new,
-                color: Colors.blueAccent,
-              ),
+              icon: Icon(Icons.arrow_back_ios_new, color: cyanAccent),
               onPressed: () {
                 Navigator.of(context).pop();
               },
@@ -104,15 +101,17 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
               ),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.65), // Frosted glass effect
+                  color: darkThemeSecondaryColor.withValues(
+                    alpha: 0.8,
+                  ), // Frosted glass dark effect
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.1),
                     width: 1.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.blueAccent.withOpacity(0.05),
+                      color: cyanAccent.withValues(alpha: 0.05),
                       blurRadius: 20,
                       spreadRadius: 5,
                     ),
@@ -152,7 +151,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                         style: bodyTextStyle.copyWith(
                           fontSize: 13,
                           fontWeight: FontWeight.w400,
-                          color: Colors.grey.withOpacity(0.9),
+                          color: darkThemeColor,
                           height: 1.5,
                         ),
                       ),
@@ -165,11 +164,11 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                         ),
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: darkThemeSecondaryColor,
                             borderRadius: BorderRadius.circular(15),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.blueAccent.withOpacity(0.08),
+                                color: cyanAccent.withValues(alpha: 0.08),
                                 blurRadius: 12,
                                 spreadRadius: 2,
                                 offset: Offset(0, 4),
@@ -181,7 +180,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                             style: bodyTextStyle.copyWith(fontSize: 14),
                             decoration: InputDecoration(
                               floatingLabelStyle: TextStyle(
-                                color: Colors.blueAccent,
+                                color: cyanAccent,
                                 fontWeight: FontWeight.bold,
                               ),
                               contentPadding: EdgeInsets.symmetric(
@@ -195,11 +194,11 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(15),
                                 borderSide: BorderSide(
-                                  color: Colors.blueAccent.withOpacity(0.5),
+                                  color: cyanAccent.withValues(alpha: 0.5),
                                   width: 1.5,
                                 ),
                               ),
-                              fillColor: Colors.white,
+                              fillColor: darkThemeSecondaryColor,
                               filled: true,
                               prefixIcon: Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -207,7 +206,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                                 ),
                                 child: Icon(
                                   Icons.email_outlined,
-                                  color: Colors.blueAccent.withOpacity(0.8),
+                                  color: cyanAccent.withValues(alpha: 0.8),
                                 ),
                               ),
                               labelText: "Email",
@@ -230,13 +229,16 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(15),
                             gradient: LinearGradient(
-                              colors: [Colors.blueAccent, Colors.lightBlue],
+                              colors: [
+                                cyanAccent,
+                                cyanAccent.withValues(alpha: 0.8),
+                              ],
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.blueAccent.withOpacity(0.4),
+                                color: cyanAccent.withValues(alpha: 0.4),
                                 spreadRadius: 1,
                                 blurRadius: 8,
                                 offset: Offset(0, 4),

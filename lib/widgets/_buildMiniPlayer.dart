@@ -28,86 +28,83 @@ class _MiniPlayerState extends State<MiniPlayer> with TickerProviderStateMixin {
   }
 
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withOpacity(0.9), 
-              Colors.lightBlue.shade50.withOpacity(0.95),
-            ],
-          ),
-          borderRadius: BorderRadius.all(Radius.circular(12)),
-          border: Border.all(color: Colors.grey, width: 1),
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xff1C2541), // Deep Midnight / Navy Slate
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 1),
         ),
-        height: 70,
-        // สีขาวโปร่งแสง
-        child: Row(
-          children: [
-            const SizedBox(width: 16),
-            RotationTransition(
-              turns: _controller,
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('lib/pages/images/banner.jpg'),
-                    fit: BoxFit.fill,
-                  ),
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(colors: [Colors.cyan, Colors.blue]),
+      ),
+      height: 70,
+      // สีขาวโปร่งแสง
+      child: Row(
+        children: [
+          const SizedBox(width: 16),
+          RotationTransition(
+            turns: _controller,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage('lib/pages/images/banner.jpg'),
+                  fit: BoxFit.fill,
                 ),
-                child: const Icon(Icons.album, color: Colors.white),
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: [Colors.cyan, Colors.blue]),
               ),
+              child: const Icon(Icons.album, color: Colors.white),
             ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Beloved Tomboyish Girl",
-                    style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Beloved Tomboyish Girl",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontSize: 14,
                   ),
-                  Text(
-                    "Playing Now | 3:42/4:30",
-                    style: TextStyle(fontSize: 10, color: Colors.cyan),
-                  ),
-                ],
-              ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Text(
+                  "Playing Now | 3:42/4:30",
+                  style: TextStyle(fontSize: 12, color: Colors.white70),
+                ),
+              ],
             ),
-            IconButton(
-              onPressed: () {
-                setState(() {
-                  favorite = !favorite;
-                });
-              },
-              icon: Icon(
-                CupertinoIcons.heart_circle,
-                size: 40,
-                color: favorite ? dangerColor : primaryColor,
-              ),
+          ),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                favorite = !favorite;
+              });
+            },
+            icon: Icon(
+              CupertinoIcons.heart_circle,
+              size: 40,
+              color: favorite ? dangerColor : primaryColor,
             ),
-            IconButton(
-              onPressed: () {
-                setState(() {
-                  togglespin();
-                });
-              },
-              icon: Icon(
-                playpause ? Icons.play_circle_fill : Icons.pause_circle,
-                size: 40,
-                color: Colors.black,
-              ),
+          ),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                togglespin();
+              });
+            },
+            icon: Icon(
+              playpause ? Icons.play_arrow_rounded : Icons.pause_rounded,
+              size: 36,
+              color: Colors.white,
             ),
-            const SizedBox(width: 16),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
     );
   }

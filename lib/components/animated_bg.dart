@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:wave/config.dart';
 import 'package:wave/wave.dart';
+import '../constant/my_constant.dart'; // Import theme colors
 
 class AnimatedBackground extends StatefulWidget {
   final Widget child;
@@ -54,7 +55,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
       children: [
         // Base Color
         Container(
-          color: const Color(0xFFF5F9FF), // Very light clean blue/white base
+          color: darkModeBackgroundColor, // Deep Midnight Base
         ),
 
         // Animated Orb 1 (Top Left to Bottom Right)
@@ -69,7 +70,9 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
                 height: size.width * 0.8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.blueAccent.withOpacity(0.4), // Primary Blue
+                  color: cyanAccent.withValues(
+                    alpha: 0.15,
+                  ), // Subtle Light Blue
                 ),
               ),
             );
@@ -89,12 +92,9 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
                 height: size.width * 0.9,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color.fromARGB(
-                    255,
-                    131,
-                    176,
-                    255,
-                  ).withOpacity(0.5), // Lighter Blue
+                  color: darkElevatedButtonColor.withValues(
+                    alpha: 0.1,
+                  ), // Subtle Coral
                 ),
               ),
             );
@@ -113,12 +113,9 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
                 height: size.width * 0.6,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color.fromARGB(
-                    255,
-                    200,
-                    222,
-                    255,
-                  ).withOpacity(0.6), // Very light highlight
+                  color: cyanAccent.withValues(
+                    alpha: 0.08,
+                  ), // Very light highlight
                 ),
               ),
             );
@@ -130,7 +127,9 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
             child: Container(
-              color: Colors.white.withOpacity(0.1), // Adds a slight frost
+              color: darkThemeSecondaryColor.withValues(
+                alpha: 0.3,
+              ), // Dark frost
             ),
           ),
         ),
@@ -143,8 +142,8 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
           child: WaveWidget(
             config: CustomConfig(
               colors: [
-                Colors.blueAccent.withOpacity(0.2),
-                const Color.fromARGB(255, 193, 216, 255).withOpacity(0.4),
+                darkModeBackgroundColor.withValues(alpha: 0.5),
+                cyanAccent.withValues(alpha: 0.05),
               ],
               durations: [10000, 8000], // Slower waves
               heightPercentages: [0.65, 0.66],

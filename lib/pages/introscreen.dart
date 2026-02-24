@@ -32,12 +32,12 @@ class _IntroScreenState extends State<IntroScreen> {
         style: bodyTextStyle.copyWith(
           fontSize: 24,
           fontWeight: FontWeight.bold,
-          color: Colors.black87,
+          color: darkThemeTextColor,
         ),
       ),
       bodyWidget: Text(
         "Explore a vast library of Touhou arrangements. From jazz to metal, enjoy your favorite circles and tracks anytime, anywhere",
-        style: bodyTextStyle.copyWith(color: Colors.black54),
+        style: bodyTextStyle.copyWith(color: darkThemeColor),
         textAlign: TextAlign.center,
       ),
       image: Center(
@@ -58,12 +58,12 @@ class _IntroScreenState extends State<IntroScreen> {
         style: bodyTextStyle.copyWith(
           fontSize: 24,
           fontWeight: FontWeight.bold,
-          color: Colors.black87,
+          color: darkThemeTextColor,
         ),
       ),
       bodyWidget: Text(
         "You don't have to listen alone! Join the chat, share your favorite playlists, and make new friends within the global Touhou community.",
-        style: bodyTextStyle.copyWith(color: Colors.black54),
+        style: bodyTextStyle.copyWith(color: darkThemeColor),
         textAlign: TextAlign.center,
       ),
       image: Center(
@@ -84,12 +84,12 @@ class _IntroScreenState extends State<IntroScreen> {
         style: bodyTextStyle.copyWith(
           fontSize: 24,
           fontWeight: FontWeight.bold,
-          color: Colors.black87,
+          color: darkThemeTextColor,
         ),
       ),
       bodyWidget: Text(
         "Experience the \"Listen Along\" feature. Sync your music with friends perfectly and dance to the same rhythm at the exact same second.",
-        style: bodyTextStyle.copyWith(color: Colors.black54),
+        style: bodyTextStyle.copyWith(color: darkThemeColor),
         textAlign: TextAlign.center,
       ),
       image: Center(
@@ -124,7 +124,7 @@ class _IntroScreenState extends State<IntroScreen> {
                     child: Text(
                       "Skip",
                       style: bodyTextStyle.copyWith(
-                        color: Colors.blueAccent,
+                        color: cyanAccent,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -147,8 +147,8 @@ class _IntroScreenState extends State<IntroScreen> {
                   showNextButton: false,
                   showDoneButton: false,
                   dotsDecorator: DotsDecorator(
-                    color: Colors.blueAccent.withOpacity(0.3),
-                    activeColor: Colors.blueAccent,
+                    color: cyanAccent.withValues(alpha: 0.3),
+                    activeColor: cyanAccent,
                     size: const Size(10, 10),
                     activeSize: const Size(30, 10),
                     activeShape: RoundedRectangleBorder(
@@ -247,15 +247,12 @@ class _IntroScreenState extends State<IntroScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(
-                                Icons.arrow_back_rounded,
-                                color: Colors.blueAccent,
-                              ),
+                              Icon(Icons.arrow_back_rounded, color: cyanAccent),
                               const SizedBox(width: 10),
                               Text(
                                 "Back",
                                 style: bodyTextStyle.copyWith(
-                                  color: Colors.blueAccent,
+                                  color: cyanAccent,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
                                 ),

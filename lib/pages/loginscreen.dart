@@ -4,7 +4,7 @@ import 'package:yo/constant/my_constant.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:delightful_toast/toast/components/toast_card.dart';
-import 'package:yo/pages/home_screen.dart';
+import 'package:yo/pages/main_layout.dart';
 import '../pages/signup.dart';
 import '../pages/forgetpass.dart';
 import '../pages/introscreen.dart';
@@ -37,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (seen) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (context) => const MainLayout()),
       );
     } else {
       Navigator.of(
@@ -81,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         showGlassToast("Login Successful", isError: false);
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => HomeScreen()),
+          MaterialPageRoute(builder: (context) => const MainLayout()),
         );
       } on FirebaseAuthException catch (e) {
         showGlassToast(
@@ -116,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
         showGlassToast("Login Successful", isError: false);
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => HomeScreen()),
+          MaterialPageRoute(builder: (context) => const MainLayout()),
         );
       } on FirebaseAuthException catch (e) {
         final message = e.code == "account-exists-with-different-credential"
@@ -153,9 +153,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     Future<UserCredential?> signInWithGoogle() async {
       try {
-        _googleSignIn.initialize();
+        await _googleSignIn.signOut();
         final GoogleSignInAccount? googleUser = await _googleSignIn
             .authenticate();
+
         if (googleUser == null) {
           showGlassToast("Google login cancelled.");
           return null;
@@ -235,15 +236,17 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.65), // Frosted glass effect
+                  color: darkThemeSecondaryColor.withValues(
+                    alpha: 0.8,
+                  ), // Frosted glass dark effect
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.1),
                     width: 1.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.blueAccent.withOpacity(0.05),
+                      color: cyanAccent.withValues(alpha: 0.05),
                       blurRadius: 20,
                       spreadRadius: 5,
                     ),
@@ -278,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: bodyTextStyle.copyWith(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w100,
-                          color: Colors.grey.withOpacity(0.9),
+                          color: darkThemeColor,
                         ),
                       ),
                       SizedBox(height: 30),
@@ -310,7 +313,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   isSwitch = value;
                                 });
                               },
-                              activeTrackColor: Colors.blueAccent,
+                              activeTrackColor: cyanAccent,
                             ),
                             SizedBox(width: 5),
                             Text(
@@ -332,7 +335,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 style: bodyTextStyle.copyWith(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w100,
-                                  color: Colors.blueAccent.withOpacity(0.9),
+                                  color: cyanAccent.withValues(alpha: 0.9),
                                 ),
                               ),
                             ),
@@ -349,13 +352,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(15),
                             gradient: LinearGradient(
-                              colors: [Colors.blueAccent, Colors.lightBlue],
+                              colors: [
+                                cyanAccent,
+                                cyanAccent.withValues(alpha: 0.8),
+                              ],
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.blueAccent.withOpacity(0.4),
+                                color: cyanAccent.withValues(alpha: 0.4),
                                 spreadRadius: 1,
                                 blurRadius: 8,
                                 offset: Offset(0, 4),
@@ -398,7 +404,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                             style: headerTextStyle.copyWith(
                               fontSize: 10,
-                              color: Colors.grey.withOpacity(0.9),
+                              color: darkThemeColor,
                             ),
                           ),
                           GestureDetector(
@@ -413,7 +419,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               " Sign Up ",
                               style: headerTextStyle.copyWith(
                                 fontSize: 10,
-                                color: Colors.blueAccent,
+                                color: cyanAccent,
                               ),
                             ),
                           ),
@@ -421,7 +427,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             "Here",
                             style: headerTextStyle.copyWith(
                               fontSize: 10,
-                              color: Colors.grey.withOpacity(0.9),
+                              color: darkThemeColor,
                             ),
                           ),
                         ],
@@ -429,16 +435,28 @@ class _LoginScreenState extends State<LoginScreen> {
                       SizedBox(height: 20),
                       Row(
                         children: [
-                          Expanded(child: Divider(thickness: 1, endIndent: 10)),
+                          Expanded(
+                            child: Divider(
+                              thickness: 1,
+                              endIndent: 10,
+                              color: darkThemeColor.withValues(alpha: 0.2),
+                            ),
+                          ),
                           Text(
                             "OR CONTINUE WITH",
                             style: headerTextStyle.copyWith(
                               fontSize: 10,
-                              color: Colors.grey.withOpacity(0.9),
+                              color: darkThemeColor,
                             ),
                           ),
                           SizedBox(height: 20),
-                          Expanded(child: Divider(thickness: 1, indent: 10)),
+                          Expanded(
+                            child: Divider(
+                              thickness: 1,
+                              indent: 10,
+                              color: darkThemeColor.withValues(alpha: 0.2),
+                            ),
+                          ),
                         ],
                       ),
                       SizedBox(height: 20),
@@ -470,7 +488,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             onpressed: signInWithTwitter,
                             icon: FontAwesomeIcons.twitter,
                             iconSize: 28,
-                            iconColor: Colors.lightBlue,
+                            iconColor: cyanAccent,
                             semanticsLabel: 'Twitter logo',
                           ),
                         ],
@@ -510,10 +528,10 @@ class _LoginButton extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white,
+        color: Colors.white.withValues(alpha: 0.15), // Brighter background
         boxShadow: [
           BoxShadow(
-            color: Colors.blueAccent.withOpacity(0.15),
+            color: cyanAccent.withValues(alpha: 0.15),
             spreadRadius: 2,
             blurRadius: 10,
             offset: Offset(0, 4),
@@ -574,11 +592,11 @@ class _BuildTextFieldState extends State<_BuildTextField> {
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: darkThemeSecondaryColor,
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
             BoxShadow(
-              color: Colors.blueAccent.withOpacity(0.08),
+              color: cyanAccent.withValues(alpha: 0.08),
               blurRadius: 12,
               spreadRadius: 2,
               offset: Offset(0, 4),
@@ -591,7 +609,7 @@ class _BuildTextFieldState extends State<_BuildTextField> {
           style: bodyTextStyle.copyWith(fontSize: 14),
           decoration: InputDecoration(
             floatingLabelStyle: TextStyle(
-              color: Colors.blueAccent,
+              color: cyanAccent,
               fontWeight: FontWeight.bold,
             ),
             contentPadding: EdgeInsets.symmetric(vertical: 20, horizontal: 20),
@@ -602,17 +620,17 @@ class _BuildTextFieldState extends State<_BuildTextField> {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(15),
               borderSide: BorderSide(
-                color: Colors.blueAccent.withOpacity(0.5),
+                color: cyanAccent.withValues(alpha: 0.5),
                 width: 1.5,
               ),
             ),
-            fillColor: Colors.white,
+            fillColor: darkThemeSecondaryColor,
             filled: true,
             prefixIcon: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12.0),
               child: Icon(
                 widget.icon,
-                color: Colors.blueAccent.withOpacity(0.8),
+                color: cyanAccent.withValues(alpha: 0.8),
               ),
             ),
             suffixIcon: widget.isPassword

@@ -4,7 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:delightful_toast/toast/components/toast_card.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:yo/pages/home_screen.dart';
+import 'package:yo/pages/main_layout.dart';
 import 'package:delightful_toast/delight_toast.dart';
 import 'package:yo/pages/loginscreen.dart';
 import '../components/animated_bg.dart';
@@ -80,7 +80,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (seen) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (context) => const MainLayout()),
       );
     } else {
       Navigator.of(context).pushReplacement(
@@ -184,9 +184,10 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<UserCredential?> signInWithGoogle() async {
     try {
-      _googleSignIn.initialize();
+      await _googleSignIn.signOut(); // Clear stale state from hot restarts
       final GoogleSignInAccount? googleUser = await _googleSignIn
           .authenticate();
+
       if (googleUser == null) {
         showGlassToast("Google login cancelled.");
         return null;
@@ -286,15 +287,17 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.65), // Frosted glass effect
+                  color: darkThemeSecondaryColor.withValues(
+                    alpha: 0.8,
+                  ), // Frosted glass dark effect
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.1),
                     width: 1.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.blueAccent.withOpacity(0.05),
+                      color: cyanAccent.withValues(alpha: 0.05),
                       blurRadius: 20,
                       spreadRadius: 5,
                     ),
@@ -334,7 +337,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         style: bodyTextStyle.copyWith(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w100,
-                          color: Colors.grey.withOpacity(0.9),
+                          color: darkThemeColor,
                         ),
                       ),
                       SizedBox(height: 30),
@@ -463,13 +466,16 @@ class _SignupScreenState extends State<SignupScreen> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(15),
                             gradient: LinearGradient(
-                              colors: [Colors.blueAccent, Colors.lightBlue],
+                              colors: [
+                                cyanAccent,
+                                cyanAccent.withValues(alpha: 0.8),
+                              ],
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.blueAccent.withOpacity(0.4),
+                                color: cyanAccent.withValues(alpha: 0.4),
                                 spreadRadius: 1,
                                 blurRadius: 8,
                                 offset: Offset(0, 4),
@@ -514,7 +520,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
                             style: headerTextStyle.copyWith(
                               fontSize: 10,
-                              color: Colors.grey.withOpacity(0.9),
+                              color: darkThemeColor,
                             ),
                           ),
                           GestureDetector(
@@ -525,7 +531,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               " Login ",
                               style: headerTextStyle.copyWith(
                                 fontSize: 10,
-                                color: Colors.blueAccent,
+                                color: cyanAccent,
                               ),
                             ),
                           ),
@@ -533,7 +539,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             "Here",
                             style: headerTextStyle.copyWith(
                               fontSize: 10,
-                              color: Colors.grey.withOpacity(0.9),
+                              color: darkThemeColor,
                             ),
                           ),
                         ],
@@ -541,16 +547,28 @@ class _SignupScreenState extends State<SignupScreen> {
                       SizedBox(height: 20),
                       Row(
                         children: [
-                          Expanded(child: Divider(thickness: 1, endIndent: 10)),
+                          Expanded(
+                            child: Divider(
+                              thickness: 1,
+                              endIndent: 10,
+                              color: darkThemeColor.withValues(alpha: 0.2),
+                            ),
+                          ),
                           Text(
                             "OR CONTINUE WITH",
                             style: headerTextStyle.copyWith(
                               fontSize: 10,
-                              color: Colors.grey.withOpacity(0.9),
+                              color: darkThemeColor,
                             ),
                           ),
 
-                          Expanded(child: Divider(thickness: 1, indent: 10)),
+                          Expanded(
+                            child: Divider(
+                              thickness: 1,
+                              indent: 10,
+                              color: darkThemeColor.withValues(alpha: 0.2),
+                            ),
+                          ),
                         ],
                       ),
                       SizedBox(height: 20),
@@ -581,7 +599,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           _LoginButton(
                             icon: FontAwesomeIcons.twitter,
                             iconSize: 28,
-                            iconColor: Colors.lightBlue,
+                            iconColor: cyanAccent,
                             semanticsLabel: 'Twitter logo',
                             onTap: signInWithTwitter,
                           ),
@@ -623,10 +641,10 @@ class _LoginButton extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white,
+        color: Colors.white.withValues(alpha: 0.15), // Brighter background
         boxShadow: [
           BoxShadow(
-            color: Colors.blueAccent.withOpacity(0.15),
+            color: cyanAccent.withValues(alpha: 0.15),
             spreadRadius: 2,
             blurRadius: 10,
             offset: Offset(0, 4),
@@ -689,11 +707,11 @@ class _BuildTextFieldState extends State<_BuildTextField> {
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: darkThemeSecondaryColor,
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
             BoxShadow(
-              color: Colors.blueAccent.withOpacity(0.08),
+              color: cyanAccent.withValues(alpha: 0.08),
               blurRadius: 12,
               spreadRadius: 2,
               offset: Offset(0, 4),
@@ -706,7 +724,7 @@ class _BuildTextFieldState extends State<_BuildTextField> {
           style: bodyTextStyle.copyWith(fontSize: 14),
           decoration: InputDecoration(
             floatingLabelStyle: TextStyle(
-              color: Colors.blueAccent,
+              color: cyanAccent,
               fontWeight: FontWeight.bold,
             ),
             contentPadding: EdgeInsets.symmetric(vertical: 20, horizontal: 20),
@@ -717,17 +735,17 @@ class _BuildTextFieldState extends State<_BuildTextField> {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(15),
               borderSide: BorderSide(
-                color: Colors.blueAccent.withOpacity(0.5),
+                color: cyanAccent.withValues(alpha: 0.5),
                 width: 1.5,
               ),
             ),
-            fillColor: Colors.white,
+            fillColor: darkThemeSecondaryColor,
             filled: true,
             prefixIcon: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12.0),
               child: Icon(
                 widget.icon,
-                color: Colors.blueAccent.withOpacity(0.8),
+                color: cyanAccent.withValues(alpha: 0.8),
               ),
             ),
             suffixIcon: widget.isPassword
