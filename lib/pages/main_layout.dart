@@ -15,8 +15,10 @@ import 'library_screen.dart';
 import 'social_screen.dart';
 import 'profile_screen.dart';
 
-// Import MiniPlayer
+// Import MiniPlayer and Audio Service
 import '../widgets/_buildMiniPlayer.dart';
+import '../services/audio_player_service.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -163,6 +165,21 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
             body: Stack(
               alignment: Alignment.bottomCenter,
               children: [
+                // Hidden Youtube Player acting as our global audio engine.
+                // We move it completely off-screen (-1000) instead of using Opacity,
+                // because Android WebViews sometimes ignore opacity and render on top anyway.
+                // Must retain a decent size (320x240) so YouTube doesn't block it as a "hidden background player".
+                Positioned(
+                  top: -1000,
+                  left: -1000,
+                  width: 320,
+                  height: 240,
+                  child: IgnorePointer(
+                    child: YoutubePlayer(
+                      controller: AudioPlayerService().controller,
+                    ),
+                  ),
+                ),
                 // PageView — each page handles its own bottom padding internally
                 PageView(
                   controller: _pageController,

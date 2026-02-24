@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import 'dart:ui';
 import '../constant/my_constant.dart';
 import 'package:mobkit_dashed_border/mobkit_dashed_border.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -16,6 +15,8 @@ import 'package:yo/data/customSongsList.dart';
 import 'package:yo/data/albumsList.dart';
 import 'package:yo/data/toprateSong.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../services/audio_player_service.dart';
+import '../models/song_info.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,6 +28,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final user = FirebaseAuth.instance.currentUser;
   final TouhouDBService _service = TouhouDBService();
+  final AudioPlayerService _audioService = AudioPlayerService();
   late Future<List<customSongList>> _songsFuture;
   late Future<List<Albumslist>> _albumsFuture;
   late Future<List<TopRatedSongList>> _topRatedSongsFuture;
@@ -343,7 +345,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     artist: song.artist,
                     imageUrl: song.image,
                     indexNumber: (index + 1).toString(),
-                    onTap: () {},
+                    onTap: song.pvId.isNotEmpty
+                        ? () {
+                            _audioService.playFromYoutubeId(
+                              song.pvId,
+                              SongInfo(
+                                title: song.name,
+                                artist: song.artist,
+                                thumbnailUrl: song.image,
+                                youtubeVideoId: song.pvId,
+                              ),
+                            );
+                          }
+                        : null,
                   )
                   .animate()
                   .fade(duration: 300.ms, delay: (550 + index * 80).ms)
