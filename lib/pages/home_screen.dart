@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors
           .transparent, // Let the AnimatedBackground pass through, but child elements will be darker
       body: ListView(
-        padding: EdgeInsets.only(top: kToolbarHeight + 16, bottom: 140),
+        padding: EdgeInsets.only(top: kToolbarHeight + 16, bottom: 180),
         children: [
           const SizedBox(height: 24),
 

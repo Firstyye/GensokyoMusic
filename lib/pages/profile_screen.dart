@@ -39,7 +39,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent, // AnimatedBackground pass through
       body: ListView(
-        padding: const EdgeInsets.only(top: 0, bottom: 140),
+        padding: const EdgeInsets.only(top: 0, bottom: 180),
         children: [
           // ─── PROFILE HEADER WITH GRADIENT ───
           _buildProfileHeader(),
@@ -82,8 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         // Banner image with Deep Midnight gradient overlay
         SizedBox(
-          height:
-              340, // Increased to fully cover avatar + name + email + joined text
+          height: 380, // Taller banner to fully cover all profile content
           width: double.infinity,
           child: Stack(
             fit: StackFit.expand,
@@ -423,12 +422,86 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: "Log Out",
                 isDestructive: true,
                 onTap: () async {
-                  await FirebaseAuth.instance.signOut();
-                  await GoogleSignIn.instance.signOut();
-                  if (mounted) {
-                    Navigator.of(
-                      context,
-                    ).push(MaterialPageRoute(builder: (_) => LoginScreen()));
+                  final shouldLogout = await showDialog<bool>(
+                    context: context,
+                    barrierColor: Colors.black54,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: darkThemeSecondaryColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      title: Row(
+                        children: [
+                          Icon(
+                            Icons.logout_rounded,
+                            color: Colors.redAccent,
+                            size: 28,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Log Out',
+                            style: headerTextStyle.copyWith(
+                              fontSize: 20,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      content: Text(
+                        'Are you sure you want to log out?',
+                        style: bodyTextStyle.copyWith(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white70,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Log Out',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (shouldLogout == true && mounted) {
+                    await FirebaseAuth.instance.signOut();
+                    await GoogleSignIn.instance.signOut();
+                    if (mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => LoginScreen()),
+                        (route) => false,
+                      );
+                    }
                   }
                 },
               ),
