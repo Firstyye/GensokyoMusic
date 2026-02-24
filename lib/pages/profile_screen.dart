@@ -82,7 +82,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         // Banner image with Deep Midnight gradient overlay
         SizedBox(
-          height: 280, // Increased from 220 to prevent text cutoff
+          height:
+              340, // Increased to fully cover avatar + name + email + joined text
           width: double.infinity,
           child: Stack(
             fit: StackFit.expand,
@@ -120,89 +121,97 @@ class _ProfileScreenState extends State<ProfileScreen> {
             top:
                 MediaQuery.of(context).padding.top + 32, // Pushed down slightly
           ),
-          child: Column(
-            children: [
-              // Avatar with Light Blue glow ring
-              Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: cyanAccent.withValues(
-                            alpha: 0.4,
-                          ), // Using new Light Blue accent
-                          blurRadius: 36,
-                          spreadRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: CircleAvatar(
-                      radius: 56,
-                      backgroundColor: darkThemeSecondaryColor,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              children: [
+                // Avatar with Light Blue glow ring
+                Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: cyanAccent.withValues(
+                              alpha: 0.4,
+                            ), // Using new Light Blue accent
+                            blurRadius: 36,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
                       child: CircleAvatar(
-                        radius: 52,
-                        backgroundImage: (user?.photoURL != null)
-                            ? NetworkImage(user!.photoURL!)
-                            : const AssetImage('lib/pages/images/avatar.jpg')
-                                  as ImageProvider,
+                        radius: 56,
+                        backgroundColor: darkThemeSecondaryColor,
+                        child: CircleAvatar(
+                          radius: 52,
+                          backgroundImage: (user?.photoURL != null)
+                              ? NetworkImage(user!.photoURL!)
+                              : const AssetImage('lib/pages/images/avatar.jpg')
+                                    as ImageProvider,
+                        ),
+                      ),
+                    )
+                    .animate()
+                    .fade(duration: 500.ms)
+                    .scale(
+                      begin: const Offset(0.8, 0.8),
+                      duration: 500.ms,
+                      curve: Curves.easeOutBack,
+                    ),
+
+                const SizedBox(height: 16),
+
+                // Name
+                Text(
+                  user?.displayName ?? 'Cirno, The Fairy',
+                  style: headerTextStyle.copyWith(
+                    color: darkThemeTextColor,
+                    fontSize: 28,
+                    letterSpacing: -0.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ).animate().fade(duration: 400.ms, delay: 100.ms),
+
+                const SizedBox(height: 4),
+
+                // Email
+                Text(
+                  _getUserEmail(),
+                  style: bodyTextStyle.copyWith(
+                    color: darkThemeTextColor.withValues(alpha: 0.8),
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                ).animate().fade(duration: 400.ms, delay: 150.ms),
+
+                const SizedBox(height: 8),
+
+                // Join date
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.calendar_month_rounded,
+                      size: 14,
+                      color: cyanAccent,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Joined 5 January 2023',
+                        style: bodyTextStyle.copyWith(
+                          color: darkThemeTextColor.withValues(alpha: 0.7),
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  )
-                  .animate()
-                  .fade(duration: 500.ms)
-                  .scale(
-                    begin: const Offset(0.8, 0.8),
-                    duration: 500.ms,
-                    curve: Curves.easeOutBack,
-                  ),
-
-              const SizedBox(height: 16),
-
-              // Name
-              Text(
-                user?.displayName ?? 'Cirno, The Fairy',
-                style: headerTextStyle.copyWith(
-                  color: darkThemeTextColor,
-                  fontSize: 28,
-                  letterSpacing: -0.5,
-                ),
-              ).animate().fade(duration: 400.ms, delay: 100.ms),
-
-              const SizedBox(height: 4),
-
-              // Email
-              Text(
-                _getUserEmail(),
-                style: bodyTextStyle.copyWith(
-                  color: darkThemeTextColor.withValues(
-                    alpha: 0.8,
-                  ), // Better contrast for Light Blue theme
-                  fontSize: 14,
-                ),
-              ).animate().fade(duration: 400.ms, delay: 150.ms),
-
-              const SizedBox(height: 8),
-
-              // Join date
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.calendar_month_rounded,
-                    size: 14,
-                    color: cyanAccent, // Light Blue accent icon
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Joined 5 January 2023',
-                    style: bodyTextStyle.copyWith(
-                      color: darkThemeTextColor.withValues(alpha: 0.7),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ).animate().fade(duration: 400.ms, delay: 180.ms),
-            ],
+                  ],
+                ).animate().fade(duration: 400.ms, delay: 180.ms),
+              ],
+            ),
           ),
         ),
       ],

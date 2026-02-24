@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:yo/constant/my_constant.dart';
@@ -28,6 +29,22 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  bool _googleInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initGoogleSignIn();
+  }
+
+  Future<void> _initGoogleSignIn() async {
+    try {
+      await _googleSignIn.initialize();
+      _googleInitialized = true;
+    } catch (e) {
+      debugPrint('Google Sign-In init error: $e');
+    }
+  }
 
   Future<void> _handleLoginSuccess() async {
     final prefs = await SharedPreferences.getInstance();
@@ -153,17 +170,49 @@ class _LoginScreenState extends State<LoginScreen> {
 
     Future<UserCredential?> signInWithGoogle() async {
       try {
-        await _googleSignIn.signOut();
-        final GoogleSignInAccount? googleUser = await _googleSignIn
-            .authenticate();
+        if (!_googleInitialized) {
+          await _googleSignIn.initialize();
+          _googleInitialized = true;
+        }
+
+        // Use a Completer to bridge the stream-based v7 API
+        final completer = Completer<GoogleSignInAccount?>();
+        late StreamSubscription<GoogleSignInAuthenticationEvent> sub;
+
+        sub = _googleSignIn.authenticationEvents.listen(
+          (event) {
+            if (!completer.isCompleted) {
+              switch (event) {
+                case GoogleSignInAuthenticationEventSignIn():
+                  completer.complete(event.user);
+                case GoogleSignInAuthenticationEventSignOut():
+                  completer.complete(null);
+              }
+            }
+            sub.cancel();
+          },
+          onError: (e) {
+            if (!completer.isCompleted) {
+              completer.completeError(e);
+            }
+            sub.cancel();
+          },
+        );
+
+        // authenticate() returns void in v7; result comes via stream
+        await _googleSignIn.authenticate();
+
+        final GoogleSignInAccount? googleUser = await completer.future.timeout(
+          const Duration(seconds: 60),
+        );
 
         if (googleUser == null) {
           showGlassToast("Google login cancelled.");
           return null;
         }
 
-        final GoogleSignInAuthentication googleAuth =
-            await googleUser.authentication;
+        // Get the idToken from the user's authentication
+        final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
         final credential = GoogleAuthProvider.credential(
           idToken: googleAuth.idToken,
@@ -175,13 +224,20 @@ class _LoginScreenState extends State<LoginScreen> {
         await Future.delayed(const Duration(seconds: 2));
         _handleLoginSuccess();
         return userCredential;
+      } on GoogleSignInException catch (e) {
+        if (e.code == GoogleSignInExceptionCode.canceled) {
+          showGlassToast("Google login cancelled.");
+        } else {
+          showGlassToast("Google Error: ${e.description}");
+        }
+        return null;
       } on FirebaseAuthException catch (e) {
         showGlassToast(
           "Google Login Failed: \n${e.message ?? 'Unknown error'}",
         );
         return null;
       } catch (e) {
-        showGlassToast("Unexpected error occurred.");
+        showGlassToast("Google Error: $e");
         return null;
       }
     }

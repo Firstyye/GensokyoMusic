@@ -1,5 +1,5 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'dart:ui';
 
 import '../components/animated_bg.dart';
@@ -12,7 +12,7 @@ import 'library_screen.dart';
 import 'social_screen.dart';
 import 'profile_screen.dart';
 
-// Import MiniPlayer (assuming it's a standalone widget)
+// Import MiniPlayer
 import '../widgets/_buildMiniPlayer.dart';
 
 class MainLayout extends StatefulWidget {
@@ -26,6 +26,7 @@ class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  // สร้าง List ของหน้าหลัก
   final List<Widget> _pages = [
     HomeScreen(),
     const ExploreScreen(),
@@ -38,7 +39,6 @@ class _MainLayoutState extends State<MainLayout> {
     setState(() {
       _selectedIndex = index;
     });
-    // Close drawer after selection
     if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
       Navigator.pop(context);
     }
@@ -46,81 +46,101 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBackground(
-      child: Scaffold(
-        key: _scaffoldKey,
-        backgroundColor: Colors.transparent,
-        extendBody: false,
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white, size: 28),
-            onPressed: () {
-              _scaffoldKey.currentState?.openDrawer();
-            },
-          ),
-          title: Row(
-            children: [
-              const Icon(
-                Icons.play_circle_filled,
-                color: Colors.redAccent,
-                size: 28,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                "Music",
-                style: headerTextStyle.copyWith(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.cast, color: Colors.white),
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: const Icon(Icons.search, color: Colors.white),
-              onPressed: () {},
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () {}, // can open profile dialog or navigate
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: cyanAccent, width: 2),
-                ),
-                child: const CircleAvatar(
-                  radius: 14,
-                  backgroundImage: AssetImage('lib/pages/images/avatar.jpg'),
-                  backgroundColor: Colors.transparent,
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-          ],
-        ),
-        drawer: _buildDrawer(),
-        body: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            // Main Content
-            IndexedStack(index: _selectedIndex, children: _pages),
+    // ใช้ StreamBuilder เพื่อคอยดักฟังสถานะ User จาก Firebase
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        final user = snapshot.data; // ดึงข้อมูล User ล่าสุดที่ Login อยู่
 
-            // Persistent Mini Player docked to the bottom
-            Positioned(bottom: 0, left: 0, right: 0, child: MiniPlayer()),
-          ],
+        return AnimatedBackground(
+          child: Scaffold(
+            key: _scaffoldKey,
+            backgroundColor: Colors.transparent,
+            extendBodyBehindAppBar: true,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              flexibleSpace: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Container(
+                    color: darkModeBackgroundColor.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+              leading: IconButton(
+                icon: const Icon(Icons.menu, color: Colors.white, size: 28),
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+              ),
+              title: Row(
+                children: [
+                  const Icon(
+                    Icons.play_circle_filled,
+                    color: Colors.redAccent,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Music",
+                    style: headerTextStyle.copyWith(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.search, color: Colors.white),
+                  onPressed: () {},
+                ),
+                const SizedBox(width: 8),
+
+                // ส่วนแสดงรูปโปรไฟล์ใน AppBar
+                _buildAvatar(user),
+
+                const SizedBox(width: 16),
+              ],
+            ),
+            drawer: _buildDrawer(user),
+            body: Stack(
+              alignment: Alignment.bottomCenter,
+              children: [
+                IndexedStack(index: _selectedIndex, children: _pages),
+                Positioned(bottom: 0, left: 0, right: 0, child: MiniPlayer()),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Widget สำหรับแสดงรูป Profile (CircleAvatar)
+  Widget _buildAvatar(User? user) {
+    return GestureDetector(
+      onTap: () {
+        // นำทางไปหน้า Profile เมื่อคลิกที่รูป
+        _onItemTapped(4);
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: cyanAccent, width: 2),
+        ),
+        child: CircleAvatar(
+          radius: 14,
+          backgroundColor: Colors.grey[800],
+          backgroundImage: (user?.photoURL != null)
+              ? NetworkImage(user!.photoURL!)
+              : const AssetImage('lib/pages/images/avatar.jpg')
+                    as ImageProvider,
         ),
       ),
     );
   }
 
-  Widget _buildDrawer() {
+  Widget _buildDrawer(User? user) {
     return Drawer(
       backgroundColor: darkThemeSecondaryColor,
       child: ListView(
@@ -133,15 +153,44 @@ class _MainLayoutState extends State<MainLayout> {
                 bottom: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
               ),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.play_circle_filled,
-                  color: Colors.redAccent,
-                  size: 40,
+                Row(
+                  children: [
+                    // รูปโปรไฟล์ขนาดใหญ่ใน Drawer
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundImage: (user?.photoURL != null)
+                          ? NetworkImage(user!.photoURL!)
+                          : const AssetImage('lib/pages/images/avatar.jpg')
+                                as ImageProvider,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            user?.displayName ?? "Guest User",
+                            style: headerTextStyle.copyWith(fontSize: 18),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            user?.email ?? "Sign in to sync music",
+                            style: bodyTextStyle.copyWith(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Text("Music", style: headerTextStyle.copyWith(fontSize: 24)),
               ],
             ),
           ),
@@ -154,6 +203,18 @@ class _MainLayoutState extends State<MainLayout> {
           ),
           _buildDrawerItem(Icons.people_alt_outlined, 3, "สังคม"),
           _buildDrawerItem(Icons.person_outline, 4, "โปรไฟล์"),
+
+          // ปุ่ม Logout
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.redAccent),
+            title: const Text(
+              "ออกจากระบบ",
+              style: TextStyle(color: Colors.redAccent),
+            ),
+            onTap: () async {
+              await FirebaseAuth.instance.signOut();
+            },
+          ),
         ],
       ),
     );
