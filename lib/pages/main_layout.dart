@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'loginscreen.dart';
+import 'about_screen.dart';
+import 'help_feedback_screen.dart';
 
 import '../components/animated_bg.dart';
 import '../constant/my_constant.dart';
@@ -305,87 +307,125 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
   Widget _buildDrawer() {
     return Drawer(
       backgroundColor: darkThemeSecondaryColor,
-      child: ListView(
-        padding: EdgeInsets.zero,
+      child: Column(
         children: [
-          // Header with branding
-          Container(
-            color: darkModeBackgroundColor,
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 8,
-              bottom: 12,
-              left: 8,
-              right: 16,
-            ),
-            child: Row(
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white, size: 26),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                const SizedBox(width: 4),
-                Image.asset(
-                  'assets/images/GensokyoMusic.png',
-                  width: 36,
-                  height: 36,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: RichText(
-                    overflow: TextOverflow.ellipsis,
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'Gensokyo',
-                          style: headerTextStyle.copyWith(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: -0.5,
+                // Header with branding
+                Container(
+                  color: darkModeBackgroundColor,
+                  padding: EdgeInsets.only(
+                    top: MediaQuery.of(context).padding.top + 8,
+                    bottom: 12,
+                    left: 8,
+                    right: 16,
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      const SizedBox(width: 4),
+                      Image.asset(
+                        'assets/images/GensokyoMusic.png',
+                        width: 36,
+                        height: 36,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: RichText(
+                          overflow: TextOverflow.ellipsis,
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Gensokyo',
+                                style: headerTextStyle.copyWith(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              TextSpan(
+                                text: 'Music',
+                                style: headerTextStyle.copyWith(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.redAccent,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        TextSpan(
-                          text: 'Music',
-                          style: headerTextStyle.copyWith(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.redAccent,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: Colors.white.withValues(alpha: 0.1)),
+
+                const SizedBox(height: 8),
+
+                // Settings items
+                _drawerTile(Icons.settings_outlined, 'Settings', () {}),
+                _drawerTile(Icons.info_outline_rounded, 'About', () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AboutScreen()),
+                  );
+                }),
+                _drawerTile(Icons.help_outline_rounded, 'Help & Feedback', () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const HelpFeedbackScreen(),
                     ),
+                  );
+                }),
+
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Divider(color: Colors.white24, height: 30),
+                ),
+
+                // Logout
+                ListTile(
+                  leading: const Icon(Icons.logout, color: Colors.redAccent),
+                  title: const Text(
+                    "Log Out",
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                  onTap: () => _showLogoutDialog(),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 4,
                   ),
                 ),
               ],
             ),
           ),
-          Divider(height: 1, color: Colors.white.withValues(alpha: 0.1)),
-
-          const SizedBox(height: 8),
-
-          // Settings items
-          _drawerTile(Icons.settings_outlined, 'Settings', () {}),
-          _drawerTile(Icons.info_outline_rounded, 'About', () {}),
-          _drawerTile(Icons.help_outline_rounded, 'Help & Feedback', () {}),
-
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
-            child: Divider(color: Colors.white24, height: 30),
-          ),
-
-          // Logout
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text(
-              "Log Out",
-              style: TextStyle(color: Colors.redAccent),
+          // Version text pinned at bottom
+          Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).padding.bottom + 16,
+              top: 12,
             ),
-            onTap: () => _showLogoutDialog(),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 24,
-              vertical: 4,
+            child: Text(
+              'GensokyoMusic v1.0.0',
+              style: bodyTextStyle.copyWith(
+                color: Colors.white24,
+                fontSize: 12,
+              ),
             ),
           ),
         ],

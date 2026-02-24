@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:ui';
 import '../pages/loginscreen.dart';
+import '../pages/about_screen.dart';
+import '../pages/help_feedback_screen.dart';
 import '../constant/my_constant.dart';
 
 // NEW WIDGET IMPORTS
@@ -406,15 +408,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               _menuDivider(),
               ModernSettingsTile(
-                icon: Icons.notifications_none_rounded,
-                title: "Notifications",
-                onTap: () {},
+                icon: Icons.info_outline_rounded,
+                title: "About",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AboutScreen()),
+                  );
+                },
               ),
               _menuDivider(),
               ModernSettingsTile(
                 icon: Icons.help_outline_rounded,
                 title: "Help & Support",
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const HelpFeedbackScreen(),
+                    ),
+                  );
+                },
               ),
               _menuDivider(),
               ModernSettingsTile(
