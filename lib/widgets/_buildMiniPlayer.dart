@@ -4,6 +4,8 @@ import '../constant/my_constant.dart';
 import '../services/audio_player_service.dart';
 import '../models/song_info.dart';
 
+import '../pages/full_player_screen.dart';
+
 /// A persistent mini player that listens to AudioPlayerService streams.
 /// Shows song info, play/pause, favorite, and a thin progress bar.
 /// Hides itself when no song is loaded.
@@ -57,85 +59,97 @@ class _MiniPlayerState extends State<MiniPlayer>
 
         if (song == null) return const SizedBox.shrink();
 
-        return Container(
-          height: 70,
-          decoration: BoxDecoration(
-            color: darkThemeSecondaryColor,
-            border: Border(
-              top: BorderSide(
-                color: Colors.white.withValues(alpha: 0.1),
-                width: 1,
+        return InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => FullPlayerScreen(initialSong: song),
               ),
-            ),
-          ),
-          child: Column(
-            children: [
-              // Progress Bar (thin)
-              _buildProgressBar(),
-
-              // Content
-              Expanded(
-                child: Row(
-                  children: [
-                    const SizedBox(width: 12),
-
-                    // Spinning Album Art
-                    _buildAlbumArt(song),
-
-                    const SizedBox(width: 12),
-
-                    // Song Info
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            song.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: bodyTextStyle.copyWith(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            song.artist,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: bodyTextStyle.copyWith(
-                              color: Colors.white54,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Favorite Button
-                    IconButton(
-                      icon: Icon(
-                        _isFavorite
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        color: _isFavorite ? Colors.redAccent : Colors.white54,
-                        size: 22,
-                      ),
-                      onPressed: () {
-                        setState(() => _isFavorite = !_isFavorite);
-                      },
-                    ),
-
-                    // Play/Pause Button
-                    _buildPlayPauseButton(),
-
-                    const SizedBox(width: 8),
-                  ],
+            );
+          },
+          child: Container(
+            height: 70,
+            decoration: BoxDecoration(
+              color: darkThemeSecondaryColor,
+              border: Border(
+                top: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  width: 1,
                 ),
               ),
-            ],
+            ),
+            child: Column(
+              children: [
+                // Progress Bar (thin)
+                _buildProgressBar(),
+
+                // Content
+                Expanded(
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 12),
+
+                      // Spinning Album Art
+                      _buildAlbumArt(song),
+
+                      const SizedBox(width: 12),
+
+                      // Song Info
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              song.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: bodyTextStyle.copyWith(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              song.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: bodyTextStyle.copyWith(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Favorite Button
+                      IconButton(
+                        icon: Icon(
+                          _isFavorite
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          color: _isFavorite
+                              ? Colors.redAccent
+                              : Colors.white54,
+                          size: 22,
+                        ),
+                        onPressed: () {
+                          setState(() => _isFavorite = !_isFavorite);
+                        },
+                      ),
+
+                      // Play/Pause Button
+                      _buildPlayPauseButton(),
+
+                      const SizedBox(width: 8),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

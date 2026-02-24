@@ -37,6 +37,12 @@ class AudioPlayerService {
   final _positionController = StreamController<Duration>.broadcast();
   final _durationController = StreamController<Duration?>.broadcast();
 
+  // ── Queue Management ──
+  final List<SongInfo> _queue = [];
+  int _currentIndex = -1;
+  bool _isShuffle = false;
+  bool _isLoop = false;
+
   YoutubePlayerController get controller => _controller;
 
   Stream<SongInfo?> get currentSongStream => _currentSongController.stream;
@@ -46,6 +52,8 @@ class AudioPlayerService {
 
   SongInfo? get currentSong => _currentSong;
   bool get isPlaying => _isPlaying;
+  bool get isShuffle => _isShuffle;
+  bool get isLoop => _isLoop;
 
   void _listener() {
     if (!_controller.value.isReady) return;
@@ -62,19 +70,54 @@ class AudioPlayerService {
     _playerStateController.add(value.playerState);
     _positionController.add(value.position);
     _durationController.add(value.metaData.duration);
+
+    // Auto-advance to next song if ended
+    if (value.playerState == PlayerState.ended) {
+      if (_isLoop) {
+        seek(Duration.zero);
+        play();
+      } else {
+        skipToNext();
+      }
+    }
   }
 
   // ═══════════════════════════════════════════
   //  MAIN PIPELINE
   // ═══════════════════════════════════════════
 
+  /// Plays a single song immediately and clears the queue
   Future<void> playFromYoutubeId(String videoId, SongInfo songInfo) async {
+    _queue.clear();
+    _queue.add(songInfo);
+    _currentIndex = 0;
+    await _playQueueItem();
+  }
+
+  /// Sets up a queue of songs and starts playing from the specified index
+  Future<void> playQueue(List<SongInfo> songs, {int startIndex = 0}) async {
+    if (songs.isEmpty) return;
+    _queue.clear();
+    _queue.addAll(songs);
+    if (_isShuffle) {
+      _queue.shuffle();
+      _currentIndex = 0;
+    } else {
+      _currentIndex = startIndex.clamp(0, _queue.length - 1);
+    }
+    await _playQueueItem();
+  }
+
+  Future<void> _playQueueItem() async {
+    if (_currentIndex < 0 || _currentIndex >= _queue.length) return;
+
     try {
+      final songInfo = _queue[_currentIndex];
       _currentSong = songInfo;
       _currentSongController.add(songInfo);
 
       // Tell the native controller to load and play the video
-      _controller.load(videoId);
+      _controller.load(songInfo.youtubeVideoId);
     } catch (e) {
       debugPrint('AudioPlayerService error: $e');
     }
@@ -96,10 +139,47 @@ class AudioPlayerService {
     }
   }
 
+  Future<void> skipToNext() async {
+    if (_queue.isEmpty) return;
+
+    _currentIndex++;
+    if (_currentIndex >= _queue.length) {
+      _currentIndex = 0; // Wrap around to start if we exceed
+    }
+    await _playQueueItem();
+  }
+
+  Future<void> skipToPrevious() async {
+    if (_queue.isEmpty) return;
+
+    // If we're more than 3 seconds in, previous just restarts the current song.
+    final position = _controller.value.position;
+    if (position.inSeconds > 3) {
+      await seek(Duration.zero);
+      return;
+    }
+
+    _currentIndex--;
+    if (_currentIndex < 0) {
+      _currentIndex = _queue.length - 1; // Wrap around to end
+    }
+    await _playQueueItem();
+  }
+
+  void toggleShuffle() {
+    _isShuffle = !_isShuffle;
+  }
+
+  void toggleLoop() {
+    _isLoop = !_isLoop;
+  }
+
   Future<void> stop() async {
     _controller.pause();
     _currentSong = null;
     _currentSongController.add(null);
+    _queue.clear();
+    _currentIndex = -1;
   }
 
   Future<void> seek(Duration position) async {
