@@ -232,11 +232,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
         ),
         StreamBuilder<SongInfo?>(
           stream: _audioService.currentSongStream,
+          initialData: _audioService.currentSong,
           builder: (context, snapshot) {
             // If a song is loaded, the mini player is visible. Shift the FAB up.
-            final hasMiniPlayer = snapshot.hasData;
+            final hasMiniPlayer = snapshot.data != null;
             return Positioned(
-              bottom: hasMiniPlayer ? 190 : 100,
+              bottom: hasMiniPlayer ? 190 : 120,
               right: 24,
               child: FloatingActionButton(
                 backgroundColor: cyanAccent,

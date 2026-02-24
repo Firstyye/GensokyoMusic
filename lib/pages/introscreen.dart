@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:introduction_screen/introduction_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:yo/pages/home_screen.dart';
+import 'package:yo/pages/main_layout.dart';
 import 'package:yo/constant/my_constant.dart';
 import '../components/animated_bg.dart';
 
@@ -21,7 +21,7 @@ class _IntroScreenState extends State<IntroScreen> {
     await prefs.setBool('seen', true);
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
+      MaterialPageRoute(builder: (context) => const MainLayout()),
     );
   }
 
