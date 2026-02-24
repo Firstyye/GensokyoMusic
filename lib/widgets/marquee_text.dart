@@ -71,11 +71,18 @@ class _MarqueeTextState extends State<MarqueeText> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      controller: scrollController,
-      scrollDirection: Axis.horizontal,
-      physics: const NeverScrollableScrollPhysics(),
-      child: Text(widget.text, style: widget.style),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          controller: scrollController,
+          scrollDirection: Axis.horizontal,
+          physics: const NeverScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: Center(child: Text(widget.text, style: widget.style)),
+          ),
+        );
+      },
     );
   }
 }

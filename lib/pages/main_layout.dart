@@ -14,6 +14,7 @@ import 'explore_screen.dart';
 import 'library_screen.dart';
 import 'social_screen.dart';
 import 'profile_screen.dart';
+import '../pages/settings_screen.dart';
 
 // Import MiniPlayer and Audio Service
 import '../widgets/_buildMiniPlayer.dart';
@@ -395,7 +396,13 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
                 const SizedBox(height: 8),
 
                 // Settings items
-                _drawerTile(Icons.settings_outlined, 'Settings', () {}),
+                _drawerTile(Icons.settings_outlined, 'Settings', () {
+                  Navigator.pop(context); // Close the drawer
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                }),
                 _drawerTile(Icons.info_outline_rounded, 'About', () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -591,6 +598,7 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
     );
 
     if (shouldLogout == true && mounted) {
+      await AudioPlayerService().stop();
       await FirebaseAuth.instance.signOut();
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(

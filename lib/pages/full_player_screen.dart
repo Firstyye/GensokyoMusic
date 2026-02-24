@@ -120,9 +120,19 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                           offset: const Offset(0, 10),
                         ),
                       ],
-                      image: DecorationImage(
-                        image: NetworkImage(_currentSong.thumbnailUrl),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24.0),
+                      child: Image.network(
+                        'https://img.youtube.com/vi/${_currentSong.youtubeVideoId}/maxresdefault.jpg',
                         fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          // Fallback to standard thumbnail if maxresdefault doesn't exist
+                          return Image.network(
+                            _currentSong.thumbnailUrl,
+                            fit: BoxFit.cover,
+                          );
+                        },
                       ),
                     ),
                   ),

@@ -1,75 +1,125 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:ui';
-import '../pages/loginscreen.dart';
-import '../pages/about_screen.dart';
-import '../pages/help_feedback_screen.dart';
+import '../pages/settings_screen.dart';
+import '../pages/playlist_detail_screen.dart'; // To view playlists
+import '../pages/full_player_screen.dart'; // To play favorites
+import '../services/firestore_service.dart';
+import '../services/audio_player_service.dart';
+import '../models/song_info.dart';
 import '../constant/my_constant.dart';
-
-// NEW WIDGET IMPORTS
-import '../widgets/modern_settings_tile.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final String? userId;
+  final String? userName;
+  final String? userPhotoUrl;
+
+  const ProfileScreen({
+    super.key,
+    this.userId,
+    this.userName,
+    this.userPhotoUrl,
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  final user = FirebaseAuth.instance.currentUser;
-  bool isSwitched = true; // Still tracking theme for future if needed
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
+  late String targetUserId;
+  final currentUser = FirebaseAuth.instance.currentUser;
+  final FirestoreService _firestoreService = FirestoreService();
+  final AudioPlayerService _audioService = AudioPlayerService();
+  late TabController _tabController;
 
-  String _getUserEmail() {
-    if (user?.email != null && user!.email!.isNotEmpty) {
-      return user!.email!;
-    }
-    if (user?.providerData != null) {
-      for (var profile in user!.providerData) {
-        if (profile.email != null && profile.email!.isNotEmpty) {
-          return profile.email!;
-        }
-      }
-    }
-    return 'Cirno_Gensokyo@gmail.com';
+  @override
+  void initState() {
+    super.initState();
+    targetUserId = widget.userId ?? currentUser?.uid ?? '';
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  bool get _isOwner => targetUserId == currentUser?.uid;
+
+  String get _displayName {
+    if (!_isOwner) return widget.userName ?? 'Unknown User';
+    return currentUser?.displayName ??
+        currentUser?.email?.split('@').first ??
+        'User';
+  }
+
+  String? get _photoUrl {
+    if (!_isOwner) return widget.userPhotoUrl;
+    return currentUser?.photoURL;
   }
 
   @override
   Widget build(BuildContext context) {
+    if (targetUserId.isEmpty) {
+      return const Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(
+          child: Text('User not found', style: TextStyle(color: Colors.white)),
+        ),
+      );
+    }
+
     return Scaffold(
-      backgroundColor: Colors.transparent, // AnimatedBackground pass through
-      body: ListView(
-        padding: const EdgeInsets.only(top: 0, bottom: 180),
-        children: [
-          // ─── PROFILE HEADER WITH GRADIENT ───
-          _buildProfileHeader(),
-
-          const SizedBox(height: 24),
-
-          // ─── STATS ROW ───
-          _buildStatsRow()
-              .animate()
-              .fade(duration: 400.ms, delay: 200.ms)
-              .slideY(begin: 0.08),
-
-          const SizedBox(height: 32),
-
-          // ─── ACTION BUTTONS ───
-          _buildActionButtons()
-              .animate()
-              .fade(duration: 400.ms, delay: 300.ms)
-              .slideY(begin: 0.08),
-
-          const SizedBox(height: 40),
-
-          // ─── SETTINGS MENU ───
-          _buildSettingsMenu()
-              .animate()
-              .fade(duration: 500.ms, delay: 400.ms)
-              .slideY(begin: 0.1),
-        ],
+      backgroundColor: Colors.transparent,
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  _buildProfileHeader(),
+                  const SizedBox(height: 24),
+                  _buildStatsRow()
+                      .animate()
+                      .fade(duration: 400.ms, delay: 200.ms)
+                      .slideY(begin: 0.08),
+                  const SizedBox(height: 32),
+                  if (_isOwner)
+                    _buildActionButtons()
+                        .animate()
+                        .fade(duration: 400.ms, delay: 300.ms)
+                        .slideY(begin: 0.08),
+                  if (_isOwner) const SizedBox(height: 32),
+                ],
+              ),
+            ),
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _SliverAppBarDelegate(
+                TabBar(
+                  controller: _tabController,
+                  indicatorColor: cyanAccent,
+                  labelColor: cyanAccent,
+                  unselectedLabelColor: Colors.white54,
+                  tabs: const [
+                    Tab(text: "Playlists"),
+                    Tab(text: "Favorites"),
+                  ],
+                ),
+              ),
+            ),
+          ];
+        },
+        body: Container(
+          color: darkModeBackgroundColor,
+          child: TabBarView(
+            controller: _tabController,
+            children: [_buildPlaylistsTab(), _buildFavoritesTab()],
+          ),
+        ),
       ),
     );
   }
@@ -82,59 +132,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
       clipBehavior: Clip.none,
       alignment: Alignment.center,
       children: [
-        // Banner image with Deep Midnight gradient overlay
         SizedBox(
-          height: 380, // Taller banner to fully cover all profile content
+          height: 320,
           width: double.infinity,
           child: Stack(
             fit: StackFit.expand,
             children: [
               Image.asset('lib/pages/images/banner.jpg', fit: BoxFit.cover),
-              // Gradient overlay matching Deep Midnight theme
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      darkModeBackgroundColor.withValues(alpha: 0.2),
+                      darkModeBackgroundColor.withValues(alpha: 0.4),
                       darkModeBackgroundColor.withValues(alpha: 0.8),
-                      darkModeBackgroundColor, // Solid at the bottom to blend with Scaffold
+                      darkModeBackgroundColor,
                     ],
                     stops: const [0.0, 0.6, 1.0],
                   ),
                 ),
               ),
-              // Blur effect
               ClipRRect(
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+                  filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
                   child: Container(color: Colors.transparent),
                 ),
               ),
             ],
           ),
         ),
-
-        // Content overlaid on the banner
         Padding(
           padding: EdgeInsets.only(
-            top:
-                MediaQuery.of(context).padding.top + 32, // Pushed down slightly
+            top: MediaQuery.of(context).padding.top + 32,
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
-                // Avatar with Light Blue glow ring
                 Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: cyanAccent.withValues(
-                              alpha: 0.4,
-                            ), // Using new Light Blue accent
+                            color: cyanAccent.withValues(alpha: 0.4),
                             blurRadius: 36,
                             spreadRadius: 4,
                           ),
@@ -145,8 +186,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         backgroundColor: darkThemeSecondaryColor,
                         child: CircleAvatar(
                           radius: 52,
-                          backgroundImage: (user?.photoURL != null)
-                              ? NetworkImage(user!.photoURL!)
+                          backgroundImage: (_photoUrl != null)
+                              ? NetworkImage(_photoUrl!)
                               : const AssetImage('lib/pages/images/avatar.jpg')
                                     as ImageProvider,
                         ),
@@ -159,12 +200,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       duration: 500.ms,
                       curve: Curves.easeOutBack,
                     ),
-
                 const SizedBox(height: 16),
-
-                // Name
                 Text(
-                  user?.displayName ?? 'Cirno, The Fairy',
+                  _displayName,
                   style: headerTextStyle.copyWith(
                     color: darkThemeTextColor,
                     fontSize: 28,
@@ -172,45 +210,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   textAlign: TextAlign.center,
                 ).animate().fade(duration: 400.ms, delay: 100.ms),
-
-                const SizedBox(height: 4),
-
-                // Email
-                Text(
-                  _getUserEmail(),
-                  style: bodyTextStyle.copyWith(
-                    color: darkThemeTextColor.withValues(alpha: 0.8),
-                    fontSize: 14,
-                  ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                ).animate().fade(duration: 400.ms, delay: 150.ms),
-
                 const SizedBox(height: 8),
-
-                // Join date
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.calendar_month_rounded,
-                      size: 14,
-                      color: cyanAccent,
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        'Joined 5 January 2023',
-                        style: bodyTextStyle.copyWith(
-                          color: darkThemeTextColor.withValues(alpha: 0.7),
-                          fontSize: 12,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ).animate().fade(duration: 400.ms, delay: 180.ms),
               ],
             ),
           ),
@@ -242,11 +242,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildStatItem('1.2K', 'Followers'),
+            StreamBuilder<List<SongInfo>>(
+              stream: _firestoreService.getFavoriteSongsStream(targetUserId),
+              builder: (context, snapshot) {
+                final count = snapshot.data?.length ?? 0;
+                return _buildStatItem(count.toString(), 'Favorites');
+              },
+            ),
             _buildDivider(),
-            _buildStatItem('345', 'Following'),
-            _buildDivider(),
-            _buildStatItem('12', 'Playlists'),
+            StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _firestoreService.getPlaylistsStream(targetUserId),
+              builder: (context, snapshot) {
+                final count = snapshot.data?.length ?? 0;
+                return _buildStatItem(count.toString(), 'Playlists');
+              },
+            ),
           ],
         ),
       ),
@@ -293,23 +303,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Row(
         children: [
           Expanded(
-            child: _buildActionBtn(
-              icon: Icons.edit_rounded,
-              label: 'Edit Profile',
-              color: cyanAccent,
-              textColor: Colors.black,
-              onTap: () {},
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildActionBtn(
-              icon: Icons.share_rounded,
-              label: 'Share',
-              color: Colors.transparent,
-              textColor: darkThemeTextColor,
-              outlined: true,
-              onTap: () {},
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: cyanAccent,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.settings_rounded,
+                      size: 18,
+                      color: Colors.black,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Edit Profile & Settings',
+                      style: bodyTextStyle.copyWith(
+                        color: Colors.black,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -317,220 +343,224 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildActionBtn({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required Color textColor,
-    bool outlined = false,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(24), // Pill shape for modern look
-          border: Border.all(
-            color: outlined
-                ? Colors.white.withValues(alpha: 0.2)
-                : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18, color: textColor),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: bodyTextStyle.copyWith(
-                color: textColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // ══════════════════════════════════════════
+  //  TABS CONTENT
+  // ══════════════════════════════════════════
+  Widget _buildPlaylistsTab() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _firestoreService.getPlaylistsStream(targetUserId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Colors.cyanAccent),
+          );
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Error loading playlists', style: bodyTextStyle),
+          );
+        }
 
-  // ══════════════════════════════════════════
-  //  SETTINGS MENU
-  // ══════════════════════════════════════════
-  Widget _buildSettingsMenu() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        decoration: BoxDecoration(
-          color: darkThemeSecondaryColor,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Column(
-            children: [
-              ModernSettingsTile(
-                icon: Icons.person_outline_rounded,
-                title: "Account Details",
-                onTap: () {},
+        final playlists = snapshot.data ?? [];
+        if (playlists.isEmpty) {
+          return _buildEmptyState('No playlists found', Icons.queue_music);
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.only(top: 16, bottom: 120),
+          itemCount: playlists.length,
+          itemBuilder: (context, index) {
+            final playlist = playlists[index];
+            final id = playlist['id'] as String;
+            final name = playlist['name'] as String;
+
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 8,
               ),
-              _menuDivider(),
-              ModernSettingsTile(
-                icon: Icons.lock_outline_rounded,
-                title: "Privacy & Security",
-                onTap: () {},
+              leading: StreamBuilder<List<SongInfo>>(
+                stream: _firestoreService.getPlaylistSongsStream(id),
+                builder: (context, songSnap) {
+                  final Widget placeholder = Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: darkThemeSecondaryColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.music_note, color: Colors.white54),
+                  );
+
+                  if (!songSnap.hasData || songSnap.data!.isEmpty) {
+                    return placeholder;
+                  }
+
+                  final firstSongUrl = songSnap.data!.first.thumbnailUrl;
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      firstSongUrl,
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => placeholder,
+                    ),
+                  );
+                },
               ),
-              _menuDivider(),
-              ModernSettingsTile(
-                icon: Icons.palette_outlined,
-                title: "Appearance",
-                onTap: () {},
-                trailing: Switch(
-                  value: isSwitched,
-                  onChanged: (val) {
-                    setState(() => isSwitched = val);
-                  },
-                  activeColor: cyanAccent,
-                  activeTrackColor: cyanAccent.withValues(alpha: 0.3),
+              title: Text(
+                name,
+                style: bodyTextStyle.copyWith(
+                  color: Colors.white,
+                  fontSize: 16,
                 ),
               ),
-              _menuDivider(),
-              ModernSettingsTile(
-                icon: Icons.info_outline_rounded,
-                title: "About",
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AboutScreen()),
-                  );
-                },
+              trailing: const Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.white54,
+                size: 16,
               ),
-              _menuDivider(),
-              ModernSettingsTile(
-                icon: Icons.help_outline_rounded,
-                title: "Help & Support",
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const HelpFeedbackScreen(),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PlaylistDetailScreen(
+                      playlistId: id,
+                      playlistName: name,
                     ),
-                  );
-                },
-              ),
-              _menuDivider(),
-              ModernSettingsTile(
-                icon: Icons.logout_rounded,
-                title: "Log Out",
-                isDestructive: true,
-                onTap: () async {
-                  final shouldLogout = await showDialog<bool>(
-                    context: context,
-                    barrierColor: Colors.black54,
-                    builder: (ctx) => AlertDialog(
-                      backgroundColor: darkThemeSecondaryColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      title: Row(
-                        children: [
-                          Icon(
-                            Icons.logout_rounded,
-                            color: Colors.redAccent,
-                            size: 28,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Log Out',
-                            style: headerTextStyle.copyWith(
-                              fontSize: 20,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                      content: Text(
-                        'Are you sure you want to log out?',
-                        style: bodyTextStyle.copyWith(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(false),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.white70,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.of(ctx).pop(true),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.redAccent,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Log Out',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-
-                  if (shouldLogout == true && mounted) {
-                    await FirebaseAuth.instance.signOut();
-                    await GoogleSignIn.instance.signOut();
-                    if (mounted) {
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => LoginScreen()),
-                        (route) => false,
-                      );
-                    }
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 
-  Widget _menuDivider() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      height: 1,
-      color: Colors.white.withValues(alpha: 0.05),
+  Widget _buildFavoritesTab() {
+    return StreamBuilder<List<SongInfo>>(
+      stream: _firestoreService.getFavoriteSongsStream(targetUserId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Colors.cyanAccent),
+          );
+        }
+
+        final songs = snapshot.data ?? [];
+        if (songs.isEmpty) {
+          return _buildEmptyState(
+            'No favorite songs yet',
+            Icons.favorite_border,
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.only(top: 16, bottom: 120),
+          itemCount: songs.length,
+          itemBuilder: (context, index) {
+            final song = songs[index];
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 8,
+              ),
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  song.thumbnailUrl,
+                  width: 50,
+                  height: 50,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              title: Text(
+                song.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: bodyTextStyle.copyWith(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: Text(
+                song.artist,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: bodyTextStyle.copyWith(
+                  color: Colors.white54,
+                  fontSize: 13,
+                ),
+              ),
+              trailing: Icon(Icons.play_arrow_rounded, color: cyanAccent),
+              onTap: () async {
+                // If the user taps a favorite, we add the favorites to the queue and play the selected one
+                await _audioService.playQueue(
+                  songs,
+                  startIndex: index,
+                  queueTitle: "Favorites",
+                );
+                if (mounted) {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => FullPlayerScreen(initialSong: song),
+                  );
+                }
+              },
+            );
+          },
+        );
+      },
     );
+  }
+
+  Widget _buildEmptyState(String message, IconData icon) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 48, color: Colors.white24),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: bodyTextStyle.copyWith(color: Colors.white54, fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  _SliverAppBarDelegate(this._tabBar);
+
+  final TabBar _tabBar;
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height + 16;
+  @override
+  double get maxExtent => _tabBar.preferredSize.height + 16;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(
+      color: darkModeBackgroundColor,
+      child: Column(children: [const SizedBox(height: 16), _tabBar]),
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
   }
 }

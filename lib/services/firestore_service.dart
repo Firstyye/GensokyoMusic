@@ -67,11 +67,12 @@ class FirestoreService {
     return ref.doc(videoId).snapshots().map((snap) => snap.exists);
   }
 
-  /// Returns a stream of all favorite songs for the current user.
-  Stream<List<SongInfo>> getFavoriteSongsStream() {
-    final ref = _favoritesRef;
-    if (ref == null) return Stream.value([]);
+  /// Returns a stream of all favorite songs for a specific user.
+  Stream<List<SongInfo>> getFavoriteSongsStream([String? uid]) {
+    final targetUid = uid ?? _auth.currentUser?.uid;
+    if (targetUid == null) return Stream.value([]);
 
+    final ref = _db.collection('favorites').doc(targetUid).collection('songs');
     return ref.orderBy('addedAt', descending: true).snapshots().map((snapshot) {
       return snapshot.docs.map((doc) {
         final data = doc.data();
@@ -102,26 +103,27 @@ class FirestoreService {
     });
   }
 
-  /// Returns a stream of playlists for the current user.
-  Stream<List<Map<String, dynamic>>> getPlaylistsStream() {
-    final user = _auth.currentUser;
-    if (user == null) return Stream.value([]);
+  /// Returns a stream of playlists for a specific user.
+  Stream<List<Map<String, dynamic>>> getPlaylistsStream([String? uid]) {
+    final targetUid = uid ?? _auth.currentUser?.uid;
+    if (targetUid == null) return Stream.value([]);
 
-    return _playlistsRef.where('ownerUid', isEqualTo: user.uid).snapshots().map(
-      (snapshot) {
-        final list = snapshot.docs
-            .map((doc) => {'id': doc.id, ...doc.data()})
-            .toList();
-        // Sort in memory to avoid requiring a composite index in Firestore
-        list.sort((a, b) {
-          final t1 = a['createdAt'] as Timestamp?;
-          final t2 = b['createdAt'] as Timestamp?;
-          if (t1 == null || t2 == null) return 0;
-          return t2.compareTo(t1);
+    return _playlistsRef
+        .where('ownerUid', isEqualTo: targetUid)
+        .snapshots()
+        .map((snapshot) {
+          final list = snapshot.docs
+              .map((doc) => {'id': doc.id, ...doc.data()})
+              .toList();
+          // Sort in memory to avoid requiring a composite index in Firestore
+          list.sort((a, b) {
+            final t1 = a['createdAt'] as Timestamp?;
+            final t2 = b['createdAt'] as Timestamp?;
+            if (t1 == null || t2 == null) return 0;
+            return t2.compareTo(t1);
+          });
+          return list;
         });
-        return list;
-      },
-    );
   }
 
   Future<void> addSongToPlaylist(String playlistId, SongInfo song) async {
