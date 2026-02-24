@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../models/song_info.dart';
 
+enum LoopMode { off, all, one }
+
 /// Singleton service managing the entire audio pipeline via youtube_player_flutter.
 /// This bypasses 403 Forbidden errors by using a Native WebView wrapping the official IFrame API.
 class AudioPlayerService {
@@ -37,13 +39,14 @@ class AudioPlayerService {
   final _playerStateController = StreamController<PlayerState>.broadcast();
   final _positionController = StreamController<Duration>.broadcast();
   final _durationController = StreamController<Duration?>.broadcast();
+  final _loopModeController = StreamController<LoopMode>.broadcast();
 
   // ── Queue Management ──
   final List<SongInfo> _queue = [];
   int _currentIndex = -1;
   String _queueTitle = 'Queue';
   bool _isShuffle = false;
-  bool _isLoop = false;
+  LoopMode _loopMode = LoopMode.off;
 
   YoutubePlayerController get controller => _controller;
 
@@ -51,11 +54,12 @@ class AudioPlayerService {
   Stream<PlayerState> get playerStateStream => _playerStateController.stream;
   Stream<Duration> get positionStream => _positionController.stream;
   Stream<Duration?> get durationStream => _durationController.stream;
+  Stream<LoopMode> get loopModeStream => _loopModeController.stream;
 
   SongInfo? get currentSong => _currentSong;
   bool get isPlaying => _isPlaying;
   bool get isShuffle => _isShuffle;
-  bool get isLoop => _isLoop;
+  LoopMode get loopMode => _loopMode;
 
   List<SongInfo> get queue => _queue;
   int get currentIndex => _currentIndex;
@@ -84,7 +88,7 @@ class AudioPlayerService {
         return; // Prevent multiple triggers while loading next song
       _isHandlingEnd = true;
 
-      if (_isLoop) {
+      if (_loopMode == LoopMode.one) {
         // Run asynchronously to avoid interrupting the controller's state broadcast
         Future.delayed(const Duration(milliseconds: 300), () {
           seek(Duration.zero);
@@ -161,9 +165,17 @@ class AudioPlayerService {
   Future<void> skipToNext() async {
     if (_queue.isEmpty) return;
 
-    _currentIndex++;
-    if (_currentIndex >= _queue.length) {
-      _currentIndex = 0; // Wrap around to start if we exceed
+    if (_currentIndex + 1 >= _queue.length) {
+      // If we are at the end of the queue
+      if (_loopMode == LoopMode.all) {
+        _currentIndex = 0; // Wrap around
+      } else {
+        // Pause and stop if loop off or loop one (when manually skipping)
+        pause();
+        return;
+      }
+    } else {
+      _currentIndex++;
     }
     await _playQueueItem();
   }
@@ -206,7 +218,14 @@ class AudioPlayerService {
   }
 
   void toggleLoop() {
-    _isLoop = !_isLoop;
+    if (_loopMode == LoopMode.off) {
+      _loopMode = LoopMode.all;
+    } else if (_loopMode == LoopMode.all) {
+      _loopMode = LoopMode.one;
+    } else {
+      _loopMode = LoopMode.off;
+    }
+    _loopModeController.add(_loopMode);
   }
 
   Future<void> stop() async {

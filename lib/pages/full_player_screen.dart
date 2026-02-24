@@ -326,8 +326,10 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                     // Loop
                     IconButton(
                       icon: Icon(
-                        Icons.repeat_rounded,
-                        color: _audioService.isLoop
+                        _audioService.loopMode == LoopMode.one
+                            ? Icons.repeat_one_rounded
+                            : Icons.repeat_rounded,
+                        color: _audioService.loopMode != LoopMode.off
                             ? cyanAccent
                             : Colors.white54,
                         size: 28,
@@ -353,10 +355,14 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                         final nextSong = queue[currentIndex + 1];
                         upNextText =
                             "Up Next: ${nextSong.title} • ${nextSong.artist}";
-                      } else if (_audioService.isLoop) {
+                      } else if (_audioService.loopMode == LoopMode.all) {
                         final nextSong = queue[0];
                         upNextText =
-                            "Up Next (Loop): ${nextSong.title} • ${nextSong.artist}";
+                            "Up Next (Loop All): ${nextSong.title} • ${nextSong.artist}";
+                      } else if (_audioService.loopMode == LoopMode.one) {
+                        final nextSong = queue[currentIndex];
+                        upNextText =
+                            "Up Next (Loop One): ${nextSong.title} • ${nextSong.artist}";
                       }
                     }
 

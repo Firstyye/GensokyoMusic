@@ -172,14 +172,35 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 final name = playlist['name'] as String;
 
                 return ListTile(
-                  leading: Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Colors.white10,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(Icons.queue_music, color: cyanAccent),
+                  leading: StreamBuilder<List<SongInfo>>(
+                    stream: _firestoreService.getPlaylistSongsStream(id),
+                    builder: (context, snapshot) {
+                      Widget placeholder = Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white10,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.queue_music, color: cyanAccent),
+                      );
+
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return placeholder;
+                      }
+
+                      final firstSongUrl = snapshot.data!.first.thumbnailUrl;
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          firstSongUrl,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => placeholder,
+                        ),
+                      );
+                    },
                   ),
                   title: Text(
                     name,
@@ -209,14 +230,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
             );
           },
         ),
-        Positioned(
-          bottom: 100,
-          right: 24,
-          child: FloatingActionButton(
-            backgroundColor: cyanAccent,
-            child: const Icon(Icons.add, color: Colors.black),
-            onPressed: () => _showCreatePlaylistDialog(context),
-          ),
+        StreamBuilder<SongInfo?>(
+          stream: _audioService.currentSongStream,
+          builder: (context, snapshot) {
+            // If a song is loaded, the mini player is visible. Shift the FAB up.
+            final hasMiniPlayer = snapshot.hasData;
+            return Positioned(
+              bottom: hasMiniPlayer ? 190 : 100,
+              right: 24,
+              child: FloatingActionButton(
+                backgroundColor: cyanAccent,
+                child: const Icon(Icons.add, color: Colors.black),
+                onPressed: () => _showCreatePlaylistDialog(context),
+              ),
+            );
+          },
         ),
       ],
     );

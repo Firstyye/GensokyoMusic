@@ -116,40 +116,43 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
                 icon: const Icon(Icons.menu, color: Colors.white, size: 28),
                 onPressed: () => _scaffoldKey.currentState?.openDrawer(),
               ),
-              title: Row(
-                children: [
-                  Image.asset(
-                    'assets/images/GensokyoMusic.png',
-                    width: 48,
-                    height: 48,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(width: 8),
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'Gensokyo',
-                          style: headerTextStyle.copyWith(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        TextSpan(
-                          text: 'Music',
-                          style: headerTextStyle.copyWith(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.redAccent,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                      ],
+              title: GestureDetector(
+                onTap: () => _onItemTapped(0),
+                child: Row(
+                  children: [
+                    Image.asset(
+                      'assets/images/GensokyoMusic.png',
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.contain,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Gensokyo',
+                            style: headerTextStyle.copyWith(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          TextSpan(
+                            text: 'Music',
+                            style: headerTextStyle.copyWith(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.redAccent,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 IconButton(
@@ -414,6 +417,71 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
                   padding: EdgeInsets.symmetric(horizontal: 16.0),
                   child: Divider(color: Colors.white24, height: 30),
                 ),
+
+                // User Profile Header
+                if (FirebaseAuth.instance.currentUser != null) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 8,
+                    ),
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.pop(context); // Close the drawer
+                        _onItemTapped(4); // Navigate to Profile tab
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Row(
+                          children: [
+                            _buildAvatar(FirebaseAuth.instance.currentUser),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    FirebaseAuth
+                                            .instance
+                                            .currentUser
+                                            ?.displayName ??
+                                        FirebaseAuth.instance.currentUser?.email
+                                            ?.split('@')
+                                            .first ??
+                                        'User',
+                                    style: bodyTextStyle.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (FirebaseAuth
+                                          .instance
+                                          .currentUser
+                                          ?.email !=
+                                      null)
+                                    Text(
+                                      FirebaseAuth.instance.currentUser!.email!,
+                                      style: bodyTextStyle.copyWith(
+                                        color: Colors.white54,
+                                        fontSize: 12,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
 
                 // Logout
                 ListTile(
