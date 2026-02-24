@@ -29,6 +29,7 @@ class AudioPlayerService {
 
   late final YoutubePlayerController _controller;
   bool _isPlaying = false;
+  bool _isHandlingEnd = false;
   SongInfo? _currentSong;
 
   // ── Streams ──
@@ -40,6 +41,7 @@ class AudioPlayerService {
   // ── Queue Management ──
   final List<SongInfo> _queue = [];
   int _currentIndex = -1;
+  String _queueTitle = 'Queue';
   bool _isShuffle = false;
   bool _isLoop = false;
 
@@ -55,6 +57,10 @@ class AudioPlayerService {
   bool get isShuffle => _isShuffle;
   bool get isLoop => _isLoop;
 
+  List<SongInfo> get queue => _queue;
+  int get currentIndex => _currentIndex;
+  String get queueTitle => _queueTitle;
+
   void _listener() {
     if (!_controller.value.isReady) return;
 
@@ -62,6 +68,7 @@ class AudioPlayerService {
 
     if (value.playerState == PlayerState.playing) {
       _isPlaying = true;
+      _isHandlingEnd = false; // Reset debounce when successfully playing
     } else if (value.playerState == PlayerState.paused ||
         value.playerState == PlayerState.ended) {
       _isPlaying = false;
@@ -73,9 +80,16 @@ class AudioPlayerService {
 
     // Auto-advance to next song if ended
     if (value.playerState == PlayerState.ended) {
+      if (_isHandlingEnd)
+        return; // Prevent multiple triggers while loading next song
+      _isHandlingEnd = true;
+
       if (_isLoop) {
-        seek(Duration.zero);
-        play();
+        // Run asynchronously to avoid interrupting the controller's state broadcast
+        Future.delayed(const Duration(milliseconds: 300), () {
+          seek(Duration.zero);
+          play();
+        });
       } else {
         skipToNext();
       }
@@ -95,8 +109,13 @@ class AudioPlayerService {
   }
 
   /// Sets up a queue of songs and starts playing from the specified index
-  Future<void> playQueue(List<SongInfo> songs, {int startIndex = 0}) async {
+  Future<void> playQueue(
+    List<SongInfo> songs, {
+    int startIndex = 0,
+    String? queueTitle,
+  }) async {
     if (songs.isEmpty) return;
+    _queueTitle = queueTitle ?? 'Queue';
     _queue.clear();
     _queue.addAll(songs);
     if (_isShuffle) {
@@ -149,6 +168,12 @@ class AudioPlayerService {
     await _playQueueItem();
   }
 
+  Future<void> skipToQueueItem(int index) async {
+    if (index < 0 || index >= _queue.length) return;
+    _currentIndex = index;
+    await _playQueueItem();
+  }
+
   Future<void> skipToPrevious() async {
     if (_queue.isEmpty) return;
 
@@ -168,6 +193,16 @@ class AudioPlayerService {
 
   void toggleShuffle() {
     _isShuffle = !_isShuffle;
+
+    // If the user turns ON shuffle during playback, shuffle the queue but keep the current song at the current index.
+    if (_isShuffle && _queue.isNotEmpty && _currentIndex >= 0) {
+      final current = _queue[_currentIndex];
+      _queue.shuffle();
+      // Move current song back to the current index (or front) so playback flow isn't interrupted
+      _queue.remove(current);
+      _queue.insert(0, current);
+      _currentIndex = 0;
+    }
   }
 
   void toggleLoop() {

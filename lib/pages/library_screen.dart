@@ -1,38 +1,224 @@
 import 'package:flutter/material.dart';
 import '../constant/my_constant.dart';
+import '../services/firestore_service.dart';
+import '../services/audio_player_service.dart';
+import '../models/song_info.dart';
+import '../widgets/modern_song_list_tile.dart';
+import 'playlist_detail_screen.dart';
 
-class LibraryScreen extends StatelessWidget {
+class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.library_music,
-              size: 80,
-              color: Colors.blueAccent.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              "My Library",
-              style: headerTextStyle.copyWith(
-                fontSize: 28,
-                color: Colors.blueAccent,
+  State<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends State<LibraryScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
+  final AudioPlayerService _audioService = AudioPlayerService();
+
+  void _showCreatePlaylistDialog(BuildContext context) {
+    final TextEditingController controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: darkModeBackgroundColor,
+          title: Text(
+            'Create Playlist',
+            style: headerTextStyle.copyWith(color: Colors.white),
+          ),
+          content: TextField(
+            controller: controller,
+            style: bodyTextStyle.copyWith(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Playlist Name',
+              hintStyle: TextStyle(color: Colors.white54),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white24),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: cyanAccent),
               ),
             ),
-            const SizedBox(height: 10),
-            Text(
-              "Your favorite songs and playlists",
-              style: bodyTextStyle.copyWith(color: Colors.grey.shade600),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: cyanAccent),
+              onPressed: () async {
+                final text = controller.text.trim();
+                if (text.isNotEmpty) {
+                  await _firestoreService.createPlaylist(text);
+                  if (context.mounted) Navigator.pop(context);
+                }
+              },
+              child: Text(
+                'Create',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: kToolbarHeight), // Spacer for global app bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: TabBar(
+                indicatorColor: cyanAccent,
+                labelColor: cyanAccent,
+                unselectedLabelColor: Colors.white54,
+                tabs: const [
+                  Tab(text: 'Favorites', icon: Icon(Icons.favorite)),
+                  Tab(text: 'Playlists', icon: Icon(Icons.queue_music)),
+                ],
+              ),
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [_buildFavoritesTab(), _buildPlaylistsTab()],
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildFavoritesTab() {
+    return StreamBuilder<List<SongInfo>>(
+      stream: _firestoreService.getFavoriteSongsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator(color: cyanAccent));
+        }
+        final songs = snapshot.data;
+        if (songs == null || songs.isEmpty) {
+          return Center(
+            child: Text(
+              'No favorite songs yet.',
+              style: bodyTextStyle.copyWith(color: Colors.white54),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.only(top: 8, bottom: 100),
+          itemCount: songs.length,
+          itemBuilder: (context, index) {
+            final song = songs[index];
+            return ModernSongListTile(
+              title: song.title,
+              artist: song.artist,
+              imageUrl: song.thumbnailUrl,
+              indexNumber: (index + 1).toString(),
+              onTap: () {
+                _audioService.playQueue(
+                  songs,
+                  startIndex: index,
+                  queueTitle: 'Favorites',
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPlaylistsTab() {
+    return Stack(
+      children: [
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _firestoreService.getPlaylistsStream(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(
+                child: CircularProgressIndicator(color: cyanAccent),
+              );
+            }
+            final playlists = snapshot.data;
+            if (playlists == null || playlists.isEmpty) {
+              return Center(
+                child: Text(
+                  'No playlists created yet.',
+                  style: bodyTextStyle.copyWith(color: Colors.white54),
+                ),
+              );
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.only(top: 8, bottom: 100),
+              itemCount: playlists.length,
+              itemBuilder: (context, index) {
+                final playlist = playlists[index];
+                final id = playlist['id'] as String;
+                final name = playlist['name'] as String;
+
+                return ListTile(
+                  leading: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.white10,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.queue_music, color: cyanAccent),
+                  ),
+                  title: Text(
+                    name,
+                    style: bodyTextStyle.copyWith(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.white54,
+                    size: 16,
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PlaylistDetailScreen(
+                          playlistId: id,
+                          playlistName: name,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ),
+        Positioned(
+          bottom: 100,
+          right: 24,
+          child: FloatingActionButton(
+            backgroundColor: cyanAccent,
+            child: const Icon(Icons.add, color: Colors.black),
+            onPressed: () => _showCreatePlaylistDialog(context),
+          ),
+        ),
+      ],
     );
   }
 }

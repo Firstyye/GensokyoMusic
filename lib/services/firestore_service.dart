@@ -66,4 +66,95 @@ class FirestoreService {
 
     return ref.doc(videoId).snapshots().map((snap) => snap.exists);
   }
+
+  /// Returns a stream of all favorite songs for the current user.
+  Stream<List<SongInfo>> getFavoriteSongsStream() {
+    final ref = _favoritesRef;
+    if (ref == null) return Stream.value([]);
+
+    return ref.orderBy('addedAt', descending: true).snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return SongInfo(
+          title: data['title'] ?? '',
+          artist: data['artist'] ?? '',
+          thumbnailUrl: data['thumbnailUrl'] ?? '',
+          youtubeVideoId: data['youtubeVideoId'] ?? doc.id,
+        );
+      }).toList();
+    });
+  }
+
+  // ─── Playlists ───
+
+  CollectionReference<Map<String, dynamic>> get _playlistsRef {
+    return _db.collection('playlists');
+  }
+
+  Future<void> createPlaylist(String name) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    await _playlistsRef.add({
+      'name': name,
+      'ownerUid': user.uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Returns a stream of playlists for the current user.
+  Stream<List<Map<String, dynamic>>> getPlaylistsStream() {
+    final user = _auth.currentUser;
+    if (user == null) return Stream.value([]);
+
+    return _playlistsRef.where('ownerUid', isEqualTo: user.uid).snapshots().map(
+      (snapshot) {
+        final list = snapshot.docs
+            .map((doc) => {'id': doc.id, ...doc.data()})
+            .toList();
+        // Sort in memory to avoid requiring a composite index in Firestore
+        list.sort((a, b) {
+          final t1 = a['createdAt'] as Timestamp?;
+          final t2 = b['createdAt'] as Timestamp?;
+          if (t1 == null || t2 == null) return 0;
+          return t2.compareTo(t1);
+        });
+        return list;
+      },
+    );
+  }
+
+  Future<void> addSongToPlaylist(String playlistId, SongInfo song) async {
+    await _playlistsRef
+        .doc(playlistId)
+        .collection('songs')
+        .doc(song.youtubeVideoId)
+        .set({
+          'title': song.title,
+          'artist': song.artist,
+          'thumbnailUrl': song.thumbnailUrl,
+          'youtubeVideoId': song.youtubeVideoId,
+          'addedAt': FieldValue.serverTimestamp(),
+        });
+  }
+
+  /// Returns a stream of songs for a specific playlist.
+  Stream<List<SongInfo>> getPlaylistSongsStream(String playlistId) {
+    return _playlistsRef
+        .doc(playlistId)
+        .collection('songs')
+        .orderBy('addedAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            final data = doc.data();
+            return SongInfo(
+              title: data['title'] ?? '',
+              artist: data['artist'] ?? '',
+              thumbnailUrl: data['thumbnailUrl'] ?? '',
+              youtubeVideoId: data['youtubeVideoId'] ?? doc.id,
+            );
+          }).toList();
+        });
+  }
 }

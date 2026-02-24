@@ -336,25 +336,39 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
           final songs = snapshot.data!;
+
+          // Pre-compute the playlist for queue functionality
+          final validSongs = songs.where((s) => s.pvId.isNotEmpty).toList();
+          final queue = validSongs
+              .map(
+                (s) => SongInfo(
+                  title: s.name,
+                  artist: s.artist,
+                  thumbnailUrl: s.image,
+                  youtubeVideoId: s.pvId,
+                ),
+              )
+              .toList();
+
           return Column(
             children: songs.asMap().entries.map((entry) {
               final index = entry.key;
               final song = entry.value;
+
+              // Find the correct index in the queue for this song (-1 if not in queue)
+              final queueIndex = validSongs.indexOf(song);
+
               return ModernSongListTile(
                     title: song.name,
                     artist: song.artist,
                     imageUrl: song.image,
                     indexNumber: (index + 1).toString(),
-                    onTap: song.pvId.isNotEmpty
+                    onTap: song.pvId.isNotEmpty && queueIndex != -1
                         ? () {
-                            _audioService.playFromYoutubeId(
-                              song.pvId,
-                              SongInfo(
-                                title: song.name,
-                                artist: song.artist,
-                                thumbnailUrl: song.image,
-                                youtubeVideoId: song.pvId,
-                              ),
+                            _audioService.playQueue(
+                              queue,
+                              startIndex: queueIndex,
+                              queueTitle: 'Suggested Tracks',
                             );
                           }
                         : null,

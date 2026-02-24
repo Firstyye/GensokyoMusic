@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../constant/my_constant.dart';
 import '../services/audio_player_service.dart';
+import '../services/firestore_service.dart';
 import '../models/song_info.dart';
 
 import '../pages/full_player_screen.dart';
@@ -20,9 +21,9 @@ class MiniPlayer extends StatefulWidget {
 class _MiniPlayerState extends State<MiniPlayer>
     with SingleTickerProviderStateMixin {
   final AudioPlayerService _audioService = AudioPlayerService();
+  final FirestoreService _firestoreService = FirestoreService();
 
   late final AnimationController _spinController;
-  bool _isFavorite = false;
 
   @override
   void initState() {
@@ -61,11 +62,12 @@ class _MiniPlayerState extends State<MiniPlayer>
 
         return InkWell(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => FullPlayerScreen(initialSong: song),
-              ),
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              useSafeArea: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => FullPlayerScreen(initialSong: song),
             );
           },
           child: Container(
@@ -126,18 +128,26 @@ class _MiniPlayerState extends State<MiniPlayer>
                       ),
 
                       // Favorite Button
-                      IconButton(
-                        icon: Icon(
-                          _isFavorite
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          color: _isFavorite
-                              ? Colors.redAccent
-                              : Colors.white54,
-                          size: 22,
+                      StreamBuilder<bool>(
+                        stream: _firestoreService.isFavoriteStream(
+                          song.youtubeVideoId,
                         ),
-                        onPressed: () {
-                          setState(() => _isFavorite = !_isFavorite);
+                        builder: (context, favSnapshot) {
+                          final isFavorite = favSnapshot.data ?? false;
+                          return IconButton(
+                            icon: Icon(
+                              isFavorite
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              color: isFavorite
+                                  ? Colors.redAccent
+                                  : Colors.white54,
+                              size: 22,
+                            ),
+                            onPressed: () {
+                              _firestoreService.toggleFavorite(song);
+                            },
+                          );
                         },
                       ),
 

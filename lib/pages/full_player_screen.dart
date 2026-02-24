@@ -5,6 +5,7 @@ import '../models/song_info.dart';
 import '../services/audio_player_service.dart';
 import '../services/firestore_service.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../widgets/marquee_text.dart';
 
 class FullPlayerScreen extends StatefulWidget {
   final SongInfo initialSong;
@@ -157,6 +158,15 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                           ),
                         ],
                       ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.playlist_add_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                      onPressed: () =>
+                          _showAddToPlaylistBottomSheet(context, _currentSong),
                     ),
                     IconButton(
                       icon: Icon(
@@ -330,9 +340,283 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                     ),
                   ],
                 ),
-                Spacer(flex: 2),
+                // ── Up Next Peek (YouTube Music Style) ──
+                StreamBuilder<SongInfo?>(
+                  stream: _audioService.currentSongStream,
+                  builder: (context, snapshot) {
+                    final queue = _audioService.queue;
+                    final currentIndex = _audioService.currentIndex;
+
+                    String upNextText = "Up Next: End of queue";
+                    if (queue.isNotEmpty && currentIndex >= 0) {
+                      if (currentIndex + 1 < queue.length) {
+                        final nextSong = queue[currentIndex + 1];
+                        upNextText =
+                            "Up Next: ${nextSong.title} • ${nextSong.artist}";
+                      } else if (_audioService.isLoop) {
+                        final nextSong = queue[0];
+                        upNextText =
+                            "Up Next (Loop): ${nextSong.title} • ${nextSong.artist}";
+                      }
+                    }
+
+                    return GestureDetector(
+                      onTap: () => _showQueueList(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        color: Colors
+                            .transparent, // Ensure tap area covers the whole block
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Drag Handle
+                            Container(
+                              width: 36,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: Colors.white24,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            // Marquee Text
+                            SizedBox(
+                              width: MediaQuery.of(context).size.width * 0.7,
+                              child: MarqueeText(
+                                text: upNextText,
+                                style: bodyTextStyle.copyWith(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                Spacer(flex: 1),
               ],
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showQueueList(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent, // allow translucent styling
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.65,
+          decoration: BoxDecoration(
+            color: darkModeBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              // ── Handle / Title ──
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Column(
+                children: [
+                  Text(
+                    'Up Next',
+                    style: bodyTextStyle.copyWith(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (_audioService.queueTitle != 'Queue' &&
+                      _audioService.queueTitle.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        _audioService.queueTitle,
+                        style: bodyTextStyle.copyWith(
+                          color: cyanAccent,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Divider(height: 1, color: Colors.white.withValues(alpha: 0.1)),
+
+              // ── Queue List ──
+              Expanded(
+                child: StreamBuilder<SongInfo?>(
+                  stream: _audioService.currentSongStream,
+                  builder: (context, snapshot) {
+                    final queue = _audioService.queue;
+                    if (queue.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No songs in queue',
+                          style: bodyTextStyle.copyWith(color: Colors.white54),
+                        ),
+                      );
+                    }
+
+                    final currentIndex = _audioService.currentIndex;
+
+                    return ListView.builder(
+                      itemCount: queue.length,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemBuilder: (context, index) {
+                        final song = queue[index];
+                        final isPlaying = index == currentIndex;
+
+                        return ListTile(
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              song.thumbnailUrl,
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          title: Text(
+                            song.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: bodyTextStyle.copyWith(
+                              color: isPlaying ? cyanAccent : Colors.white,
+                              fontWeight: isPlaying
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                          subtitle: Text(
+                            song.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: bodyTextStyle.copyWith(
+                              color: isPlaying
+                                  ? cyanAccent.withValues(alpha: 0.7)
+                                  : Colors.white54,
+                            ),
+                          ),
+                          trailing: isPlaying
+                              ? Icon(Icons.volume_up_rounded, color: cyanAccent)
+                              : null,
+                          onTap: () {
+                            _audioService.skipToQueueItem(index);
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddToPlaylistBottomSheet(BuildContext context, SongInfo song) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.6,
+          decoration: BoxDecoration(
+            color: darkModeBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2.5),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Add to Playlist',
+                style: headerTextStyle.copyWith(
+                  color: Colors.white,
+                  fontSize: 20,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _firestoreService.getPlaylistsStream(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(
+                        child: CircularProgressIndicator(color: cyanAccent),
+                      );
+                    }
+                    final playlists = snapshot.data;
+                    if (playlists == null || playlists.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No playlists found.',
+                          style: bodyTextStyle.copyWith(color: Colors.white54),
+                        ),
+                      );
+                    }
+                    return ListView.builder(
+                      itemCount: playlists.length,
+                      itemBuilder: (context, index) {
+                        final playlist = playlists[index];
+                        final id = playlist['id'] as String;
+                        final name = playlist['name'] as String;
+                        return ListTile(
+                          leading: Icon(Icons.queue_music, color: cyanAccent),
+                          title: Text(
+                            name,
+                            style: bodyTextStyle.copyWith(color: Colors.white),
+                          ),
+                          onTap: () async {
+                            Navigator.pop(context); // Close sheet
+                            await _firestoreService.addSongToPlaylist(id, song);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Added to $name',
+                                    style: bodyTextStyle,
+                                  ),
+                                  backgroundColor: Colors.green.shade700,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         );
       },
