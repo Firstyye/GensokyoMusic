@@ -10,6 +10,7 @@ import '../constant/my_constant.dart';
 import 'home_screen.dart';
 import 'explore_screen.dart';
 import 'library_screen.dart';
+import 'social_screen.dart';
 import 'profile_screen.dart';
 
 // Import MiniPlayer
@@ -37,6 +38,11 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
       Icons.library_music_outlined,
       'Library',
     ),
+    _NavItem(
+      Icons.chat_bubble_rounded,
+      Icons.chat_bubble_outline_rounded,
+      'Social',
+    ),
     _NavItem(Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
   ];
 
@@ -44,6 +50,7 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
     HomeScreen(),
     const ExploreScreen(),
     const LibraryScreen(),
+    const SocialScreen(),
     const ProfileScreen(),
   ];
 
@@ -274,7 +281,7 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
   // ══════════════════════════════════════════
   Widget _buildAvatar(User? user) {
     return GestureDetector(
-      onTap: () => _onItemTapped(3), // Profile is index 3 now
+      onTap: () => _onItemTapped(4), // Profile is index 4
       child: Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
