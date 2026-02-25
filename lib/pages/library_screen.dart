@@ -128,12 +128,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
               artist: song.artist,
               imageUrl: song.thumbnailUrl,
               indexNumber: (index + 1).toString(),
-              onTap: () {
-                _audioService.playQueue(
+              onTap: () async {
+                final result = await _audioService.playQueue(
                   songs,
                   startIndex: index,
                   queueTitle: 'Favorites',
                 );
+                if (result == PlayResult.blockedAsListener && context.mounted) {
+                  showListenerBlockedDialog(context);
+                }
               },
             );
           },

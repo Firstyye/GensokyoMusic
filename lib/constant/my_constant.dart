@@ -54,3 +54,41 @@ TextStyle bodyTextStyle = TextStyle(
   fontSize: 14,
   fontWeight: FontWeight.w400,
 );
+
+/// Shows a dialog informing a listener they must leave the party before playing.
+void showListenerBlockedDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: const Color(0xFF1A1A2E),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      icon: const Icon(
+        Icons.headset_off_rounded,
+        color: Colors.orangeAccent,
+        size: 48,
+      ),
+      title: Text(
+        'In a Live Party',
+        style: headerTextStyle.copyWith(color: Colors.white),
+      ),
+      content: Text(
+        'You are currently listening in a Live Party. Leave the party first to play songs independently.',
+        style: bodyTextStyle.copyWith(color: Colors.white70),
+        textAlign: TextAlign.center,
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text(
+            'Got it',
+            style: bodyTextStyle.copyWith(
+              color: cyanAccent,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}

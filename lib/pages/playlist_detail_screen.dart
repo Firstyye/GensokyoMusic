@@ -104,12 +104,16 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                               color: Colors.black,
                             ),
                           ),
-                          onPressed: () {
-                            _audioService.playQueue(
+                          onPressed: () async {
+                            final result = await _audioService.playQueue(
                               songs,
                               startIndex: 0,
                               queueTitle: widget.playlistName,
                             );
+                            if (result == PlayResult.blockedAsListener &&
+                                context.mounted) {
+                              showListenerBlockedDialog(context);
+                            }
                           },
                         ),
                       ),
@@ -124,12 +128,16 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                               artist: song.artist,
                               imageUrl: song.thumbnailUrl,
                               indexNumber: (index + 1).toString(),
-                              onTap: () {
-                                _audioService.playQueue(
+                              onTap: () async {
+                                final result = await _audioService.playQueue(
                                   songs,
                                   startIndex: index,
                                   queueTitle: widget.playlistName,
                                 );
+                                if (result == PlayResult.blockedAsListener &&
+                                    context.mounted) {
+                                  showListenerBlockedDialog(context);
+                                }
                               },
                             );
                           },

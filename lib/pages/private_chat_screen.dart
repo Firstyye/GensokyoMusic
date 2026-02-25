@@ -91,7 +91,14 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
     final song = SongInfo.fromMap(Map<String, dynamic>.from(songMap));
 
     // Play immediately
-    await _audioService.playFromYoutubeId(song.youtubeVideoId, song);
+    final result = await _audioService.playFromYoutubeId(
+      song.youtubeVideoId,
+      song,
+    );
+    if (result == PlayResult.blockedAsListener && mounted) {
+      showListenerBlockedDialog(context);
+      return;
+    }
 
     if (mounted) {
       Navigator.push(

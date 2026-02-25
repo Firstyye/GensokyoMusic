@@ -51,11 +51,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
-  void _playSong(SongInfo song) {
+  void _playSong(SongInfo song) async {
     // Hide keyboard
     FocusScope.of(context).unfocus();
     // Play song
-    AudioPlayerService().playFromYoutubeId(song.youtubeVideoId, song);
+    final result = await AudioPlayerService().playFromYoutubeId(
+      song.youtubeVideoId,
+      song,
+    );
+    if (result == PlayResult.blockedAsListener && mounted) {
+      showListenerBlockedDialog(context);
+    }
   }
 
   @override

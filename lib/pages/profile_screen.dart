@@ -652,11 +652,15 @@ class _ProfileScreenState extends State<ProfileScreen>
               trailing: Icon(Icons.play_arrow_rounded, color: cyanAccent),
               onTap: () async {
                 // If the user taps a favorite, we add the favorites to the queue and play the selected one
-                await _audioService.playQueue(
+                final result = await _audioService.playQueue(
                   songs,
                   startIndex: index,
                   queueTitle: "Favorites",
                 );
+                if (result == PlayResult.blockedAsListener && mounted) {
+                  showListenerBlockedDialog(context);
+                  return;
+                }
                 if (mounted) {
                   showModalBottomSheet(
                     context: context,

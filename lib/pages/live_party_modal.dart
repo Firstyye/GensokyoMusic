@@ -134,7 +134,7 @@ class _LivePartyModalState extends State<LivePartyModal> {
     }
 
     setState(() => _isLoading = true);
-    final partyId = await _dbService.createParty(initialSong: song);
+    final partyId = await _dbService.createParty();
     setState(() => _isLoading = false);
 
     if (partyId != null && mounted) {

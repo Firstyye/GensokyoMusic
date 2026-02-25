@@ -7,6 +7,8 @@ import '../services/realtime_database_service.dart';
 
 enum LoopMode { off, all, one }
 
+enum PlayResult { ok, blockedAsListener }
+
 /// Singleton service managing the entire audio pipeline via youtube_player_flutter.
 /// This bypasses 403 Forbidden errors by using a Native WebView wrapping the official IFrame API.
 class AudioPlayerService {
@@ -118,21 +120,63 @@ class AudioPlayerService {
   //  MAIN PIPELINE
   // ═══════════════════════════════════════════
 
-  /// Plays a single song immediately and clears the queue
-  Future<void> playFromYoutubeId(String videoId, SongInfo songInfo) async {
+  /// Plays a single song immediately and clears the queue.
+  /// If in a party as host, adds the song to the party queue.
+  /// If in a party as listener, blocks playback.
+  Future<PlayResult> playFromYoutubeId(
+    String videoId,
+    SongInfo songInfo,
+  ) async {
+    // Listener in a party → block
+    if (_currentPartyId != null && !_isHost) {
+      return PlayResult.blockedAsListener;
+    }
+
+    // Host in a party → add to party queue and play
+    if (_currentPartyId != null && _isHost) {
+      _queue.add(songInfo);
+      _currentIndex = _queue.length - 1;
+      await _playQueueItem();
+      _rtdbService.addSongToQueue(_currentPartyId!, songInfo);
+      return PlayResult.ok;
+    }
+
+    // Normal (not in any party)
     _queue.clear();
     _queue.add(songInfo);
     _currentIndex = 0;
     await _playQueueItem();
+    return PlayResult.ok;
   }
 
-  /// Sets up a queue of songs and starts playing from the specified index
-  Future<void> playQueue(
+  /// Sets up a queue of songs and starts playing from the specified index.
+  /// If in a party as host, adds all songs to party queue.
+  /// If in a party as listener, blocks playback.
+  Future<PlayResult> playQueue(
     List<SongInfo> songs, {
     int startIndex = 0,
     String? queueTitle,
   }) async {
-    if (songs.isEmpty) return;
+    if (songs.isEmpty) return PlayResult.ok;
+
+    // Listener in a party → block
+    if (_currentPartyId != null && !_isHost) {
+      return PlayResult.blockedAsListener;
+    }
+
+    // Host in a party → add songs to party queue
+    if (_currentPartyId != null && _isHost) {
+      for (final song in songs) {
+        _queue.add(song);
+        _rtdbService.addSongToQueue(_currentPartyId!, song);
+      }
+      _currentIndex =
+          _queue.length - songs.length + startIndex.clamp(0, songs.length - 1);
+      await _playQueueItem();
+      return PlayResult.ok;
+    }
+
+    // Normal (not in any party)
     _queueTitle = queueTitle ?? 'Queue';
     _queue.clear();
     _queue.addAll(songs);
@@ -143,6 +187,7 @@ class AudioPlayerService {
       _currentIndex = startIndex.clamp(0, _queue.length - 1);
     }
     await _playQueueItem();
+    return PlayResult.ok;
   }
 
   Future<void> _playQueueItem() async {

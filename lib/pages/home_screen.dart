@@ -487,12 +487,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     imageUrl: song.image,
                     indexNumber: (index + 1).toString(),
                     onTap: song.pvId.isNotEmpty && queueIndex != -1
-                        ? () {
-                            _audioService.playQueue(
+                        ? () async {
+                            final result = await _audioService.playQueue(
                               queue,
                               startIndex: queueIndex,
                               queueTitle: 'Suggested Tracks',
                             );
+                            if (result == PlayResult.blockedAsListener &&
+                                mounted) {
+                              showListenerBlockedDialog(context);
+                            }
                           }
                         : null,
                   )
