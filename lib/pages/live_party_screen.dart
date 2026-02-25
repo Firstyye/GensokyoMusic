@@ -209,6 +209,26 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
     );
   }
 
+  String _formatTimestamp(int timestamp) {
+    final now = DateTime.now();
+    final dt = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final diff = now.difference(dt);
+    final hour = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
+    final timeStr = '$hour:$min';
+
+    if (now.year == dt.year && now.month == dt.month && now.day == dt.day) {
+      return timeStr; // Today
+    } else if (diff.inDays == 1 || (diff.inDays == 0 && now.day != dt.day)) {
+      return 'Yesterday, $timeStr';
+    } else {
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      final year = dt.year;
+      return '$day/$month/$year, $timeStr';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -415,58 +435,102 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
             final msg = msgs[index];
             final isMe = msg['uid'] == myUid;
 
-            return Align(
-              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+            Widget bubble = Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.75,
+              ),
+              decoration: BoxDecoration(
+                color: isMe
+                    ? cyanAccent.withValues(alpha: 0.2)
+                    : darkThemeSecondaryColor,
+                borderRadius: BorderRadius.circular(20).copyWith(
+                  bottomRight: isMe
+                      ? const Radius.circular(0)
+                      : const Radius.circular(20),
+                  bottomLeft: !isMe
+                      ? const Radius.circular(0)
+                      : const Radius.circular(20),
                 ),
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.75,
-                ),
-                decoration: BoxDecoration(
-                  color: isMe
-                      ? cyanAccent.withValues(alpha: 0.2)
-                      : darkThemeSecondaryColor,
-                  borderRadius: BorderRadius.circular(20).copyWith(
-                    bottomRight: isMe
-                        ? const Radius.circular(0)
-                        : const Radius.circular(20),
-                    bottomLeft: !isMe
-                        ? const Radius.circular(0)
-                        : const Radius.circular(20),
+                border: isMe
+                    ? Border.all(color: cyanAccent.withValues(alpha: 0.5))
+                    : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    msg['message'] ?? '',
+                    style: bodyTextStyle.copyWith(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
                   ),
-                  border: isMe
-                      ? Border.all(color: cyanAccent.withValues(alpha: 0.5))
-                      : null,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                ],
+              ),
+            );
+
+            if (isMe) {
+              return Align(alignment: Alignment.centerRight, child: bubble);
+            } else {
+              final senderPhotoUrl = msg['photoUrl']?.toString() ?? '';
+              final senderName = msg['name'] ?? 'User';
+              final timestamp = msg['timestamp'];
+              String timeStr = '';
+              if (timestamp is int) {
+                timeStr = ' • ${_formatTimestamp(timestamp)}';
+              }
+
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (!isMe) ...[
-                      Text(
-                        msg['name'] ?? 'User',
-                        style: bodyTextStyle.copyWith(
-                          color: cyanAccent,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: CircleAvatar(
+                        radius: 14,
+                        backgroundColor: darkThemeSecondaryColor,
+                        backgroundImage: senderPhotoUrl.isNotEmpty
+                            ? NetworkImage(senderPhotoUrl)
+                            : null,
+                        child: senderPhotoUrl.isEmpty
+                            ? const Icon(
+                                Icons.person,
+                                size: 16,
+                                color: Colors.white,
+                              )
+                            : null,
                       ),
-                      const SizedBox(height: 4),
-                    ],
-                    Text(
-                      msg['message'] ?? '',
-                      style: bodyTextStyle.copyWith(
-                        color: Colors.white,
-                        fontSize: 14,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: 4,
+                              bottom: 2,
+                              top: 8,
+                            ),
+                            child: Text(
+                              '$senderName$timeStr',
+                              style: bodyTextStyle.copyWith(
+                                color: Colors.white54,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                          bubble,
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            );
+              );
+            }
           },
         );
       },

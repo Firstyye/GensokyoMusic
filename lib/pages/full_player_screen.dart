@@ -626,7 +626,38 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                         final id = playlist['id'] as String;
                         final name = playlist['name'] as String;
                         return ListTile(
-                          leading: Icon(Icons.queue_music, color: cyanAccent),
+                          leading: StreamBuilder<List<SongInfo>>(
+                            stream: _firestoreService.getPlaylistSongsStream(
+                              id,
+                            ),
+                            builder: (context, songSnap) {
+                              Widget placeholder = Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.queue_music,
+                                  color: cyanAccent,
+                                ),
+                              );
+                              if (!songSnap.hasData || songSnap.data!.isEmpty) {
+                                return placeholder;
+                              }
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  songSnap.data!.first.thumbnailUrl,
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => placeholder,
+                                ),
+                              );
+                            },
+                          ),
                           title: Text(
                             name,
                             style: bodyTextStyle.copyWith(color: Colors.white),

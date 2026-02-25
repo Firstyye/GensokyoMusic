@@ -30,13 +30,14 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late String targetUserId;
-  final currentUser = FirebaseAuth.instance.currentUser;
+  User? get currentUser => FirebaseAuth.instance.currentUser;
   final FirestoreService _firestoreService = FirestoreService();
   final AudioPlayerService _audioService = AudioPlayerService();
   late TabController _tabController;
 
   bool _isTargetPrivate = false;
   bool _isLoadingPrivacy = false;
+  DateTime? _targetCreatedAt;
 
   @override
   void initState() {
@@ -46,6 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (!_isOwner && targetUserId.isNotEmpty) {
       _isLoadingPrivacy = true;
       _checkPrivacy();
+      _loadCreatedAt();
     }
   }
 
@@ -56,6 +58,13 @@ class _ProfileScreenState extends State<ProfileScreen>
         _isTargetPrivate = isPriv;
         _isLoadingPrivacy = false;
       });
+    }
+  }
+
+  Future<void> _loadCreatedAt() async {
+    final dt = await _firestoreService.getUserCreatedAt(targetUserId);
+    if (mounted && dt != null) {
+      setState(() => _targetCreatedAt = dt);
     }
   }
 
@@ -77,6 +86,34 @@ class _ProfileScreenState extends State<ProfileScreen>
   String? get _photoUrl {
     if (!_isOwner) return widget.userPhotoUrl;
     return currentUser?.photoURL;
+  }
+
+  String _formatJoinDate(DateTime dt) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
+  String? get _joinDateText {
+    if (_isOwner && currentUser?.metadata.creationTime != null) {
+      return _formatJoinDate(currentUser!.metadata.creationTime!);
+    }
+    if (!_isOwner && _targetCreatedAt != null) {
+      return _formatJoinDate(_targetCreatedAt!);
+    }
+    return null;
   }
 
   @override
@@ -172,12 +209,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
 
     if (_isOwner) {
-      return Scaffold(backgroundColor: Colors.transparent, body: content);
+      return Scaffold(backgroundColor: darkModeBackgroundColor, body: content);
     }
 
     // When viewing someone else's profile (Pushed from CHAT/SOCIAL) -> provide Scaffold, AppBar and MiniPlayer!
     return Scaffold(
-      backgroundColor: Colors.black, // Fallback
+      backgroundColor: darkModeBackgroundColor,
       appBar: AppBar(
         title: Text(
           "Profile",
@@ -281,6 +318,29 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   textAlign: TextAlign.center,
                 ).animate().fade(duration: 400.ms, delay: 100.ms),
+                if (_joinDateText != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.calendar_month_rounded,
+                          size: 14,
+                          color: cyanAccent,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Joined ${_joinDateText!}',
+                          style: bodyTextStyle.copyWith(
+                            color: darkThemeTextColor.withValues(alpha: 0.7),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ).animate().fade(duration: 400.ms, delay: 150.ms),
                 const SizedBox(height: 8),
               ],
             ),
@@ -299,14 +359,24 @@ class _ProfileScreenState extends State<ProfileScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         decoration: BoxDecoration(
-          color: darkThemeSecondaryColor,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [const Color(0xFF122248), const Color(0xFF0D1A3A)],
+          ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          border: Border.all(color: cyanAccent.withValues(alpha: 0.15)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.4),
-              blurRadius: 16,
+              color: cyanAccent.withValues(alpha: 0.08),
+              blurRadius: 24,
+              spreadRadius: 2,
               offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -340,17 +410,18 @@ class _ProfileScreenState extends State<ProfileScreen>
         Text(
           value,
           style: headerTextStyle.copyWith(
-            color: darkThemeTextColor,
-            fontSize: 22,
+            color: Colors.white,
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           label,
           style: bodyTextStyle.copyWith(
-            color: darkThemeTextColor.withValues(alpha: 0.6),
+            color: cyanAccent.withValues(alpha: 0.7),
             fontSize: 12,
-            letterSpacing: 0.5,
+            letterSpacing: 0.8,
           ),
         ),
       ],
@@ -359,9 +430,19 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildDivider() {
     return Container(
-      height: 32,
+      height: 36,
       width: 1,
-      color: Colors.white.withValues(alpha: 0.1),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withValues(alpha: 0.15),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+        ),
+      ),
     );
   }
 
@@ -376,11 +457,12 @@ class _ProfileScreenState extends State<ProfileScreen>
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: () {
-                Navigator.push(
+              onTap: () async {
+                await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const SettingsScreen()),
                 );
+                if (mounted) setState(() {});
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 14),

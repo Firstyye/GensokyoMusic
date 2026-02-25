@@ -101,50 +101,119 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
     }
   }
 
+  String _formatTimestamp(int timestamp) {
+    final now = DateTime.now();
+    final dt = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final diff = now.difference(dt);
+    final hour = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
+    final timeStr = '$hour:$min';
+
+    if (now.year == dt.year && now.month == dt.month && now.day == dt.day) {
+      return timeStr; // Today
+    } else if (diff.inDays == 1 || (diff.inDays == 0 && now.day != dt.day)) {
+      return 'Yesterday, $timeStr';
+    } else {
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      final year = dt.year;
+      return '$day/$month/$year, $timeStr';
+    }
+  }
+
   Widget _buildMessageBubble(Map<dynamic, dynamic> msgMap, bool isMe) {
     final hasSong = msgMap['song'] != null;
     final text = msgMap['text']?.toString() ?? '';
+    final senderName = widget.friendData['displayName'] ?? 'User';
+    final senderPhotoUrl = widget.friendData['photoUrl']?.toString() ?? '';
+    final timestamp = msgMap['timestamp'];
+    String timeStr = '';
+    if (timestamp is int) {
+      timeStr = ' • ${_formatTimestamp(timestamp)}';
+    }
 
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-        padding: hasSong
-            ? const EdgeInsets.all(0)
-            : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
+    Widget bubble = Container(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      padding: hasSong
+          ? const EdgeInsets.all(0)
+          : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.75,
+      ),
+      decoration: BoxDecoration(
+        color: isMe
+            ? (hasSong ? Colors.transparent : cyanAccent.withValues(alpha: 0.9))
+            : (hasSong ? Colors.transparent : Colors.grey[800]),
+        borderRadius: BorderRadius.circular(20).copyWith(
+          bottomRight: isMe
+              ? const Radius.circular(0)
+              : const Radius.circular(20),
+          bottomLeft: !isMe
+              ? const Radius.circular(0)
+              : const Radius.circular(20),
         ),
-        decoration: BoxDecoration(
-          color: isMe
-              ? (hasSong
-                    ? Colors.transparent
-                    : cyanAccent.withValues(alpha: 0.9))
-              : (hasSong ? Colors.transparent : Colors.grey[800]),
-          borderRadius: BorderRadius.circular(20).copyWith(
-            bottomRight: isMe
-                ? const Radius.circular(0)
-                : const Radius.circular(20),
-            bottomLeft: !isMe
-                ? const Radius.circular(0)
-                : const Radius.circular(20),
-          ),
-        ),
-        child: hasSong
-            ? _buildSongCardBubble(
-                Map<String, dynamic>.from(msgMap['song']),
-                text,
-                isMe,
-              )
-            : Text(
-                text,
-                style: bodyTextStyle.copyWith(
-                  color: isMe ? Colors.black87 : Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
+      ),
+      child: hasSong
+          ? _buildSongCardBubble(
+              Map<String, dynamic>.from(msgMap['song']),
+              text,
+              isMe,
+            )
+          : Text(
+              text,
+              style: bodyTextStyle.copyWith(
+                color: isMe ? Colors.black87 : Colors.white,
+                fontWeight: FontWeight.w500,
               ),
-      ).animate().fade().slideY(begin: 0.1),
+            ),
     );
+
+    if (isMe) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: bubble.animate().fade().slideY(begin: 0.1),
+      );
+    } else {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 16, bottom: 4),
+              child: CircleAvatar(
+                radius: 14,
+                backgroundColor: darkThemeSecondaryColor,
+                backgroundImage: senderPhotoUrl.isNotEmpty
+                    ? NetworkImage(senderPhotoUrl)
+                    : null,
+                child: senderPhotoUrl.isEmpty
+                    ? const Icon(Icons.person, size: 16, color: Colors.white)
+                    : null,
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16, bottom: 2, top: 8),
+                    child: Text(
+                      '$senderName$timeStr',
+                      style: bodyTextStyle.copyWith(
+                        color: Colors.white54,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                  bubble,
+                ],
+              ),
+            ),
+          ],
+        ).animate().fade().slideY(begin: 0.1),
+      );
+    }
   }
 
   Widget _buildSongCardBubble(
@@ -285,6 +354,9 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
       appBar: AppBar(
         titleSpacing: 0,
         backgroundColor: darkThemeSecondaryColor,
+        iconTheme: const IconThemeData(
+          color: Colors.white,
+        ), // Makes back button white
         title: Row(
           children: [
             CircleAvatar(

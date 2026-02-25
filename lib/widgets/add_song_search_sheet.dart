@@ -271,18 +271,39 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
                     itemCount: playlists.length,
                     itemBuilder: (context, index) {
                       final playlist = playlists[index];
+                      final plId = playlist['id'] as String;
                       return ListTile(
-                        leading: Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: darkThemeSecondaryColor,
-                            borderRadius: BorderRadius.circular(8),
+                        leading: StreamBuilder<List<SongInfo>>(
+                          stream: _firestoreService.getPlaylistSongsStream(
+                            plId,
                           ),
-                          child: const Icon(
-                            Icons.queue_music,
-                            color: Colors.white54,
-                          ),
+                          builder: (context, songSnap) {
+                            Widget placeholder = Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: darkThemeSecondaryColor,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.queue_music,
+                                color: Colors.white54,
+                              ),
+                            );
+                            if (!songSnap.hasData || songSnap.data!.isEmpty) {
+                              return placeholder;
+                            }
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                songSnap.data!.first.thumbnailUrl,
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => placeholder,
+                              ),
+                            );
+                          },
                         ),
                         title: Text(
                           playlist['name'] ?? 'Untitled Playlist',

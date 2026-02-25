@@ -12,16 +12,37 @@ class FirestoreService {
   Future<void> saveUserToFirestore(User user) async {
     try {
       final docRef = _db.collection('users').doc(user.uid);
-      await docRef.set({
+      final doc = await docRef.get();
+      final data = <String, dynamic>{
         'uid': user.uid,
         'displayName': user.displayName ?? 'Unknown DJ',
         'photoUrl': user.photoURL ?? '',
         'lastLoginAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+      // Only set createdAt on first save
+      if (!doc.exists || doc.data()?['createdAt'] == null) {
+        data['createdAt'] =
+            user.metadata.creationTime?.toIso8601String() ??
+            FieldValue.serverTimestamp();
+      }
+      await docRef.set(data, SetOptions(merge: true));
       print('FirestoreService: User data saved for ${user.uid}');
     } catch (e) {
       print('FirestoreService ERROR: Failed to save user: $e');
     }
+  }
+
+  /// Fetches the createdAt date for a given user from Firestore.
+  Future<DateTime?> getUserCreatedAt(String uid) async {
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      if (doc.exists && doc.data()?['createdAt'] != null) {
+        return DateTime.tryParse(doc.data()!['createdAt'].toString());
+      }
+    } catch (e) {
+      print('FirestoreService ERROR: Failed to get createdAt: $e');
+    }
+    return null;
   }
 
   /// Sets the user's privacy mode (true = private, false = public).

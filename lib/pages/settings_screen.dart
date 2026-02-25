@@ -8,6 +8,7 @@ import '../pages/about_screen.dart';
 import '../pages/help_feedback_screen.dart';
 import '../constant/my_constant.dart';
 import '../services/firestore_service.dart';
+import '../models/song_info.dart';
 
 // NEW WIDGET IMPORTS
 import '../widgets/modern_settings_tile.dart';
@@ -21,7 +22,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final user = FirebaseAuth.instance.currentUser;
+  User? get user => FirebaseAuth.instance.currentUser;
   final FirestoreService _firestoreService = FirestoreService();
   bool isPrivate = false;
 
@@ -54,6 +55,172 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     }
     return 'Cirno_Gensokyo@gmail.com';
+  }
+
+  String _getJoinDate() {
+    final creationTime = user?.metadata.creationTime;
+    if (creationTime == null) return 'Unknown';
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${creationTime.day} ${months[creationTime.month - 1]} ${creationTime.year}';
+  }
+
+  void _showEditAvatarBannerDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Edit Profile Image',
+          style: headerTextStyle.copyWith(color: Colors.white),
+          textAlign: TextAlign.center,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'What would you like to change?',
+              style: bodyTextStyle.copyWith(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            _buildDialogOption(
+              ctx: ctx,
+              icon: Icons.account_circle_rounded,
+              label: 'Change Avatar',
+              onTap: () {
+                Navigator.pop(ctx);
+                showDialog(
+                  context: context,
+                  builder: (c) => AlertDialog(
+                    backgroundColor: const Color(0xFF1A1A2E),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    icon: const Icon(
+                      Icons.construction_rounded,
+                      color: Colors.orangeAccent,
+                      size: 48,
+                    ),
+                    title: Text(
+                      'Coming Soon',
+                      style: headerTextStyle.copyWith(color: Colors.white),
+                    ),
+                    content: Text(
+                      'Avatar upload will be available once cloud storage is connected.',
+                      style: bodyTextStyle.copyWith(color: Colors.white70),
+                      textAlign: TextAlign.center,
+                    ),
+                    actionsAlignment: MainAxisAlignment.center,
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(c),
+                        child: Text(
+                          'OK',
+                          style: bodyTextStyle.copyWith(
+                            color: cyanAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildDialogOption(
+              ctx: ctx,
+              icon: Icons.panorama_rounded,
+              label: 'Change Banner',
+              onTap: () {
+                Navigator.pop(ctx);
+                showDialog(
+                  context: context,
+                  builder: (c) => AlertDialog(
+                    backgroundColor: const Color(0xFF1A1A2E),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    icon: const Icon(
+                      Icons.construction_rounded,
+                      color: Colors.orangeAccent,
+                      size: 48,
+                    ),
+                    title: Text(
+                      'Coming Soon',
+                      style: headerTextStyle.copyWith(color: Colors.white),
+                    ),
+                    content: Text(
+                      'Banner upload will be available once cloud storage is connected.',
+                      style: bodyTextStyle.copyWith(color: Colors.white70),
+                      textAlign: TextAlign.center,
+                    ),
+                    actionsAlignment: MainAxisAlignment.center,
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(c),
+                        child: Text(
+                          'OK',
+                          style: bodyTextStyle.copyWith(
+                            color: cyanAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialogOption({
+    required BuildContext ctx,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: cyanAccent, size: 28),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: bodyTextStyle.copyWith(color: Colors.white, fontSize: 16),
+            ),
+            const Spacer(),
+            Icon(Icons.chevron_right, color: Colors.white54, size: 22),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -233,7 +400,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        'Joined 5 January 2023',
+                        'Joined ${_getJoinDate()}',
                         style: bodyTextStyle.copyWith(
                           color: darkThemeTextColor.withValues(alpha: 0.7),
                           fontSize: 12,
@@ -260,25 +427,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         decoration: BoxDecoration(
-          color: darkThemeSecondaryColor,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [const Color(0xFF122248), const Color(0xFF0D1A3A)],
+          ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          border: Border.all(color: cyanAccent.withValues(alpha: 0.15)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.4),
-              blurRadius: 16,
+              color: cyanAccent.withValues(alpha: 0.08),
+              blurRadius: 24,
+              spreadRadius: 2,
               offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildStatItem('1.2K', 'Followers'),
+            StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _firestoreService.getFriendsStream(),
+              builder: (context, snapshot) {
+                final count = snapshot.data?.length ?? 0;
+                return _buildStatItem(count.toString(), 'Friends');
+              },
+            ),
             _buildDivider(),
-            _buildStatItem('345', 'Following'),
+            StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _firestoreService.getPlaylistsStream(),
+              builder: (context, snapshot) {
+                final count = snapshot.data?.length ?? 0;
+                return _buildStatItem(count.toString(), 'Playlists');
+              },
+            ),
             _buildDivider(),
-            _buildStatItem('12', 'Playlists'),
+            StreamBuilder<List<SongInfo>>(
+              stream: _firestoreService.getFavoriteSongsStream(),
+              builder: (context, snapshot) {
+                final count = snapshot.data?.length ?? 0;
+                return _buildStatItem(count.toString(), 'Favorites');
+              },
+            ),
           ],
         ),
       ),
@@ -291,17 +486,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Text(
           value,
           style: headerTextStyle.copyWith(
-            color: darkThemeTextColor,
-            fontSize: 22,
+            color: Colors.white,
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           label,
           style: bodyTextStyle.copyWith(
-            color: darkThemeTextColor.withValues(alpha: 0.6),
+            color: cyanAccent.withValues(alpha: 0.7),
             fontSize: 12,
-            letterSpacing: 0.5,
+            letterSpacing: 0.8,
           ),
         ),
       ],
@@ -310,9 +506,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildDivider() {
     return Container(
-      height: 32,
+      height: 36,
       width: 1,
-      color: Colors.white.withValues(alpha: 0.1),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withValues(alpha: 0.15),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+        ),
+      ),
     );
   }
 
@@ -326,11 +532,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Expanded(
             child: _buildActionBtn(
-              icon: Icons.edit_rounded,
-              label: 'Edit Profile',
+              icon: Icons.image_rounded,
+              label: 'Edit Avatar / Banner',
               color: cyanAccent,
               textColor: Colors.black,
-              onTap: () {},
+              onTap: _showEditAvatarBannerDialog,
             ),
           ),
           const SizedBox(width: 16),
@@ -360,7 +566,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(24), // Pill shape for modern look
@@ -374,14 +580,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: textColor),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: bodyTextStyle.copyWith(
-                color: textColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+            Icon(icon, size: 16, color: textColor),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: bodyTextStyle.copyWith(
+                  color: textColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -435,7 +644,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (newName.isNotEmpty && user != null) {
                   await user!.updateDisplayName(newName);
                   // Reload user to get updated name locally
-                  await user!.reload();
+                  await FirebaseAuth.instance.currentUser!.reload();
                   await _firestoreService.saveUserToFirestore(
                     FirebaseAuth.instance.currentUser!,
                   );

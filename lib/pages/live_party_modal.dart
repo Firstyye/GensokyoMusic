@@ -51,12 +51,93 @@ class _LivePartyModalState extends State<LivePartyModal> {
   }
 
   Future<void> _createPartyWithSong(SongInfo song) async {
+    // Block if already hosting a party
+    if (_audioService.currentPartyId != null && _audioService.isHost) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            icon: const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.redAccent,
+              size: 48,
+            ),
+            title: Text(
+              'Already Hosting',
+              style: headerTextStyle.copyWith(color: Colors.white),
+            ),
+            content: Text(
+              'You are already hosting Room ${_audioService.currentPartyId}. Leave that party first before creating a new one.',
+              style: bodyTextStyle.copyWith(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Got it',
+                  style: bodyTextStyle.copyWith(
+                    color: cyanAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    // If listener in another party, ask to switch
+    if (_audioService.currentPartyId != null && !_audioService.isHost) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: Text(
+            'Leave Current Party?',
+            style: headerTextStyle.copyWith(color: Colors.white),
+          ),
+          content: Text(
+            'You are currently in Room ${_audioService.currentPartyId}. Do you want to leave and create a new party?',
+            style: bodyTextStyle.copyWith(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(
+                'Cancel',
+                style: bodyTextStyle.copyWith(color: Colors.white54),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(
+                'Leave & Create',
+                style: bodyTextStyle.copyWith(
+                  color: cyanAccent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+      _audioService.leaveParty();
+    }
+
     setState(() => _isLoading = true);
     final partyId = await _dbService.createParty(initialSong: song);
     setState(() => _isLoading = false);
 
     if (partyId != null && mounted) {
-      // Add it to the local queue first for immediate readiness
       _audioService.setHostParty(partyId);
       await _audioService.playFromYoutubeId(song.youtubeVideoId, song);
 
@@ -69,8 +150,41 @@ class _LivePartyModalState extends State<LivePartyModal> {
       );
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to create party.')),
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            icon: const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.redAccent,
+              size: 48,
+            ),
+            title: Text(
+              'Party Creation Failed',
+              style: headerTextStyle.copyWith(color: Colors.white),
+            ),
+            content: Text(
+              'Could not create the party. Please try again.',
+              style: bodyTextStyle.copyWith(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'OK',
+                  style: bodyTextStyle.copyWith(
+                    color: cyanAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       }
     }
@@ -79,6 +193,88 @@ class _LivePartyModalState extends State<LivePartyModal> {
   Future<void> _joinParty() async {
     final code = _joinController.text.trim();
     if (code.isEmpty) return;
+
+    // Block if already hosting a party
+    if (_audioService.currentPartyId != null && _audioService.isHost) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            icon: const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.redAccent,
+              size: 48,
+            ),
+            title: Text(
+              'Already Hosting',
+              style: headerTextStyle.copyWith(color: Colors.white),
+            ),
+            content: Text(
+              'You are hosting Room ${_audioService.currentPartyId}. Leave that party first before joining another.',
+              style: bodyTextStyle.copyWith(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Got it',
+                  style: bodyTextStyle.copyWith(
+                    color: cyanAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    // If listener in another party, ask to switch
+    if (_audioService.currentPartyId != null && !_audioService.isHost) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: Text(
+            'Switch Party?',
+            style: headerTextStyle.copyWith(color: Colors.white),
+          ),
+          content: Text(
+            'You are currently in Room ${_audioService.currentPartyId}. Do you want to leave and join Room $code?',
+            style: bodyTextStyle.copyWith(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(
+                'Cancel',
+                style: bodyTextStyle.copyWith(color: Colors.white54),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(
+                'Switch',
+                style: bodyTextStyle.copyWith(
+                  color: cyanAccent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+      _audioService.leaveParty();
+    }
 
     setState(() => _isLoading = true);
     final exists = await _dbService.checkPartyExists(code);
@@ -96,8 +292,41 @@ class _LivePartyModalState extends State<LivePartyModal> {
       );
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Party not found or already closed.')),
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            icon: const Icon(
+              Icons.search_off_rounded,
+              color: Colors.orangeAccent,
+              size: 48,
+            ),
+            title: Text(
+              'Party Not Found',
+              style: headerTextStyle.copyWith(color: Colors.white),
+            ),
+            content: Text(
+              'Room "$code" does not exist or has already been closed.',
+              style: bodyTextStyle.copyWith(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'OK',
+                  style: bodyTextStyle.copyWith(
+                    color: cyanAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       }
     }
@@ -460,18 +689,39 @@ class _LivePartyModalState extends State<LivePartyModal> {
                     itemCount: playlists.length,
                     itemBuilder: (context, index) {
                       final playlist = playlists[index];
+                      final plId = playlist['id'] as String;
                       return ListTile(
-                        leading: Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: darkThemeSecondaryColor,
-                            borderRadius: BorderRadius.circular(8),
+                        leading: StreamBuilder<List<SongInfo>>(
+                          stream: _firestoreService.getPlaylistSongsStream(
+                            plId,
                           ),
-                          child: const Icon(
-                            Icons.queue_music,
-                            color: Colors.white54,
-                          ),
+                          builder: (context, songSnap) {
+                            Widget placeholder = Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: darkThemeSecondaryColor,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.queue_music,
+                                color: Colors.white54,
+                              ),
+                            );
+                            if (!songSnap.hasData || songSnap.data!.isEmpty) {
+                              return placeholder;
+                            }
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                songSnap.data!.first.thumbnailUrl,
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => placeholder,
+                              ),
+                            );
+                          },
                         ),
                         title: Text(
                           playlist['name'] ?? 'Untitled Playlist',
