@@ -14,6 +14,7 @@ import 'package:delightful_toast/delight_toast.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:yo/data/authService.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import '../services/firestore_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -47,6 +48,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLoginSuccess() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirestoreService().saveUserToFirestore(user);
+    }
+
     final prefs = await SharedPreferences.getInstance();
     bool seen = prefs.getBool('seen') ?? false;
 
@@ -97,9 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await FirebaseAuth.instance.signInWithProvider(twitterProvider);
 
         showGlassToast("Login Successful", isError: false);
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const MainLayout()),
-        );
+        await _handleLoginSuccess();
       } on FirebaseAuthException catch (e) {
         showGlassToast(
           "Twitter Login Failed: \n${e.message ?? 'Unknown error'}",
@@ -132,9 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
           facebookAuthCredential,
         );
         showGlassToast("Login Successful", isError: false);
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const MainLayout()),
-        );
+        await _handleLoginSuccess();
       } on FirebaseAuthException catch (e) {
         final message = e.code == "account-exists-with-different-credential"
             ? "An account already exists with the same email but different sign-in credentials."

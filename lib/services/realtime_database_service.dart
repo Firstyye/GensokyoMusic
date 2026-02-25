@@ -225,4 +225,58 @@ class RealtimeDatabaseService {
         .limitToLast(50)
         .onValue;
   }
+
+  // ═══════════════════════════════════════════
+  //  PRIVATE CHAT MANAGEMENT
+  // ═══════════════════════════════════════════
+
+  /// Generates a consistent chat ID between two users by sorting their UIDs alphabetically.
+  String getPrivateChatId(String uid1, String uid2) {
+    List<String> uids = [uid1, uid2];
+    uids.sort();
+    return "${uids[0]}_${uids[1]}";
+  }
+
+  /// Sends a private message to a specific chat ID. Supports optional song attachment.
+  Future<void> sendPrivateMessage(
+    String chatId,
+    String message, {
+    Map<String, dynamic>? songData,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final messageData = {
+      'text': message,
+      'senderId': user.uid,
+      'senderName': user.displayName ?? 'Unknown',
+      'senderPhotoUrl': user.photoURL ?? '',
+      'timestamp': ServerValue.timestamp,
+    };
+
+    if (songData != null) {
+      messageData['song'] = songData;
+    }
+
+    try {
+      await _db.ref('private_chats/$chatId/messages').push().set(messageData);
+
+      // Update last message timestamp for indexing/sorting
+      await _db.ref('private_chats/$chatId/metadata').set({
+        'lastMessageAt': ServerValue.timestamp,
+      });
+    } catch (e) {
+      print(
+        'RealtimeDatabaseService ERROR: Failed to send private message: $e',
+      );
+    }
+  }
+
+  /// Streams the chat messages for a specific private 1-on-1 chat room.
+  Stream<DatabaseEvent> getPrivateChatStream(String chatId) {
+    return _db
+        .ref('private_chats/$chatId/messages')
+        .orderByChild('timestamp')
+        .onValue;
+  }
 }

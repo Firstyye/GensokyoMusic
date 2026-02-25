@@ -6,6 +6,85 @@ class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // ─── Users & Friends ───
+
+  /// Saves or updates the user's data in Firestore.
+  Future<void> saveUserToFirestore(User user) async {
+    try {
+      final docRef = _db.collection('users').doc(user.uid);
+      await docRef.set({
+        'uid': user.uid,
+        'displayName': user.displayName ?? 'Unknown DJ',
+        'photoUrl': user.photoURL ?? '',
+        'lastLoginAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      print('FirestoreService: User data saved for ${user.uid}');
+    } catch (e) {
+      print('FirestoreService ERROR: Failed to save user: $e');
+    }
+  }
+
+  /// Searches for a user by their UID. Returns user data or null.
+  Future<Map<String, dynamic>?> searchUserByUid(String uid) async {
+    try {
+      final docSnap = await _db.collection('users').doc(uid).get();
+      if (docSnap.exists) {
+        return docSnap.data();
+      }
+    } catch (e) {
+      print('FirestoreService ERROR: Failed to search user: $e');
+    }
+    return null;
+  }
+
+  /// Adds a friend for the current user.
+  Future<bool> addFriend(String friendUid) async {
+    final user = _auth.currentUser;
+    if (user == null || user.uid == friendUid) return false;
+
+    try {
+      // First verify the friend actually exists
+      final friendDoc = await _db.collection('users').doc(friendUid).get();
+      if (!friendDoc.exists) return false;
+
+      // Add to user's friends list subcollection
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('friends')
+          .doc(friendUid)
+          .set({'uid': friendUid, 'addedAt': FieldValue.serverTimestamp()});
+      return true;
+    } catch (e) {
+      print('FirestoreService ERROR: Failed to add friend: $e');
+      return false;
+    }
+  }
+
+  /// Returns a stream of the current user's friends.
+  Stream<List<Map<String, dynamic>>> getFriendsStream() {
+    final user = _auth.currentUser;
+    if (user == null) return Stream.value([]);
+
+    return _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('friends')
+        .orderBy('addedAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          List<Map<String, dynamic>> friends = [];
+          for (var doc in snapshot.docs) {
+            final friendUid = doc.id;
+            final friendData = await searchUserByUid(friendUid);
+            if (friendData != null) {
+              friends.add(friendData);
+            }
+          }
+          return friends;
+        });
+  }
+
   // ─── Favorites ───
 
   /// Gets the collection reference for the current user's favorites
