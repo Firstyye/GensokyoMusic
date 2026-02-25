@@ -8,6 +8,9 @@ import '../services/audio_player_service.dart';
 import '../models/song_info.dart';
 import 'full_player_screen.dart';
 import '../widgets/add_song_search_sheet.dart';
+import 'profile_screen.dart';
+import '../services/firestore_service.dart';
+import '../widgets/_buildMiniPlayer.dart';
 
 class PrivateChatScreen extends StatefulWidget {
   final Map<String, dynamic> friendData;
@@ -278,7 +281,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.black, // fallback
+      backgroundColor: const Color(0xFF0B1426), // Deep blue background
       appBar: AppBar(
         titleSpacing: 0,
         backgroundColor: darkThemeSecondaryColor,
@@ -310,6 +313,70 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person, color: Colors.white),
+            tooltip: 'View Profile',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileScreen(
+                    userId: widget.friendData['uid'],
+                    userName: widget.friendData['displayName'],
+                    userPhotoUrl: widget.friendData['photoUrl'],
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.person_remove, color: Colors.redAccent),
+            tooltip: 'Remove Friend',
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  backgroundColor: Colors.grey[900],
+                  title: Text(
+                    'Remove Friend',
+                    style: headerTextStyle.copyWith(color: Colors.white),
+                  ),
+                  content: Text(
+                    'Are you sure you want to remove ${widget.friendData['displayName']}?',
+                    style: bodyTextStyle.copyWith(color: Colors.white70),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: Text(
+                        'Cancel',
+                        style: bodyTextStyle.copyWith(color: Colors.white),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: Text(
+                        'Remove',
+                        style: bodyTextStyle.copyWith(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                await FirestoreService().removeFriend(widget.friendData['uid']);
+                if (mounted) {
+                  Navigator.pop(context); // Go back to social screen
+                }
+              }
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -371,6 +438,9 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
               },
             ),
           ),
+
+          // Global MiniPlayer stacked above the chat input
+          const MiniPlayer(),
 
           // Message Input Field
           SafeArea(

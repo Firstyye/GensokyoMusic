@@ -279,4 +279,39 @@ class RealtimeDatabaseService {
         .orderByChild('timestamp')
         .onValue;
   }
+
+  // ═══════════════════════════════════════════
+  //  USER PRESENCE
+  // ═══════════════════════════════════════════
+
+  /// Updates the user's online status using RTDB's .info/connected
+  void updateUserPresence() {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final myStatusRef = _db.ref('status/${user.uid}');
+    _db.ref('.info/connected').onValue.listen((event) {
+      final isConnected = event.snapshot.value as bool? ?? false;
+      if (isConnected) {
+        // Automatically switch to offline when client disconnects
+        myStatusRef
+            .onDisconnect()
+            .update({'isOnline': false, 'lastSeen': ServerValue.timestamp})
+            .then((_) {
+              // Set to online
+              myStatusRef.set({
+                'isOnline': true,
+                'lastSeen': ServerValue.timestamp,
+              });
+            });
+      }
+    });
+  }
+
+  /// Streams the online presence status of a specific user.
+  Stream<bool> getUserPresenceStream(String uid) {
+    return _db.ref('status/$uid/isOnline').onValue.map((event) {
+      return (event.snapshot.value as bool?) ?? false;
+    });
+  }
 }

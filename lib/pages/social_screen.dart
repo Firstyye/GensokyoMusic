@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../constant/my_constant.dart';
 import '../services/firestore_service.dart';
+import '../services/realtime_database_service.dart';
 import 'private_chat_screen.dart';
 
 class SocialScreen extends StatefulWidget {
@@ -89,6 +90,101 @@ class _SocialScreenState extends State<SocialScreen> {
         });
       }
     }
+  }
+
+  Widget _buildUserTile(Map<String, dynamic> user, {required bool isRequest}) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+      leading: StreamBuilder<bool>(
+        stream: RealtimeDatabaseService().getUserPresenceStream(user['uid']),
+        builder: (context, snapshot) {
+          final isOnline = snapshot.data ?? false;
+          return Stack(
+            children: [
+              CircleAvatar(
+                backgroundColor: Colors.white12,
+                backgroundImage:
+                    user['photoUrl'] != null &&
+                        user['photoUrl'].toString().isNotEmpty
+                    ? NetworkImage(user['photoUrl'])
+                    : null,
+                child:
+                    user['photoUrl'] == null ||
+                        user['photoUrl'].toString().isEmpty
+                    ? const Icon(Icons.person, color: Colors.white)
+                    : null,
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: isOnline ? Colors.greenAccent : Colors.grey.shade600,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      width: 2.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+      title: Text(
+        user['displayName'] ?? 'Unknown',
+        style: bodyTextStyle.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      subtitle: Text(
+        isRequest ? "Pending Request" : "Tap to chat",
+        style: bodyTextStyle.copyWith(
+          color: isRequest ? cyanAccent : Colors.white54,
+          fontSize: 12,
+        ),
+      ),
+      trailing: isRequest
+          ? ElevatedButton(
+              onPressed: () async {
+                await _firestoreService.addFriend(user['uid']);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Added ${user['displayName']} back!'),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cyanAccent,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 0,
+                ),
+              ),
+              child: const Text("Accept"),
+            )
+          : null,
+      onTap: isRequest
+          ? null
+          : () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PrivateChatScreen(friendData: user),
+                ),
+              );
+            },
+    ).animate().fade().slideX(begin: 0.05);
   }
 
   @override
@@ -275,24 +371,18 @@ class _SocialScreenState extends State<SocialScreen> {
               const SizedBox(height: 32),
 
               // ─── FRIENDS LIST ───
-              Text(
-                "Friends",
-                style: headerTextStyle.copyWith(
-                  fontSize: 18,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 8),
+              // ─── SOCIAL CONNECTIONS ───
               Expanded(
                 child: StreamBuilder<List<Map<String, dynamic>>>(
                   stream: _firestoreService.getFriendsStream(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
+                  builder: (context, friendsSnapshot) {
+                    if (friendsSnapshot.connectionState ==
+                        ConnectionState.waiting) {
                       return Center(
                         child: CircularProgressIndicator(color: cyanAccent),
                       );
                     }
-                    if (snapshot.hasError) {
+                    if (friendsSnapshot.hasError) {
                       return Center(
                         child: Text(
                           "Error loading friends",
@@ -301,69 +391,67 @@ class _SocialScreenState extends State<SocialScreen> {
                       );
                     }
 
-                    final friends = snapshot.data ?? [];
-                    if (friends.isEmpty) {
-                      return Center(
-                        child: Text(
-                          "You don't have any friends yet.\nShare your UID to get started!",
-                          style: bodyTextStyle.copyWith(color: Colors.white54),
-                          textAlign: TextAlign.center,
-                        ),
-                      );
-                    }
+                    final friends = friendsSnapshot.data ?? [];
+                    final friendUids = friends
+                        .map((f) => f['uid'].toString())
+                        .toSet();
 
-                    return ListView.builder(
-                      itemCount: friends.length,
-                      itemBuilder: (context, index) {
-                        final friend = friends[index];
-                        return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 0,
-                                vertical: 4,
-                              ),
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.white12,
-                                backgroundImage:
-                                    friend['photoUrl'] != null &&
-                                        friend['photoUrl'].toString().isNotEmpty
-                                    ? NetworkImage(friend['photoUrl'])
-                                    : null,
-                                child:
-                                    friend['photoUrl'] == null ||
-                                        friend['photoUrl'].toString().isEmpty
-                                    ? const Icon(
-                                        Icons.person,
-                                        color: Colors.white,
-                                      )
-                                    : null,
-                              ),
-                              title: Text(
-                                friend['displayName'] ?? 'Unknown',
-                                style: bodyTextStyle.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Text(
-                                "Tap to chat",
-                                style: bodyTextStyle.copyWith(
-                                  color: Colors.white54,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        PrivateChatScreen(friendData: friend),
-                                  ),
-                                );
-                              },
+                    return StreamBuilder<List<Map<String, dynamic>>>(
+                      stream: _firestoreService.getFollowersStream(),
+                      builder: (context, followersSnapshot) {
+                        final allFollowers = followersSnapshot.data ?? [];
+                        // Filter followers to only those who are NOT yet in the friends list
+                        final pendingRequests = allFollowers
+                            .where(
+                              (f) => !friendUids.contains(f['uid'].toString()),
                             )
-                            .animate()
-                            .fade(delay: (200 + index * 50).ms)
-                            .slideX(begin: 0.05);
+                            .toList();
+
+                        if (friends.isEmpty && pendingRequests.isEmpty) {
+                          return Center(
+                            child: Text(
+                              "You don't have any friends yet.\nShare your UID to get started!",
+                              style: bodyTextStyle.copyWith(
+                                color: Colors.white54,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          );
+                        }
+
+                        return ListView(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          children: [
+                            if (pendingRequests.isNotEmpty) ...[
+                              Text(
+                                "Friend Requests",
+                                style: headerTextStyle.copyWith(
+                                  fontSize: 18,
+                                  color: cyanAccent,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...pendingRequests.map(
+                                (req) => _buildUserTile(req, isRequest: true),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (friends.isNotEmpty) ...[
+                              Text(
+                                "Friends",
+                                style: headerTextStyle.copyWith(
+                                  fontSize: 18,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...friends.map(
+                                (friend) =>
+                                    _buildUserTile(friend, isRequest: false),
+                              ),
+                            ],
+                          ],
+                        );
                       },
                     );
                   },

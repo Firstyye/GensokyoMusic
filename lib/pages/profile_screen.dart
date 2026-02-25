@@ -9,6 +9,7 @@ import '../services/audio_player_service.dart';
 import '../models/song_info.dart';
 import '../constant/my_constant.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../widgets/_buildMiniPlayer.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
@@ -72,54 +73,74 @@ class _ProfileScreenState extends State<ProfileScreen>
       );
     }
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  _buildProfileHeader(),
-                  const SizedBox(height: 24),
-                  _buildStatsRow()
+    Widget content = NestedScrollView(
+      headerSliverBuilder: (context, innerBoxIsScrolled) {
+        return [
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                _buildProfileHeader(),
+                const SizedBox(height: 24),
+                _buildStatsRow()
+                    .animate()
+                    .fade(duration: 400.ms, delay: 200.ms)
+                    .slideY(begin: 0.08),
+                const SizedBox(height: 32),
+                if (_isOwner)
+                  _buildActionButtons()
                       .animate()
-                      .fade(duration: 400.ms, delay: 200.ms)
+                      .fade(duration: 400.ms, delay: 300.ms)
                       .slideY(begin: 0.08),
-                  const SizedBox(height: 32),
-                  if (_isOwner)
-                    _buildActionButtons()
-                        .animate()
-                        .fade(duration: 400.ms, delay: 300.ms)
-                        .slideY(begin: 0.08),
-                  if (_isOwner) const SizedBox(height: 32),
+                if (_isOwner) const SizedBox(height: 32),
+              ],
+            ),
+          ),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _SliverAppBarDelegate(
+              TabBar(
+                controller: _tabController,
+                indicatorColor: cyanAccent,
+                labelColor: cyanAccent,
+                unselectedLabelColor: Colors.white54,
+                tabs: const [
+                  Tab(text: "Playlists"),
+                  Tab(text: "Favorites"),
                 ],
               ),
             ),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _SliverAppBarDelegate(
-                TabBar(
-                  controller: _tabController,
-                  indicatorColor: cyanAccent,
-                  labelColor: cyanAccent,
-                  unselectedLabelColor: Colors.white54,
-                  tabs: const [
-                    Tab(text: "Playlists"),
-                    Tab(text: "Favorites"),
-                  ],
-                ),
-              ),
-            ),
-          ];
-        },
-        body: Container(
-          color: darkModeBackgroundColor,
-          child: TabBarView(
-            controller: _tabController,
-            children: [_buildPlaylistsTab(), _buildFavoritesTab()],
           ),
+        ];
+      },
+      body: Container(
+        color: darkModeBackgroundColor,
+        child: TabBarView(
+          controller: _tabController,
+          children: [_buildPlaylistsTab(), _buildFavoritesTab()],
         ),
+      ),
+    );
+
+    if (_isOwner) {
+      return Scaffold(backgroundColor: Colors.transparent, body: content);
+    }
+
+    // When viewing someone else's profile (Pushed from CHAT/SOCIAL) -> provide Scaffold, AppBar and MiniPlayer!
+    return Scaffold(
+      backgroundColor: Colors.black, // Fallback
+      appBar: AppBar(
+        title: Text(
+          "Profile",
+          style: headerTextStyle.copyWith(color: Colors.white, fontSize: 18),
+        ),
+        backgroundColor: darkThemeSecondaryColor,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Stack(
+        children: [
+          content,
+          Positioned(left: 0, right: 0, bottom: 0, child: const MiniPlayer()),
+        ],
       ),
     );
   }

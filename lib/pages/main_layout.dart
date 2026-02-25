@@ -19,6 +19,7 @@ import '../pages/settings_screen.dart';
 // Import MiniPlayer and Audio Service
 import '../widgets/_buildMiniPlayer.dart';
 import '../services/audio_player_service.dart';
+import '../services/realtime_database_service.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class MainLayout extends StatefulWidget {
@@ -62,6 +63,7 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    RealtimeDatabaseService().updateUserPresence();
     _pageController = PageController(initialPage: _selectedIndex);
     _navAnimController = AnimationController(
       vsync: this,

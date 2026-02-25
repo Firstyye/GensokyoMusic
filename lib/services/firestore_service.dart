@@ -54,9 +54,60 @@ class FirestoreService {
           .collection('friends')
           .doc(friendUid)
           .set({'uid': friendUid, 'addedAt': FieldValue.serverTimestamp()});
+
+      // Add to friend's followers list subcollection (Incoming Request)
+      await _db
+          .collection('users')
+          .doc(friendUid)
+          .collection('followers')
+          .doc(user.uid)
+          .set({'uid': user.uid, 'addedAt': FieldValue.serverTimestamp()});
       return true;
     } catch (e) {
       print('FirestoreService ERROR: Failed to add friend: $e');
+      return false;
+    }
+  }
+
+  /// Removes a friend and severs the mutual connection completely.
+  Future<bool> removeFriend(String friendUid) async {
+    final user = _auth.currentUser;
+    if (user == null || user.uid == friendUid) return false;
+
+    try {
+      // Remove from our friends list
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('friends')
+          .doc(friendUid)
+          .delete();
+      // Remove our pending request to them if it exists
+      await _db
+          .collection('users')
+          .doc(friendUid)
+          .collection('followers')
+          .doc(user.uid)
+          .delete();
+
+      // Also remove us from THEIR friends list (mutual sever)
+      await _db
+          .collection('users')
+          .doc(friendUid)
+          .collection('friends')
+          .doc(user.uid)
+          .delete();
+      // Remove their pending request to us if it exists
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('followers')
+          .doc(friendUid)
+          .delete();
+
+      return true;
+    } catch (e) {
+      print('FirestoreService ERROR: Failed to remove friend: $e');
       return false;
     }
   }
@@ -82,6 +133,30 @@ class FirestoreService {
             }
           }
           return friends;
+        });
+  }
+
+  /// Returns a stream of users who have added the current user (Followers/Incoming Requests).
+  Stream<List<Map<String, dynamic>>> getFollowersStream() {
+    final user = _auth.currentUser;
+    if (user == null) return Stream.value([]);
+
+    return _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('followers')
+        .orderBy('addedAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          List<Map<String, dynamic>> followers = [];
+          for (var doc in snapshot.docs) {
+            final followerUid = doc.id;
+            final followerData = await searchUserByUid(followerUid);
+            if (followerData != null) {
+              followers.add(followerData);
+            }
+          }
+          return followers;
         });
   }
 
