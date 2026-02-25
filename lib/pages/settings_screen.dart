@@ -7,6 +7,7 @@ import '../services/audio_player_service.dart';
 import '../pages/about_screen.dart';
 import '../pages/help_feedback_screen.dart';
 import '../constant/my_constant.dart';
+import '../services/firestore_service.dart';
 
 // NEW WIDGET IMPORTS
 import '../widgets/modern_settings_tile.dart';
@@ -21,7 +22,25 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final user = FirebaseAuth.instance.currentUser;
-  bool isSwitched = true; // Still tracking theme for future if needed
+  final FirestoreService _firestoreService = FirestoreService();
+  bool isPrivate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrivacyStatus();
+  }
+
+  Future<void> _loadPrivacyStatus() async {
+    if (user != null) {
+      final status = await _firestoreService.getUserPrivacyStatus(user!.uid);
+      if (mounted) {
+        setState(() {
+          isPrivate = status;
+        });
+      }
+    }
+  }
 
   String _getUserEmail() {
     if (user?.email != null && user!.email!.isNotEmpty) {
@@ -372,6 +391,123 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ══════════════════════════════════════════
+  //  DIALOGS
+  // ══════════════════════════════════════════
+
+  void _showEditProfileDialog() {
+    final TextEditingController nameController = TextEditingController(
+      text: user?.displayName ?? 'Cirno, The Fairy',
+    );
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: darkThemeSecondaryColor,
+          title: const Text(
+            "Edit Profile Name",
+            style: TextStyle(color: Colors.white),
+          ),
+          content: TextField(
+            controller: nameController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: "Enter new name",
+              hintStyle: const TextStyle(color: Colors.white54),
+              enabledBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white24),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: cyanAccent),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                "Cancel",
+                style: TextStyle(color: Colors.white54),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                final newName = nameController.text.trim();
+                if (newName.isNotEmpty && user != null) {
+                  await user!.updateDisplayName(newName);
+                  // Reload user to get updated name locally
+                  await user!.reload();
+                  await _firestoreService.saveUserToFirestore(
+                    FirebaseAuth.instance.currentUser!,
+                  );
+                  if (mounted) {
+                    setState(() {});
+                    Navigator.pop(context);
+                  }
+                }
+              },
+              child: Text("Save", style: TextStyle(color: cyanAccent)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPrivacyDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              backgroundColor: darkThemeSecondaryColor,
+              title: const Text(
+                "Privacy & Security",
+                style: TextStyle(color: Colors.white),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Private Account",
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                      Switch(
+                        value: isPrivate,
+                        onChanged: (val) async {
+                          setStateDialog(() => isPrivate = val);
+                          setState(() => isPrivate = val);
+                          await _firestoreService.setPrivacyMode(val);
+                        },
+                        activeColor: cyanAccent,
+                        activeTrackColor: cyanAccent.withValues(alpha: 0.3),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "When your account is private, only your name and avatar are visible to others. Stats and playlists will be hidden from your public profile.",
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text("Close", style: TextStyle(color: cyanAccent)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ══════════════════════════════════════════
   //  SETTINGS MENU
   // ══════════════════════════════════════════
   Widget _buildSettingsMenu() {
@@ -396,28 +532,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               ModernSettingsTile(
                 icon: Icons.person_outline_rounded,
-                title: "Account Details",
-                onTap: () {},
+                title: "Account Details / Edit Profile",
+                onTap: _showEditProfileDialog,
               ),
               _menuDivider(),
               ModernSettingsTile(
                 icon: Icons.lock_outline_rounded,
                 title: "Privacy & Security",
-                onTap: () {},
-              ),
-              _menuDivider(),
-              ModernSettingsTile(
-                icon: Icons.palette_outlined,
-                title: "Appearance",
-                onTap: () {},
-                trailing: Switch(
-                  value: isSwitched,
-                  onChanged: (val) {
-                    setState(() => isSwitched = val);
-                  },
-                  activeColor: cyanAccent,
-                  activeTrackColor: cyanAccent.withValues(alpha: 0.3),
-                ),
+                onTap: _showPrivacyDialog,
               ),
               _menuDivider(),
               ModernSettingsTile(

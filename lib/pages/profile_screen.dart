@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:ui';
-import '../pages/settings_screen.dart';
 import '../pages/playlist_detail_screen.dart'; // To view playlists
 import '../pages/full_player_screen.dart'; // To play favorites
+import '../pages/settings_screen.dart';
 import '../services/firestore_service.dart';
 import '../services/audio_player_service.dart';
 import '../models/song_info.dart';
@@ -35,11 +35,28 @@ class _ProfileScreenState extends State<ProfileScreen>
   final AudioPlayerService _audioService = AudioPlayerService();
   late TabController _tabController;
 
+  bool _isTargetPrivate = false;
+  bool _isLoadingPrivacy = false;
+
   @override
   void initState() {
     super.initState();
     targetUserId = widget.userId ?? currentUser?.uid ?? '';
     _tabController = TabController(length: 2, vsync: this);
+    if (!_isOwner && targetUserId.isNotEmpty) {
+      _isLoadingPrivacy = true;
+      _checkPrivacy();
+    }
+  }
+
+  Future<void> _checkPrivacy() async {
+    final isPriv = await _firestoreService.getUserPrivacyStatus(targetUserId);
+    if (mounted) {
+      setState(() {
+        _isTargetPrivate = isPriv;
+        _isLoadingPrivacy = false;
+      });
+    }
   }
 
   @override
@@ -73,53 +90,86 @@ class _ProfileScreenState extends State<ProfileScreen>
       );
     }
 
-    Widget content = NestedScrollView(
-      headerSliverBuilder: (context, innerBoxIsScrolled) {
-        return [
-          SliverToBoxAdapter(
-            child: Column(
-              children: [
-                _buildProfileHeader(),
-                const SizedBox(height: 24),
-                _buildStatsRow()
-                    .animate()
-                    .fade(duration: 400.ms, delay: 200.ms)
-                    .slideY(begin: 0.08),
-                const SizedBox(height: 32),
-                if (_isOwner)
-                  _buildActionButtons()
-                      .animate()
-                      .fade(duration: 400.ms, delay: 300.ms)
-                      .slideY(begin: 0.08),
-                if (_isOwner) const SizedBox(height: 32),
-              ],
-            ),
-          ),
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _SliverAppBarDelegate(
-              TabBar(
-                controller: _tabController,
-                indicatorColor: cyanAccent,
-                labelColor: cyanAccent,
-                unselectedLabelColor: Colors.white54,
-                tabs: const [
-                  Tab(text: "Playlists"),
-                  Tab(text: "Favorites"),
+    Widget content;
+
+    if (_isLoadingPrivacy) {
+      content = Center(child: CircularProgressIndicator(color: cyanAccent));
+    } else {
+      content = NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  _buildProfileHeader(),
+                  const SizedBox(height: 24),
+                  if (_isOwner || !_isTargetPrivate) ...[
+                    _buildStatsRow()
+                        .animate()
+                        .fade(duration: 400.ms, delay: 200.ms)
+                        .slideY(begin: 0.08),
+                    const SizedBox(height: 32),
+                  ],
+                  if (_isOwner)
+                    _buildActionButtons()
+                        .animate()
+                        .fade(duration: 400.ms, delay: 300.ms)
+                        .slideY(begin: 0.08),
+                  if (_isOwner) const SizedBox(height: 32),
                 ],
               ),
             ),
-          ),
-        ];
-      },
-      body: Container(
-        color: darkModeBackgroundColor,
-        child: TabBarView(
-          controller: _tabController,
-          children: [_buildPlaylistsTab(), _buildFavoritesTab()],
-        ),
-      ),
-    );
+            if (_isOwner || !_isTargetPrivate)
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _SliverAppBarDelegate(
+                  TabBar(
+                    controller: _tabController,
+                    indicatorColor: cyanAccent,
+                    labelColor: cyanAccent,
+                    unselectedLabelColor: Colors.white54,
+                    tabs: const [
+                      Tab(text: "Playlists"),
+                      Tab(text: "Favorites"),
+                    ],
+                  ),
+                ),
+              ),
+          ];
+        },
+        body: (_isOwner || !_isTargetPrivate)
+            ? Container(
+                color: darkModeBackgroundColor,
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [_buildPlaylistsTab(), _buildFavoritesTab()],
+                ),
+              )
+            : Container(
+                color: darkModeBackgroundColor,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.lock_rounded,
+                        size: 64,
+                        color: Colors.white24,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "This account is private",
+                        style: headerTextStyle.copyWith(
+                          color: Colors.white54,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+      );
+    }
 
     if (_isOwner) {
       return Scaffold(backgroundColor: Colors.transparent, body: content);
@@ -318,6 +368,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ══════════════════════════════════════════
   //  ACTION BUTTONS
   // ══════════════════════════════════════════
+
   Widget _buildActionButtons() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -347,7 +398,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Edit Profile & Settings',
+                      'Settings & Edit Profile',
                       style: bodyTextStyle.copyWith(
                         color: Colors.black,
                         fontSize: 14,

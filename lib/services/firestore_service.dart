@@ -24,6 +24,32 @@ class FirestoreService {
     }
   }
 
+  /// Sets the user's privacy mode (true = private, false = public).
+  Future<void> setPrivacyMode(bool isPrivate) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    try {
+      await _db.collection('users').doc(user.uid).set({
+        'isPrivate': isPrivate,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('FirestoreService ERROR: Failed to set privacy: $e');
+    }
+  }
+
+  /// Checks if a user's profile is marked as private.
+  Future<bool> getUserPrivacyStatus(String uid) async {
+    try {
+      final docSnap = await _db.collection('users').doc(uid).get();
+      if (docSnap.exists) {
+        return docSnap.data()?['isPrivate'] ?? false;
+      }
+    } catch (e) {
+      print('FirestoreService ERROR: Failed to get privacy: $e');
+    }
+    return false;
+  }
+
   /// Searches for a user by their UID. Returns user data or null.
   Future<Map<String, dynamic>?> searchUserByUid(String uid) async {
     try {
