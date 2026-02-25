@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:yo/data/customSongsList.dart';
 import 'package:yo/data/albumsList.dart';
 import 'package:yo/data/toprateSong.dart';
+import '../models/song_info.dart';
 
 class TouhouDBService {
   final String baseUrl = "https://touhoudb.com/api";
@@ -138,6 +139,38 @@ class TouhouDBService {
           .toList();
     } else {
       throw Exception("Failed to load songs");
+    }
+  }
+
+  Future<List<SongInfo>> searchSongs(String query) async {
+    final url = Uri.parse(
+      "$baseUrl/songs?query=${Uri.encodeComponent(query)}&maxResults=15&fields=MainPicture,PVs",
+    );
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      var data = json.decode(response.body);
+      List<dynamic> items = data['items'] ?? [];
+
+      List<SongInfo> results = [];
+      for (var song in items) {
+        final pvId = _extractYoutubePvId(song['pvs']);
+        if (pvId.isNotEmpty) {
+          results.add(
+            SongInfo(
+              youtubeVideoId: pvId,
+              title: song['defaultName'] ?? song['name'] ?? 'Unknown',
+              artist: song['artistString'] ?? 'Unknown Artist',
+              thumbnailUrl:
+                  song['mainPicture']?['urlThumb'] ??
+                  'https://i.ytimg.com/vi/$pvId/hqdefault.jpg',
+            ),
+          );
+        }
+      }
+      return results;
+    } else {
+      throw Exception("Failed to search songs");
     }
   }
 }

@@ -4,19 +4,22 @@ import 'package:flutter/material.dart';
 import '../constant/my_constant.dart';
 import 'package:mobkit_dashed_border/mobkit_dashed_border.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
-// NEW WIDGET IMPORTS
+// WIDGET IMPORTS
 import '../widgets/modern_song_list_tile.dart';
 import '../widgets/modern_feature_banner.dart';
 import '../widgets/modern_song_card.dart';
 
 import 'package:yo/data/touhoudb_service.dart';
-import 'package:yo/data/customSongsList.dart';
 import 'package:yo/data/albumsList.dart';
 import 'package:yo/data/toprateSong.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../services/audio_player_service.dart';
+import '../services/realtime_database_service.dart';
 import '../models/song_info.dart';
+import 'live_party_modal.dart';
+import 'live_party_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,7 +32,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final user = FirebaseAuth.instance.currentUser;
   final TouhouDBService _service = TouhouDBService();
   final AudioPlayerService _audioService = AudioPlayerService();
-  late Future<List<customSongList>> _songsFuture;
+  final RealtimeDatabaseService _dbService = RealtimeDatabaseService();
+
   late Future<List<Albumslist>> _albumsFuture;
   late Future<List<TopRatedSongList>> _topRatedSongsFuture;
   int _selectedChip = 0;
@@ -46,13 +50,24 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _songsFuture = _service.fetchSongs();
     _albumsFuture = _service.fetchAlbum();
     _topRatedSongsFuture = _service.fetchTopRatedSongs();
   }
 
+  void _showLivePartyModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const LivePartyModal(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // If they are currently in a party, show the banner option
+    final currentPartyId = _audioService.currentPartyId;
+
     return Scaffold(
       backgroundColor: Colors
           .transparent, // Let the AnimatedBackground pass through, but child elements will be darker
@@ -69,11 +84,41 @@ class _HomeScreenState extends State<HomeScreen> {
 
           const SizedBox(height: 36),
 
+          // ─── ACTIVE PARTY BANNER ───
+          if (currentPartyId != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: StreamBuilder<SongInfo?>(
+                stream: _audioService.currentSongStream,
+                initialData: _audioService.currentSong,
+                builder: (context, snapshot) {
+                  return ModernFeatureBanner(
+                    title: 'Live Party ($currentPartyId)',
+                    subtitle: 'You are currently in a room.',
+                    imageUrl: snapshot.data?.thumbnailUrl,
+                    onPlay: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => LivePartyScreen(
+                            partyId: currentPartyId,
+                            isHost: _audioService.isHost,
+                          ),
+                        ),
+                      ).then((_) {
+                        setState(() {});
+                      });
+                    },
+                  ).animate().fade().slideY();
+                },
+              ),
+            ),
+
           // ─── LIVE PARTIES ───
           _buildSectionTitle(
             'Live Parties',
-            Icons.play_circle_fill,
-            dangerDarkColor,
+            Icons.podcasts_rounded,
+            Colors.purpleAccent,
           ).animate().fade(duration: 400.ms, delay: 150.ms).slideX(begin: 0.05),
           const SizedBox(height: 16),
           _buildLiveParties()
@@ -81,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
               .fade(duration: 500.ms, delay: 200.ms)
               .slideY(begin: 0.08),
 
-          const SizedBox(height: 48),
+          const SizedBox(height: 32),
 
           // ─── FEATURE CIRCLE ───
           _buildSectionTitle(
@@ -95,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
               .fade(duration: 500.ms, delay: 350.ms)
               .slideY(begin: 0.08),
 
-          const SizedBox(height: 48),
+          const SizedBox(height: 32),
 
           // ─── TOP 5 SONGS ───
           _buildSectionTitle(
@@ -154,8 +199,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: isSelected
                         ? darkModeBackgroundColor
                         : darkThemeTextColor,
-                    fontSize: 14,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
                 ),
               ),
@@ -194,37 +240,111 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildLiveParties() {
     return SizedBox(
       height: 200, // Adjusted for the taller ModernSongCard profile
-      child: FutureBuilder<List<customSongList>>(
-        future: _songsFuture,
+      child: StreamBuilder<DatabaseEvent>(
+        stream: _dbService.getActivePartiesStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return _buildShimmerRow(height: 200, width: 140);
-          } else if (snapshot.hasError ||
-              !snapshot.hasData ||
-              snapshot.data!.isEmpty) {
-            return Center(
-              child: Text(
-                'No live parties',
-                style: bodyTextStyle.copyWith(color: Colors.grey),
-              ),
+          }
+
+          List<MapEntry<dynamic, dynamic>> activeParties = [];
+          if (snapshot.hasData && snapshot.data?.snapshot.value != null) {
+            final data = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
+            activeParties = data.entries.toList();
+            // Sort by newest if needed (assuming keys are push IDs)
+            activeParties.sort((a, b) => b.key.compareTo(a.key));
+          }
+
+          if (activeParties.isEmpty) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(width: 16),
+                _buildStartPartyCard(),
+                Expanded(
+                  child: SizedBox(
+                    height: 140, // Match the height of Start Party card
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.speaker_notes_off,
+                            color: Colors.white24,
+                            size: 40,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No live parties at the moment.',
+                            style: bodyTextStyle.copyWith(
+                              color: Colors.white54,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             );
           }
-          final songs = snapshot.data!;
+
           return ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: songs.length + 1,
+            itemCount: activeParties.length + 1,
             itemBuilder: (context, index) {
-              if (index == songs.length) {
+              if (index == 0) {
                 return _buildStartPartyCard();
               }
-              final song = songs[index];
-              int viewcount = 556 - index * 16;
+
+              final partyData = Map<String, dynamic>.from(
+                activeParties[index - 1].value as Map,
+              );
+              final partyId = activeParties[index - 1].key;
+              final hostName = partyData['hostName'] ?? 'Unknown Host';
+
+              final stateDynamic = partyData['state'];
+              final state = stateDynamic is Map
+                  ? Map<String, dynamic>.from(stateDynamic)
+                  : null;
+
+              final songDynamic = state?['song'];
+              final song = songDynamic is Map
+                  ? Map<String, dynamic>.from(songDynamic)
+                  : null;
+
+              final title = song?['title'] ?? 'Waiting for music...';
+              final subTitle = 'Host: $hostName';
+              // Use a generic party image or the song's thumbnail
+              final imageUrl =
+                  song?['thumbnailUrl'] ??
+                  'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg';
+
               return ModernSongCard(
-                title: song.name,
-                viewerCount: viewcount.toString(),
-                imageUrl: song.image,
-                onTap: () {},
+                title: title,
+                viewerCount:
+                    subTitle, // Abusing viewerCount to show Host name for now
+                imageUrl: imageUrl,
+                onTap: () {
+                  if (partyId != _audioService.currentPartyId) {
+                    _audioService.joinPartyAsListener(partyId);
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => LivePartyScreen(
+                        partyId: partyId,
+                        isHost: partyId == _audioService.currentPartyId
+                            ? _audioService.isHost
+                            : false,
+                      ),
+                    ),
+                  ).then((_) {
+                    setState(() {});
+                  });
+                },
               );
             },
           );
@@ -234,41 +354,44 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStartPartyCard() {
-    return Container(
-      alignment: Alignment.center,
-      margin: const EdgeInsets.only(right: 16),
-      width: 140,
-      height: 140, // Match the square aspect ratio of ModernSongCard's image
-      decoration: BoxDecoration(
-        border: DashedBorder.all(
-          dashLength: 6,
-          color: darkThemeTextColor.withValues(alpha: 0.4),
+    return GestureDetector(
+      onTap: _showLivePartyModal,
+      child: Container(
+        alignment: Alignment.center,
+        margin: const EdgeInsets.only(right: 16),
+        width: 140,
+        height: 140, // Match the square aspect ratio of ModernSongCard's image
+        decoration: BoxDecoration(
+          border: DashedBorder.all(
+            dashLength: 6,
+            color: darkThemeTextColor.withValues(alpha: 0.4),
+          ),
+          color: darkThemeSecondaryColor.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(12),
         ),
-        color: darkThemeSecondaryColor.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircleAvatar(
-            backgroundColor: darkThemeTextColor.withValues(alpha: 0.1),
-            radius: 24,
-            child: Icon(
-              CupertinoIcons.sparkles,
-              color: darkThemeTextColor,
-              size: 24,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              backgroundColor: darkThemeTextColor.withValues(alpha: 0.1),
+              radius: 24,
+              child: Icon(
+                CupertinoIcons.sparkles,
+                color: darkThemeTextColor,
+                size: 24,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Start Party',
-            style: bodyTextStyle.copyWith(
-              color: darkThemeTextColor,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
+            const SizedBox(height: 12),
+            Text(
+              'Start Party',
+              style: bodyTextStyle.copyWith(
+                color: darkThemeTextColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -284,7 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return _buildShimmerRow(height: 200, width: 340);
         } else if (snapshot.hasError ||
             !snapshot.hasData ||
-            snapshot.data!.isEmpty) {
+            (snapshot.data?.isEmpty ?? true)) {
           return Center(
             child: Text(
               'No albums found',
@@ -327,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return _buildShimmerList();
           } else if (snapshot.hasError ||
               !snapshot.hasData ||
-              snapshot.data!.isEmpty) {
+              (snapshot.data?.isEmpty ?? true)) {
             return Center(
               child: Text(
                 'No songs found',

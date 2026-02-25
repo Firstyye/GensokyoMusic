@@ -63,6 +63,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isListener =
+        _audioService.currentPartyId != null && !_audioService.isHost;
+
     return StreamBuilder<SongInfo?>(
       stream: _audioService.currentSongStream,
       builder: (context, songSnapshot) {
@@ -86,8 +89,12 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(
-              'Now Playing',
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 16),
+              isListener ? 'Listening to Party...' : 'Now Playing',
+              style: GoogleFonts.inter(
+                color: isListener ? cyanAccent : Colors.white,
+                fontSize: 14,
+                fontWeight: isListener ? FontWeight.bold : FontWeight.normal,
+              ),
             ),
             centerTitle: true,
             actions: [
@@ -226,11 +233,13 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                   0.0,
                                   duration.inMilliseconds.toDouble(),
                                 ),
-                                onChanged: (value) {
-                                  _audioService.seek(
-                                    Duration(milliseconds: value.toInt()),
-                                  );
-                                },
+                                onChanged: isListener
+                                    ? null
+                                    : (value) {
+                                        _audioService.seek(
+                                          Duration(milliseconds: value.toInt()),
+                                        );
+                                      },
                               ),
                             ),
                             Padding(
@@ -277,11 +286,13 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                             : Colors.white54,
                         size: 28,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _audioService.toggleShuffle();
-                        });
-                      },
+                      onPressed: isListener
+                          ? null
+                          : () {
+                              setState(() {
+                                _audioService.toggleShuffle();
+                              });
+                            },
                     ),
                     // Previous
                     IconButton(
@@ -290,7 +301,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                         color: Colors.white,
                         size: 40,
                       ),
-                      onPressed: _audioService.skipToPrevious,
+                      onPressed: isListener
+                          ? null
+                          : _audioService.skipToPrevious,
                     ),
                     // Play/Pause
                     StreamBuilder<PlayerState>(
@@ -298,7 +311,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                       builder: (context, snapshot) {
                         final isPlaying = snapshot.data == PlayerState.playing;
                         return GestureDetector(
-                          onTap: _audioService.togglePlayPause,
+                          onTap: isListener
+                              ? null
+                              : _audioService.togglePlayPause,
                           child: Container(
                             width: 72,
                             height: 72,
@@ -331,7 +346,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                         color: Colors.white,
                         size: 40,
                       ),
-                      onPressed: _audioService.skipToNext,
+                      onPressed: isListener ? null : _audioService.skipToNext,
                     ),
                     // Loop
                     IconButton(
@@ -344,11 +359,13 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                             : Colors.white54,
                         size: 28,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _audioService.toggleLoop();
-                        });
-                      },
+                      onPressed: isListener
+                          ? null
+                          : () {
+                              setState(() {
+                                _audioService.toggleLoop();
+                              });
+                            },
                     ),
                   ],
                 ),
@@ -531,9 +548,13 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                           trailing: isPlaying
                               ? Icon(Icons.volume_up_rounded, color: cyanAccent)
                               : null,
-                          onTap: () {
-                            _audioService.skipToQueueItem(index);
-                          },
+                          onTap:
+                              (_audioService.currentPartyId != null &&
+                                  !_audioService.isHost)
+                              ? null
+                              : () {
+                                  _audioService.skipToQueueItem(index);
+                                },
                         );
                       },
                     );

@@ -216,13 +216,16 @@ class _MiniPlayerState extends State<MiniPlayer>
           );
         }
 
+        final bool isListener =
+            _audioService.currentPartyId != null && !_audioService.isHost;
+
         return IconButton(
           icon: Icon(
             isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            color: Colors.white,
+            color: isListener ? Colors.white24 : Colors.white,
             size: 28,
           ),
-          onPressed: () => _audioService.togglePlayPause(),
+          onPressed: isListener ? null : () => _audioService.togglePlayPause(),
         );
       },
     );

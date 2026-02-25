@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../models/song_info.dart';
+import '../services/realtime_database_service.dart';
 
 enum LoopMode { off, all, one }
 
@@ -65,6 +67,15 @@ class AudioPlayerService {
   int get currentIndex => _currentIndex;
   String get queueTitle => _queueTitle;
 
+  // ── Party Sync ──
+  String? _currentPartyId;
+  bool _isHost = false;
+  StreamSubscription? _partyStateSub;
+  final RealtimeDatabaseService _rtdbService = RealtimeDatabaseService();
+
+  String? get currentPartyId => _currentPartyId;
+  bool get isHost => _isHost;
+
   void _listener() {
     if (!_controller.value.isReady) return;
 
@@ -81,6 +92,9 @@ class AudioPlayerService {
     _playerStateController.add(value.playerState);
     _positionController.add(value.position);
     _durationController.add(value.metaData.duration);
+
+    // Sync to RTDB if Host
+    _syncStateToParty();
 
     // Auto-advance to next song if ended
     if (value.playerState == PlayerState.ended) {
@@ -155,6 +169,9 @@ class AudioPlayerService {
   Future<void> pause() async => _controller.pause();
 
   Future<void> togglePlayPause() async {
+    // Listeners cannot toggle
+    if (_currentPartyId != null && !_isHost) return;
+
     if (_isPlaying) {
       await pause();
     } else {
@@ -163,6 +180,9 @@ class AudioPlayerService {
   }
 
   Future<void> skipToNext() async {
+    // Listeners cannot skip
+    if (_currentPartyId != null && !_isHost) return;
+
     if (_queue.isEmpty) return;
 
     if (_currentIndex + 1 >= _queue.length) {
@@ -181,12 +201,18 @@ class AudioPlayerService {
   }
 
   Future<void> skipToQueueItem(int index) async {
+    // Listeners cannot skip
+    if (_currentPartyId != null && !_isHost) return;
+
     if (index < 0 || index >= _queue.length) return;
     _currentIndex = index;
     await _playQueueItem();
   }
 
   Future<void> skipToPrevious() async {
+    // Listeners cannot skip
+    if (_currentPartyId != null && !_isHost) return;
+
     if (_queue.isEmpty) return;
 
     // If we're more than 3 seconds in, previous just restarts the current song.
@@ -198,7 +224,7 @@ class AudioPlayerService {
 
     _currentIndex--;
     if (_currentIndex < 0) {
-      _currentIndex = _queue.length - 1; // Wrap around to end
+      _currentIndex = _queue.isNotEmpty ? _queue.length - 1 : 0;
     }
     await _playQueueItem();
   }
@@ -229,15 +255,164 @@ class AudioPlayerService {
   }
 
   Future<void> stop() async {
-    _controller.pause();
+    // Only stop native playback if not leaving a party
+    await pause();
     _currentSong = null;
     _currentSongController.add(null);
     _queue.clear();
     _currentIndex = -1;
+    leaveParty();
+  }
+
+  // ═══════════════════════════════════════════
+  //  PARTY LOGIC (RTDB)
+  // ═══════════════════════════════════════════
+
+  Timer? _syncDebounce;
+  StreamSubscription? _partyQueueSub;
+
+  void _syncStateToParty() {
+    if (_currentPartyId == null || !_isHost) return;
+
+    // Prevent spamming the database on every tick by debouncing updates
+    if (_syncDebounce?.isActive ?? false) return;
+
+    _syncDebounce = Timer(const Duration(seconds: 2), () {
+      _rtdbService.updatePartyState(
+        partyId: _currentPartyId!,
+        song: _currentSong,
+        isPlaying: _isPlaying,
+        positionSeconds: _controller.value.position.inSeconds,
+      );
+    });
+  }
+
+  /// Called by the Host when they create a room
+  void setHostParty(String partyId) {
+    _currentPartyId = partyId;
+    _isHost = true;
+    _syncStateToParty(); // Push initial state
+    _rtdbService.joinPartyUser(partyId, isHost: true);
+    _listenToPartyQueue();
+  }
+
+  /// Called by a Listener when they join a room
+  void joinPartyAsListener(String partyId) {
+    _currentPartyId = partyId;
+    _isHost = false;
+    _queue.clear();
+    _rtdbService.joinPartyUser(partyId, isHost: false);
+    _listenToPartyQueue();
+
+    // Subscribe to the party stream
+    _partyStateSub?.cancel();
+    _partyStateSub = _rtdbService.getPartyStream(partyId).listen((event) {
+      if (event.snapshot.value == null) return;
+
+      final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+
+      final bool hostIsPlaying = data['isPlaying'] ?? false;
+      final int hostPosSecs = data['positionSeconds'] ?? 0;
+
+      SongInfo? hostSong;
+      if (data['song'] != null) {
+        hostSong = SongInfo.fromMap(Map<String, dynamic>.from(data['song']));
+      }
+
+      // Check if song changed
+      if (hostSong != null &&
+          hostSong.youtubeVideoId != _currentSong?.youtubeVideoId) {
+        _currentSong = hostSong;
+        _currentSongController.add(hostSong);
+        _controller.load(hostSong.youtubeVideoId);
+        // Position will be handled asynchronously once loaded, but let's seek immediately if ready
+      }
+
+      // Handle play/pause
+      if (_controller.value.isReady) {
+        if (hostIsPlaying && !_isPlaying) {
+          play();
+        } else if (!hostIsPlaying && _isPlaying) {
+          pause();
+        }
+
+        // Handle severe desync (allow 3 seconds buffer)
+        final int myPosSecs = _controller.value.position.inSeconds;
+        if ((hostPosSecs - myPosSecs).abs() > 3) {
+          _controller.seekTo(Duration(seconds: hostPosSecs));
+        }
+      }
+    });
+
+    // We also need to listen to metadata to catch if the host changes
+    _rtdbService.getPartyMetadataStream(partyId).listen((event) {
+      if (!event.snapshot.exists) return;
+      final meta = Map<String, dynamic>.from(event.snapshot.value as Map);
+
+      // If we got promoted to host, gracefully transition
+      if (meta['hostUid'] == FirebaseAuth.instance.currentUser?.uid &&
+          !_isHost) {
+        _isHost = true;
+        _partyStateSub?.cancel();
+        _partyStateSub = null;
+        // Broadcast state as the new host
+        _syncStateToParty();
+      }
+    });
+  }
+
+  void _listenToPartyQueue() {
+    _partyQueueSub?.cancel();
+    if (_currentPartyId == null) return;
+
+    _partyQueueSub = _rtdbService.getPartyQueueStream(_currentPartyId!).listen((
+      event,
+    ) {
+      _queue.clear();
+      if (event.snapshot.value != null) {
+        final Map<dynamic, dynamic> qMap =
+            event.snapshot.value as Map<dynamic, dynamic>;
+
+        // RTDB push IDs don't guarantee exact chronological order perfectly if pushed via separate devices concurrently
+        // but since only the host (or one array mapping) manipulates it primarily, we can rely on chronological push ID sorting
+        final sortedKeys = qMap.keys.toList()..sort();
+        for (var key in sortedKeys) {
+          _queue.add(SongInfo.fromMap(Map<String, dynamic>.from(qMap[key])));
+        }
+      }
+      // If we are host and a song finished, or we just loaded, ensure our index matches if possible
+      if (_currentSong != null) {
+        final idx = _queue.indexWhere(
+          (s) => s.youtubeVideoId == _currentSong!.youtubeVideoId,
+        );
+        if (idx != -1) _currentIndex = idx;
+      }
+    });
+  }
+
+  void leaveParty({bool isEndParty = false}) {
+    if (_currentPartyId != null) {
+      if (!isEndParty) {
+        _rtdbService.leavePartyUser(_currentPartyId!, _isHost);
+      } else if (_isHost) {
+        _rtdbService.closeParty(_currentPartyId!);
+      }
+    }
+
+    _partyStateSub?.cancel();
+    _partyQueueSub?.cancel();
+    _partyStateSub = null;
+    _partyQueueSub = null;
+    _currentPartyId = null;
+    _isHost = false;
   }
 
   Future<void> seek(Duration position) async {
+    // Listeners cannot seek
+    if (_currentPartyId != null && !_isHost) return;
+
     _controller.seekTo(position);
+    _syncStateToParty();
   }
 
   // ═══════════════════════════════════════════
