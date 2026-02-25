@@ -141,12 +141,12 @@ class AboutScreen extends StatelessWidget {
                 _featureRow(Icons.flutter_dash, 'Flutter & Dart'),
                 _featureRow(
                   Icons.cloud_rounded,
-                  'Firebase Auth, Firestore & Storage',
+                  'Firebase Auth, Firestore & Realtime Database',
                 ),
                 _featureRow(Icons.api_rounded, 'TouhouDB REST API'),
                 _featureRow(
                   Icons.play_circle_rounded,
-                  'just_audio & youtube_explode_dart',
+                  'youtube_player_flutter (IFrame-based WebView)',
                 ),
               ],
             ),
