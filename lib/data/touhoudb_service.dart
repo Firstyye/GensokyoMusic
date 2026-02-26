@@ -141,6 +141,7 @@ class TouhouDBService {
                 title: song['defaultName'] ?? song['name'] ?? 'Unknown',
                 artist: song['artistString'] ?? 'Unknown Artist',
                 thumbnailUrl:
+                    song['mainPicture']?['urlOriginal'] ??
                     song['mainPicture']?['urlThumb'] ??
                     'https://i.ytimg.com/vi/$pvId/hqdefault.jpg',
               ),
@@ -171,6 +172,7 @@ class TouhouDBService {
                 title: song['defaultName'] ?? song['name'] ?? 'Unknown',
                 artist: song['artistString'] ?? 'Unknown Artist',
                 thumbnailUrl:
+                    song['mainPicture']?['urlOriginal'] ??
                     song['mainPicture']?['urlThumb'] ??
                     'https://i.ytimg.com/vi/$pvId/hqdefault.jpg',
               ),
@@ -335,7 +337,9 @@ class TouhouDBService {
               artist: songData['artistString'] ?? 'Unknown Artist',
               thumbnailUrl: pvId.isNotEmpty
                   ? 'https://i.ytimg.com/vi/$pvId/hqdefault.jpg'
-                  : (songData['mainPicture']?['urlThumb'] ?? ''),
+                  : (songData['mainPicture']?['urlOriginal'] ??
+                        songData['mainPicture']?['urlThumb'] ??
+                        ''),
             ),
           );
         } else {

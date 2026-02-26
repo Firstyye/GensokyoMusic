@@ -48,6 +48,20 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
                 expandedHeight: 300,
                 pinned: true,
                 backgroundColor: darkThemeAppbar,
+                leading: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: CircleAvatar(
+                    backgroundColor: Colors.black.withValues(alpha: 0.3),
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                ),
                 flexibleSpace: FlexibleSpaceBar(
                   titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
                   title: Column(

@@ -24,6 +24,7 @@ import '../models/song_info.dart';
 import 'live_party_modal.dart';
 import 'live_party_screen.dart';
 import 'album_details_screen.dart';
+import '../widgets/_buildMiniPlayer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -495,27 +496,37 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          body: ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: displaySongs.length,
-            itemBuilder: (context, index) {
-              final song = displaySongs[index];
-              return ModernSongListTile(
-                title: song.title,
-                artist: song.artist,
-                imageUrl: song.thumbnailUrl,
-                indexNumber: (index + 1).toString(),
-                onTap: () async {
-                  final result = await _audioService.playFromYoutubeId(
-                    song.youtubeVideoId,
-                    song,
+          body: Stack(
+            children: [
+              ListView.builder(
+                padding: const EdgeInsets.only(top: 8, bottom: 100),
+                itemCount: displaySongs.length,
+                itemBuilder: (context, index) {
+                  final song = displaySongs[index];
+                  return ModernSongListTile(
+                    title: song.title,
+                    artist: song.artist,
+                    imageUrl: song.thumbnailUrl,
+                    indexNumber: (index + 1).toString(),
+                    onTap: () async {
+                      final result = await _audioService.playFromYoutubeId(
+                        song.youtubeVideoId,
+                        song,
+                      );
+                      if (result == PlayResult.blockedAsListener && mounted) {
+                        showListenerBlockedDialog(context);
+                      }
+                    },
                   );
-                  if (result == PlayResult.blockedAsListener && mounted) {
-                    showListenerBlockedDialog(context);
-                  }
                 },
-              );
-            },
+              ),
+              const Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: MiniPlayer(),
+              ),
+            ],
           ),
         ),
       ),

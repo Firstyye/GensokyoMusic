@@ -8,6 +8,7 @@ import '../services/audio_player_service.dart';
 import '../widgets/add_song_search_sheet.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import '../widgets/_buildMiniPlayer.dart';
 
 class LivePartyScreen extends StatefulWidget {
   final String partyId;
@@ -297,6 +298,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
             ),
           ],
         ),
+        bottomNavigationBar: const MiniPlayer(),
       ),
     );
   }
