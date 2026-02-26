@@ -7,6 +7,7 @@ class ModernSongListTile extends StatelessWidget {
   final String? imageUrl;
   final String? indexNumber;
   final VoidCallback? onTap;
+  final VoidCallback? onMoreTap;
 
   const ModernSongListTile({
     super.key,
@@ -15,6 +16,7 @@ class ModernSongListTile extends StatelessWidget {
     this.imageUrl,
     this.indexNumber,
     this.onTap,
+    this.onMoreTap,
   });
 
   @override
@@ -118,7 +120,7 @@ class ModernSongListTile extends StatelessWidget {
                 color: Colors.white54,
                 size: 20,
               ),
-              onPressed: () {},
+              onPressed: onMoreTap,
             ),
           ],
         ),

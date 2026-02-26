@@ -360,4 +360,61 @@ class FirestoreService {
           }).toList();
         });
   }
+
+  // ─── Recently Played ───
+
+  /// Adds a song to the user's recently_played subcollection.
+  /// If it exists, merges the new timestamp. Limits to 20 items.
+  Future<void> addRecentlyPlayedSong(SongInfo song) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final docRef = _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('recently_played')
+          .doc(song.youtubeVideoId);
+
+      final data = song.toMap();
+      data['playedAt'] = FieldValue.serverTimestamp();
+
+      await docRef.set(data, SetOptions(merge: true));
+
+      // Optional: Clean up old items, keep latest 20
+      final snapshot = await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('recently_played')
+          .orderBy('playedAt', descending: true)
+          .get();
+
+      if (snapshot.docs.length > 20) {
+        for (int i = 20; i < snapshot.docs.length; i++) {
+          await snapshot.docs[i].reference.delete();
+        }
+      }
+    } catch (e) {
+      print('FirestoreService ERROR: Failed to add recently played: $e');
+    }
+  }
+
+  /// Returns a stream of recently played songs for the current user.
+  Stream<List<SongInfo>> getRecentlyPlayedStream() {
+    final user = _auth.currentUser;
+    if (user == null) return const Stream.empty();
+
+    return _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('recently_played')
+        .orderBy('playedAt', descending: true)
+        .limit(10)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => SongInfo.fromMap(doc.data()))
+              .toList();
+        });
+  }
 }

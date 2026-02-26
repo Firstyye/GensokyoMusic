@@ -29,9 +29,12 @@ class ModernSongCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 140, // Standardized square width
+        width: 140,
         margin: const EdgeInsets.only(right: 16.0),
+        clipBehavior: Clip.hardEdge,
+        decoration: const BoxDecoration(),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Album Art Container
@@ -62,6 +65,7 @@ class ModernSongCard extends StatelessWidget {
                     top: 8,
                     right: 8,
                     child: Container(
+                      constraints: const BoxConstraints(maxWidth: 120),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 6,
                         vertical: 4,
@@ -73,36 +77,27 @@ class ModernSongCard extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.1),
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.person,
-                            color: Colors.white,
-                            size: 10,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            viewerCount!,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        viewerCount!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
               ],
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
             // Text outside the image (Clean Spotify style)
             Text(
               title,
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: bodyTextStyle.copyWith(
                 color: Colors.white,

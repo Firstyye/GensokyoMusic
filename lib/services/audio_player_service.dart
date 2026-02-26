@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../models/song_info.dart';
 import '../services/realtime_database_service.dart';
+import '../services/firestore_service.dart';
 
 enum LoopMode { off, all, one }
 
@@ -69,11 +70,14 @@ class AudioPlayerService {
   int get currentIndex => _currentIndex;
   String get queueTitle => _queueTitle;
 
-  // ── Party Sync ──
+  // ── Party Sync & Firestore ──
   String? _currentPartyId;
   bool _isHost = false;
   StreamSubscription? _partyStateSub;
+  StreamSubscription? _partyQueueSub;
+  Timer? _syncDebounce;
   final RealtimeDatabaseService _rtdbService = RealtimeDatabaseService();
+  final FirestoreService _firestoreService = FirestoreService();
 
   String? get currentPartyId => _currentPartyId;
   bool get isHost => _isHost;
@@ -200,6 +204,9 @@ class AudioPlayerService {
 
       // Tell the native controller to load and play the video
       _controller.load(songInfo.youtubeVideoId);
+
+      // Track recently played in Firestore
+      _firestoreService.addRecentlyPlayedSong(songInfo);
     } catch (e) {
       debugPrint('AudioPlayerService error: $e');
     }
@@ -312,9 +319,6 @@ class AudioPlayerService {
   // ═══════════════════════════════════════════
   //  PARTY LOGIC (RTDB)
   // ═══════════════════════════════════════════
-
-  Timer? _syncDebounce;
-  StreamSubscription? _partyQueueSub;
 
   void _syncStateToParty() {
     if (_currentPartyId == null || !_isHost) return;
