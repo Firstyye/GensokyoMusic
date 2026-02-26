@@ -241,9 +241,11 @@ class TouhouDBService {
   }
 
   Future<List<Albumslist>> getTopRatedAlbums() async {
+    // Variety: use a random start offset for "Daily Discovery" effect
+    final randomOffset = Random().nextInt(50);
     final response = await http.get(
       Uri.parse(
-        "$baseUrl/albums?sort=RatingTotal&maxResults=10&fields=MainPicture",
+        "$baseUrl/albums?sort=RatingTotal&start=$randomOffset&maxResults=10&fields=MainPicture",
       ),
     );
     if (response.statusCode == 200) {
@@ -304,27 +306,46 @@ class TouhouDBService {
   }
 
   Future<List<SongInfo>> getAlbumTracks(int albumId) async {
+    // Include MainPicture in field just in case, though tracks usually use album art
     final response = await http.get(
-      Uri.parse("$baseUrl/albums/$albumId/tracks?fields=PVs"),
+      Uri.parse("$baseUrl/albums/$albumId/tracks?fields=PVs,MainPicture"),
     );
     if (response.statusCode == 200) {
       var data = json.decode(response.body);
-      List<dynamic> items = data['items'] ?? [];
+      // The API returns a list directly or in an 'items' field depending on the specific endpoint version
+      List<dynamic> items = [];
+      if (data is List) {
+        items = data;
+      } else if (data is Map && data['items'] != null) {
+        items = data['items'];
+      }
 
       List<SongInfo> results = [];
       for (var track in items) {
         final songData = track['song'];
+        final trackName = track['name'] ?? 'Unknown Track';
+
         if (songData != null) {
           final pvId = _extractYoutubePvId(songData['pvs']);
 
           results.add(
             SongInfo(
               youtubeVideoId: pvId,
-              title: songData['defaultName'] ?? songData['name'] ?? 'Unknown',
+              title: songData['defaultName'] ?? songData['name'] ?? trackName,
               artist: songData['artistString'] ?? 'Unknown Artist',
               thumbnailUrl: pvId.isNotEmpty
                   ? 'https://i.ytimg.com/vi/$pvId/hqdefault.jpg'
-                  : '',
+                  : (songData['mainPicture']?['urlThumb'] ?? ''),
+            ),
+          );
+        } else {
+          // Add as a non-playable track so the list isn't empty
+          results.add(
+            SongInfo(
+              youtubeVideoId: '',
+              title: trackName,
+              artist: 'Unknown Artist',
+              thumbnailUrl: '',
             ),
           );
         }

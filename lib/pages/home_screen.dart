@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -23,7 +24,6 @@ import '../models/song_info.dart';
 import 'live_party_modal.dart';
 import 'live_party_screen.dart';
 import 'album_details_screen.dart';
-import 'dart:math';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -73,10 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _albumsFuture = _service.getTopRatedAlbums().then((albums) {
-      albums.shuffle(Random());
-      return albums;
-    });
+    _albumsFuture = _service.getTopRatedAlbums();
     _recommendedSongsFuture = _service.getRecommendedSongs(genre: 'All');
     _genreSongsFuture = _service.getRecommendedSongs(
       genre: _chipLabels[_selectedChip],
@@ -107,6 +104,23 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  Future<void> _refreshData() async {
+    setState(() {
+      _albumsFuture = _service.getTopRatedAlbums();
+      _recommendedSongsFuture = _service.getRecommendedSongs(genre: 'All');
+      _genreSongsFuture = _service.getRecommendedSongs(
+        genre: _chipLabels[_selectedChip],
+      );
+      _popularCirclesFuture = _service.getPopularCircles();
+    });
+    // Wait for the main lists to load
+    await Future.wait([
+      _albumsFuture,
+      _recommendedSongsFuture,
+      _popularCirclesFuture,
+    ]);
+  }
+
   void _showLivePartyModal() {
     showModalBottomSheet(
       context: context,
@@ -122,124 +136,133 @@ class _HomeScreenState extends State<HomeScreen> {
     final currentPartyId = _audioService.currentPartyId;
 
     return Scaffold(
-      backgroundColor: Colors
-          .transparent, // Let the AnimatedBackground pass through, but child elements will be darker
-      body: ListView(
-        padding: const EdgeInsets.only(top: kToolbarHeight + 16, bottom: 180),
-        children: [
-          const SizedBox(height: 24),
+      backgroundColor: Colors.transparent,
+      body: RefreshIndicator(
+        onRefresh: _refreshData,
+        color: cyanAccent,
+        backgroundColor: darkModeBackgroundColor,
+        child: ListView(
+          padding: const EdgeInsets.only(top: kToolbarHeight + 16, bottom: 180),
+          children: [
+            const SizedBox(height: 24),
 
-          // ─── ACTIVE PARTY BANNER ───
-          if (currentPartyId != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: StreamBuilder<SongInfo?>(
-                stream: _audioService.currentSongStream,
-                initialData: _audioService.currentSong,
-                builder: (context, snapshot) {
-                  return ModernFeatureBanner(
-                    title: 'Live Party ($currentPartyId)',
-                    subtitle: 'You are currently in a room.',
-                    imageUrl: snapshot.data?.thumbnailUrl,
-                    onPlay: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => LivePartyScreen(
-                            partyId: currentPartyId,
-                            isHost: _audioService.isHost,
+            // ─── ACTIVE PARTY BANNER ───
+            if (currentPartyId != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: StreamBuilder<SongInfo?>(
+                  stream: _audioService.currentSongStream,
+                  initialData: _audioService.currentSong,
+                  builder: (context, snapshot) {
+                    return ModernFeatureBanner(
+                      title: 'Live Party ($currentPartyId)',
+                      subtitle: 'You are currently in a room.',
+                      imageUrl: snapshot.data?.thumbnailUrl,
+                      onPlay: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => LivePartyScreen(
+                              partyId: currentPartyId,
+                              isHost: _audioService.isHost,
+                            ),
                           ),
-                        ),
-                      ).then((_) {
-                        setState(() {});
-                      });
-                    },
-                  ).animate().fade().slideY();
-                },
+                        ).then((_) {
+                          setState(() {});
+                        });
+                      },
+                    ).animate().fade().slideY();
+                  },
+                ),
               ),
-            ),
 
-          // ─── LIVE PARTIES ───
-          _buildSectionTitle(
-            'Live Parties',
-            Icons.podcasts_rounded,
-            Colors.purpleAccent,
-          ).animate().fade(duration: 400.ms, delay: 150.ms).slideX(begin: 0.05),
-          const SizedBox(height: 16),
-          _buildLiveParties()
-              .animate()
-              .fade(duration: 500.ms, delay: 200.ms)
-              .slideY(begin: 0.08),
+            // ─── LIVE PARTIES ───
+            _buildSectionTitle(
+                  'Live Parties',
+                  Icons.podcasts_rounded,
+                  Colors.purpleAccent,
+                )
+                .animate()
+                .fade(duration: 400.ms, delay: 150.ms)
+                .slideX(begin: 0.05),
+            const SizedBox(height: 16),
+            _buildLiveParties()
+                .animate()
+                .fade(duration: 500.ms, delay: 200.ms)
+                .slideY(begin: 0.08),
 
-          const SizedBox(height: 32),
+            const SizedBox(height: 32),
 
-          // ─── TOP RATED ALBUMS ───
-          _buildSectionTitle(
-            'Top Rated Albums',
-            CupertinoIcons.sparkles,
-            cyanAccent,
-          ).animate().fade(duration: 400.ms, delay: 300.ms).slideX(begin: 0.05),
-          const SizedBox(height: 16),
-          _buildTopRatedAlbums()
-              .animate()
-              .fade(duration: 500.ms, delay: 350.ms)
-              .slideY(begin: 0.08),
+            // ─── DAILY DISCOVERY (Was Top Rated Albums) ───
+            _buildSectionTitle(
+                  'Daily Discovery',
+                  CupertinoIcons.sparkles,
+                  cyanAccent,
+                )
+                .animate()
+                .fade(duration: 400.ms, delay: 300.ms)
+                .slideX(begin: 0.05),
+            const SizedBox(height: 16),
+            _buildTopRatedAlbums()
+                .animate()
+                .fade(duration: 500.ms, delay: 350.ms)
+                .slideY(begin: 0.08),
 
-          const SizedBox(height: 32),
+            const SizedBox(height: 32),
 
-          // ─── RECENTLY PLAYED ───
-          _buildSectionTitle(
-            'Recently Played',
-            Icons.history_rounded,
-            Colors.orangeAccent,
-          ).animate().fade(duration: 400.ms, delay: 380.ms).slideX(begin: 0.05),
-          const SizedBox(height: 16),
-          _buildRecentlyPlayed()
-              .animate()
-              .fade(duration: 500.ms, delay: 420.ms)
-              .slideY(begin: 0.08),
+            // ─── RECENTLY PLAYED ───
+            _buildRecentlyPlayedSection(),
+            const SizedBox(height: 32),
 
-          const SizedBox(height: 32),
+            // ─── POPULAR CIRCLES ───
+            _buildSectionTitle(
+                  'Popular Circles',
+                  Icons.people_alt_rounded,
+                  Colors.greenAccent,
+                )
+                .animate()
+                .fade(duration: 400.ms, delay: 420.ms)
+                .slideX(begin: 0.05),
+            const SizedBox(height: 16),
+            _buildPopularCircles()
+                .animate()
+                .fade(duration: 500.ms, delay: 450.ms)
+                .slideY(begin: 0.08),
 
-          // ─── POPULAR CIRCLES ───
-          _buildSectionTitle(
-            'Popular Circles',
-            Icons.people_alt_rounded,
-            Colors.greenAccent,
-          ).animate().fade(duration: 400.ms, delay: 420.ms).slideX(begin: 0.05),
-          const SizedBox(height: 16),
-          _buildPopularCircles()
-              .animate()
-              .fade(duration: 500.ms, delay: 450.ms)
-              .slideY(begin: 0.08),
+            const SizedBox(height: 32),
 
-          const SizedBox(height: 32),
+            // ─── RECOMMENDED FOR YOU ───
+            _buildSectionTitle(
+                  'Recommended for You',
+                  CupertinoIcons.music_note_list,
+                  cyanAccent,
+                )
+                .animate()
+                .fade(duration: 400.ms, delay: 450.ms)
+                .slideX(begin: 0.05),
+            const SizedBox(height: 16),
+            _buildRecommendedSongs()
+                .animate()
+                .fade(duration: 500.ms, delay: 500.ms)
+                .slideY(begin: 0.08),
 
-          // ─── RECOMMENDED FOR YOU ───
-          _buildSectionTitle(
-            'Recommended for You',
-            CupertinoIcons.music_note_list,
-            cyanAccent,
-          ).animate().fade(duration: 400.ms, delay: 450.ms).slideX(begin: 0.05),
-          const SizedBox(height: 16),
-          _buildRecommendedSongs()
-              .animate()
-              .fade(duration: 500.ms, delay: 500.ms)
-              .slideY(begin: 0.08),
+            const SizedBox(height: 36),
 
-          const SizedBox(height: 36),
-
-          // ─── BROWSE BY GENRE ───
-          _buildSectionTitle(
-            'Browse by Genre',
-            CupertinoIcons.tags_solid,
-            Colors.purpleAccent,
-          ).animate().fade().slideX(),
-          const SizedBox(height: 16),
-          _buildChips().animate().fade().slideX(),
-          const SizedBox(height: 16),
-          _buildGenreSongs().animate().fade().slideY(),
-        ],
+            // ─── BROWSE BY GENRE ───
+            _buildSectionTitle(
+              'Browse by Genre',
+              CupertinoIcons.tags_solid,
+              Colors.purpleAccent,
+            ).animate().fade().slideX(),
+            const SizedBox(height: 16),
+            _buildChips().animate().fade().slideX(),
+            const SizedBox(height: 16),
+            _buildGenreSongs().animate().fade().slideY(),
+          ],
+        ),
       ),
     );
   }
@@ -308,78 +331,143 @@ class _HomeScreenState extends State<HomeScreen> {
   // ══════════════════════════════════════════
   //  RECENTLY PLAYED
   // ══════════════════════════════════════════
-  Widget _buildRecentlyPlayed() {
+  Widget _buildRecentlyPlayedSection() {
     return StreamBuilder<List<SongInfo>>(
       stream: _recentlyPlayedStream,
       builder: (context, snapshot) {
+        final allSongs = snapshot.data ?? [];
+        final hasMore = allSongs.length > 5;
+
+        // Title Row (Animated)
+        final titleWidget = _buildSectionTitle(
+          'Recently Played',
+          Icons.history_rounded,
+          Colors.orangeAccent,
+          trailing: (hasMore)
+              ? _buildGlassButton(
+                  label: 'View All',
+                  onTap: () => _showAllRecentlyPlayed(allSongs),
+                )
+              : null,
+        ).animate().fade(duration: 400.ms, delay: 380.ms).slideX(begin: 0.05);
+
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildShimmerRow(height: 180, width: 140);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              titleWidget,
+              const SizedBox(height: 16),
+              _buildShimmerRow(height: 180, width: 140),
+            ],
+          );
         }
 
-        final allSongs = snapshot.data ?? [];
         if (allSongs.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            child: Text(
-              "Start listening to some music!",
-              style: bodyTextStyle.copyWith(
-                color: Colors.white54,
-                fontStyle: FontStyle.italic,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              titleWidget,
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 20,
+                ),
+                child: Text(
+                  "Start listening to some music!",
+                  style: bodyTextStyle.copyWith(
+                    color: Colors.white54,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
               ),
-            ),
+            ],
           );
         }
 
         // Show max 5 in the horizontal list
         final displaySongs = allSongs.take(5).toList();
-        final hasMore = allSongs.length > 5;
 
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            titleWidget,
+            const SizedBox(height: 16),
             SizedBox(
-              height: 210,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: displaySongs.length,
-                itemBuilder: (context, index) {
-                  final song = displaySongs[index];
-                  return ModernSongCard(
-                    title: song.title,
-                    imageUrl: song.thumbnailUrl,
-                    onTap: () async {
-                      final result = await _audioService.playFromYoutubeId(
-                        song.youtubeVideoId,
-                        song,
+                  height: 210,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: displaySongs.length,
+                    itemBuilder: (context, index) {
+                      final song = displaySongs[index];
+                      return ModernSongCard(
+                        title: song.title,
+                        imageUrl: song.thumbnailUrl,
+                        onTap: () async {
+                          final result = await _audioService.playFromYoutubeId(
+                            song.youtubeVideoId,
+                            song,
+                          );
+                          if (result == PlayResult.blockedAsListener &&
+                              mounted) {
+                            showListenerBlockedDialog(context);
+                          }
+                        },
                       );
-                      if (result == PlayResult.blockedAsListener && mounted) {
-                        showListenerBlockedDialog(context);
-                      }
                     },
-                  );
-                },
-              ),
-            ),
-            if (hasMore)
-              Padding(
-                padding: const EdgeInsets.only(top: 12, right: 16),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => _showAllRecentlyPlayed(allSongs),
-                    child: Text(
-                      'View All Recently ›',
-                      style: bodyTextStyle.copyWith(
-                        color: cyanAccent,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
                   ),
-                ),
-              ),
+                )
+                .animate()
+                .fade(duration: 500.ms, delay: 420.ms)
+                .slideY(begin: 0.08),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildGlassButton({
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.15),
+                width: 1.2,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: bodyTextStyle.copyWith(
+                    color: cyanAccent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: cyanAccent,
+                  size: 11,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -502,20 +590,28 @@ class _HomeScreenState extends State<HomeScreen> {
   // ══════════════════════════════════════════
   //  SECTION TITLE
   // ══════════════════════════════════════════
-  Widget _buildSectionTitle(String title, IconData icon, Color iconColor) {
+  Widget _buildSectionTitle(
+    String title,
+    IconData icon,
+    Color iconColor, {
+    Widget? trailing,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           Icon(icon, color: iconColor, size: 26),
           const SizedBox(width: 10),
-          Text(
-            title,
-            style: headerTextStyle.copyWith(
-              color: darkThemeTextColor,
-              fontSize: 22,
+          Expanded(
+            child: Text(
+              title,
+              style: headerTextStyle.copyWith(
+                color: darkThemeTextColor,
+                fontSize: 22,
+              ),
             ),
           ),
+          if (trailing != null) trailing,
         ],
       ),
     );
