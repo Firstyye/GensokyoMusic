@@ -160,7 +160,7 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.search, color: Colors.white),
-                  onPressed: () {},
+                  onPressed: () => _onItemTapped(1),
                 ),
                 const SizedBox(width: 8),
                 _buildAvatar(user),

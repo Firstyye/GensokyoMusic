@@ -33,12 +33,16 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with AutomaticKeepAliveClientMixin {
   final user = FirebaseAuth.instance.currentUser;
   final TouhouDBService _service = TouhouDBService();
   final AudioPlayerService _audioService = AudioPlayerService();
   final RealtimeDatabaseService _dbService = RealtimeDatabaseService();
   final FirestoreService _firestoreService = FirestoreService();
+
+  @override
+  bool get wantKeepAlive => true;
 
   late Future<List<Albumslist>> _albumsFuture;
   late Future<List<SongInfo>> _recommendedSongsFuture;
@@ -133,6 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required by AutomaticKeepAliveClientMixin
     // If they are currently in a party, show the banner option
     final currentPartyId = _audioService.currentPartyId;
 

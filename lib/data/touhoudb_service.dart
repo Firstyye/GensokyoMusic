@@ -244,7 +244,7 @@ class TouhouDBService {
 
   Future<List<SongInfo>> searchSongs(String query) async {
     final url = Uri.parse(
-      "$baseUrl/songs?query=${Uri.encodeComponent(query)}&maxResults=15&fields=MainPicture,PVs",
+      "$baseUrl/songs?query=${Uri.encodeComponent(query)}&nameMatchMode=Auto&maxResults=15&fields=MainPicture,PVs",
     );
     final response = await http.get(url);
 
@@ -271,6 +271,108 @@ class TouhouDBService {
       return results;
     } else {
       throw Exception("Failed to search songs");
+    }
+  }
+
+  Future<List<Albumslist>> searchAlbums(String query) async {
+    final url = Uri.parse(
+      "$baseUrl/albums?query=${Uri.encodeComponent(query)}&nameMatchMode=Auto&maxResults=15&fields=MainPicture",
+    );
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      var data = json.decode(response.body);
+      List<dynamic> items = data['items'] ?? [];
+
+      return items.map((albumUrlData) {
+        String imageUrl = "";
+        if (albumUrlData['mainPicture'] != null) {
+          imageUrl =
+              albumUrlData['mainPicture']['urlOriginal'] ??
+              albumUrlData['mainPicture']['urlThumb'] ??
+              "";
+        }
+        return Albumslist(
+          id: albumUrlData['id'] ?? 0,
+          name:
+              albumUrlData['defaultName'] ??
+              albumUrlData['name'] ??
+              'Unknown Album',
+          artist: albumUrlData['artistString'] ?? 'Unknown Artist',
+          image: imageUrl,
+        );
+      }).toList();
+    } else {
+      throw Exception("Failed to search albums");
+    }
+  }
+
+  Future<List<PopularCircle>> searchArtists(String query) async {
+    final url = Uri.parse(
+      "$baseUrl/artists?query=${Uri.encodeComponent(query)}&nameMatchMode=Auto&maxResults=15&fields=MainPicture",
+    );
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      var data = json.decode(response.body);
+      List<dynamic> items = data['items'] ?? [];
+
+      return items.map((artistData) {
+        String imageUrl = "";
+        if (artistData['mainPicture'] != null) {
+          imageUrl =
+              artistData['mainPicture']['urlOriginal'] ??
+              artistData['mainPicture']['urlThumb'] ??
+              "";
+        }
+        return PopularCircle(
+          id: artistData['id'] ?? 0,
+          name:
+              artistData['defaultName'] ??
+              artistData['name'] ??
+              'Unknown Artist',
+          imageUrl: imageUrl,
+        );
+      }).toList();
+    } else {
+      throw Exception("Failed to search artists");
+    }
+  }
+
+  Future<List<Albumslist>> getArtistAlbums(
+    int artistId, {
+    String sort = 'ReleaseDate',
+    int maxResults = 10,
+  }) async {
+    final response = await http.get(
+      Uri.parse(
+        "$baseUrl/albums?artistId[]=$artistId&sort=$sort&maxResults=$maxResults&fields=MainPicture",
+      ),
+    );
+    if (response.statusCode == 200) {
+      var data = json.decode(response.body);
+      List<dynamic> items = data['items'] ?? [];
+
+      return items.map((albumUrlData) {
+        String imageUrl = "";
+        if (albumUrlData['mainPicture'] != null) {
+          imageUrl =
+              albumUrlData['mainPicture']['urlOriginal'] ??
+              albumUrlData['mainPicture']['urlThumb'] ??
+              "";
+        }
+        return Albumslist(
+          id: albumUrlData['id'] ?? 0,
+          name:
+              albumUrlData['defaultName'] ??
+              albumUrlData['name'] ??
+              'Unknown Album',
+          artist: albumUrlData['artistString'] ?? 'Unknown Artist',
+          image: imageUrl,
+        );
+      }).toList();
+    } else {
+      throw Exception("Failed to load artist albums");
     }
   }
 
