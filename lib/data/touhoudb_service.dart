@@ -122,10 +122,12 @@ class TouhouDBService {
 
   Future<List<SongInfo>> getRecommendedSongs({String genre = 'All'}) async {
     if (genre == 'All') {
+      final sortOptions = ['RatingScore', 'AdditionDate', 'PublishDate'];
+      final randomSort = sortOptions[Random().nextInt(sortOptions.length)];
       final randomOffset = Random().nextInt(100); // Variety from top 100
       final response = await http.get(
         Uri.parse(
-          "$baseUrl/songs?sort=RatingScore&start=$randomOffset&maxResults=10&fields=MainPicture,PVs",
+          "$baseUrl/songs?sort=$randomSort&start=$randomOffset&maxResults=10&fields=MainPicture,PVs",
         ),
       );
       if (response.statusCode == 200) {
@@ -153,10 +155,40 @@ class TouhouDBService {
       throw Exception("Failed to load recommended songs");
     } else {
       // Fetch by Tag for better accuracy in Genre
-      final randomOffset = Random().nextInt(50); // Variety within top results
+      // The API ignores tagName, so we must map exactly to tagId[]
+      final Map<String, int> genreTags = {
+        'chiptune': 27,
+        'drum and bass': 20,
+        'EDM': 17,
+        'electronic': 12,
+        'eurobeat': 14,
+        'hardcore techno': 83,
+        'house': 22,
+        'jazz': 7,
+        'metal': 10,
+        'orchestra': 80,
+        'piano arrangement': 1202,
+        'rock': 3,
+        'techno': 79,
+        'Touhou-style': 338,
+        'trance': 13,
+      };
+
+      final tagId = genreTags[genre];
+      if (tagId == null) return []; // Fallback if genre not mapped
+
+      // Niche genres (like eurobeat) might have very few entries.
+      // Sorting by AdditionDate with a large offset often results in 0 items.
+      // To ensure we get results and they are varied:
+      // 1. Force RatingScore (which usually has the most robust data).
+      // 2. Use a very small random offset.
+      // 3. Add a random dummy parameter to bypass aggressive API caching.
+      final randomOffset = Random().nextInt(5); // Safe small offset
+      final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+
       final response = await http.get(
         Uri.parse(
-          "$baseUrl/songs?tagName=${Uri.encodeComponent(genre)}&sort=RatingScore&start=$randomOffset&maxResults=10&fields=MainPicture,PVs",
+          "$baseUrl/songs?tagId[]=$tagId&sort=RatingScore&start=$randomOffset&maxResults=10&fields=MainPicture,PVs&_cb=$cacheBuster",
         ),
       );
       if (response.statusCode == 200) {
