@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'dart:ui';
 import '../pages/loginscreen.dart';
 import '../services/audio_player_service.dart';
 import '../pages/about_screen.dart';
@@ -304,13 +304,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ),
-              // Blur effect
-              ClipRRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
-                  child: Container(color: Colors.transparent),
-                ),
-              ),
             ],
           ),
         ),
@@ -344,10 +337,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         backgroundColor: darkThemeSecondaryColor,
                         child: CircleAvatar(
                           radius: 52,
-                          backgroundImage: (user?.photoURL != null)
-                              ? NetworkImage(user!.photoURL!)
-                              : const AssetImage('lib/pages/images/avatar.jpg')
-                                    as ImageProvider,
+                          backgroundColor: Colors.transparent,
+                          child: ClipOval(
+                            child: (user?.photoURL != null)
+                                ? CachedNetworkImage(
+                                    imageUrl: user!.photoURL!,
+                                    memCacheWidth: 160,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) =>
+                                        const CircularProgressIndicator(),
+                                    errorWidget: (context, url, error) =>
+                                        const Icon(Icons.person, size: 50),
+                                  )
+                                : Image.asset(
+                                    'lib/pages/images/avatar.jpg',
+                                    fit: BoxFit.cover,
+                                  ),
+                          ),
                         ),
                       ),
                     )

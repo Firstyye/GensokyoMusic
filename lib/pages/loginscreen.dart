@@ -9,7 +9,7 @@ import 'package:yo/pages/main_layout.dart';
 import '../pages/signup.dart';
 import '../pages/forgetpass.dart';
 import '../pages/introscreen.dart';
-import '../components/animated_bg.dart';
+import '../components/static_bg.dart';
 import 'package:delightful_toast/delight_toast.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:yo/data/authService.dart';
@@ -284,7 +284,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      body: AnimatedBackground(
+      body: StaticBackground(
         child: Center(
           child: SingleChildScrollView(
             child: Padding(

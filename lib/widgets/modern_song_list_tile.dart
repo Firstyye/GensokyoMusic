@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../constant/my_constant.dart';
 
+import 'package:cached_network_image/cached_network_image.dart';
+
 class ModernSongListTile extends StatelessWidget {
   final String title;
   final String artist;
@@ -21,15 +23,6 @@ class ModernSongListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    ImageProvider imageProvider;
-    if (imageUrl != null && imageUrl!.startsWith('http')) {
-      imageProvider = NetworkImage(imageUrl!);
-    } else {
-      imageProvider = AssetImage(
-        imageUrl ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg',
-      );
-    }
-
     return InkWell(
       onTap: onTap,
       splashColor: Colors.white.withValues(alpha: 0.1),
@@ -62,18 +55,27 @@ class ModernSongListTile extends StatelessWidget {
                 right: 16,
               ),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(
-                  4,
-                ), // Subtle rounding like Spotify
-                image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(4), // Subtle rounding like Spotify
+                color: darkThemeSecondaryColor, // Base color helps with loading
               ),
+              clipBehavior: Clip.antiAlias,
+              child: (imageUrl != null && imageUrl!.startsWith('http'))
+                  ? CachedNetworkImage(
+                      imageUrl: imageUrl!,
+                      memCacheWidth: 120, // Same optimization as ResizeImage for 56x56
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.white.withValues(alpha: 0.05),
+                      ),
+                      errorWidget: (context, url, error) => const Icon(
+                        Icons.broken_image,
+                        color: Colors.white54,
+                      ),
+                    )
+                  : Image.asset(
+                      imageUrl ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg',
+                      fit: BoxFit.cover,
+                    ),
             ),
 
             // Text Info

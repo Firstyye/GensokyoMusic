@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
 
 class ModernFeatureBanner extends StatelessWidget {
@@ -19,40 +20,48 @@ class ModernFeatureBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    ImageProvider imageProvider;
-    if (imageUrl != null && imageUrl!.startsWith('http')) {
-      imageProvider = NetworkImage(imageUrl!);
-    } else {
-      imageProvider = AssetImage(
-        imageUrl ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg',
-      );
-    }
-
     return Container(
       width: 340,
-      height: 200, // Taller, more cinematic
+      height: 200,
       margin: const EdgeInsets.only(right: 16.0),
-      decoration: BoxDecoration(
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
-      ),
-      child: Stack(
-        children: [
+        child: Stack(
+          children: [
+            // Background Image
+            Positioned.fill(
+              child: (imageUrl != null && imageUrl!.startsWith('http'))
+                  ? CachedNetworkImage(
+                      imageUrl: imageUrl!,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 680, // 340 * 2 for retina
+                      placeholder: (context, url) => Container(
+                        color: Colors.white.withValues(alpha: 0.05),
+                      ),
+                      errorWidget: (context, url, error) => Image.asset(
+                        'lib/pages/images/SongBanner/COOL&CREATE.jpg',
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Image.asset(
+                      imageUrl ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg',
+                      fit: BoxFit.cover,
+                    ),
+            ),
           // Deep dark gradient for text readability
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.9),
-                  Colors.black.withValues(alpha: 0.3),
-                  Colors.transparent,
-                ],
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.9),
+                    Colors.black.withValues(alpha: 0.3),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
-          ),
 
           // Optional Badge (e.g. "NEW ALBUM")
           if (badgeText != null)
@@ -128,9 +137,9 @@ class ModernFeatureBanner extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: cyanAccent.withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          spreadRadius: 2,
+                          color: cyanAccent.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
@@ -146,6 +155,7 @@ class ModernFeatureBanner extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ),
+   );
   }
 }

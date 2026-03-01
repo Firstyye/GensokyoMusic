@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 // import '../constant/my_constant.dart'; // <--- อย่าลืม import file constant ของคุณถ้าต้องการใช้ bodyTextStyle
 
+import 'package:cached_network_image/cached_network_image.dart';
+
 class SongCard extends StatelessWidget {
   final String title;
   final String viewerCount;
@@ -15,27 +17,36 @@ class SongCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    ImageProvider imageProvider;
-    if( backgroundImage != null && backgroundImage!.startsWith('http')) {
-      imageProvider = NetworkImage(backgroundImage!);
-    } else {
-      imageProvider = AssetImage(backgroundImage ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg');
-    }
     return Container(
       margin: const EdgeInsets.only(right: 15.0),
       width: 150,
       height: 150,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        image: DecorationImage(
-          // ถ้าไม่มีการส่งรูปมา จะใช้รูป Default นี้แทน
-          image: imageProvider,
-          fit: BoxFit.cover,
-        ),
-        color: Colors.grey.withOpacity(0.2),
+        color: Colors.grey.withOpacity(0.2), // Fallback loading color
         borderRadius: BorderRadius.circular(12),
       ),
       child: Stack(
+        fit: StackFit.expand,
         children: [
+          // Background Image
+          (backgroundImage != null && backgroundImage!.startsWith('http'))
+              ? CachedNetworkImage(
+                  imageUrl: backgroundImage!,
+                  memCacheWidth: 300, // Optimize memory for 150x150 bounds
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.white.withOpacity(0.05),
+                  ),
+                  errorWidget: (context, url, error) => const Icon(
+                    Icons.broken_image,
+                    color: Colors.white54,
+                  ),
+                )
+              : Image.asset(
+                  backgroundImage ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg',
+                  fit: BoxFit.cover,
+                ),
           // 1. Gradient Shadow (เงาดำด้านล่าง)
           Positioned(
             bottom: 0,

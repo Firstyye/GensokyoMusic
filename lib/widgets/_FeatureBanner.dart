@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import '../constant/my_constant.dart';
 
+import 'package:cached_network_image/cached_network_image.dart';
+
 class FeatureBanner extends StatelessWidget {
   final String circlename;
   final String titlename;
   final String? buttonname;
   final String? backgroundimage;
+
   const FeatureBanner({
     super.key,
     required this.circlename,
@@ -16,35 +19,38 @@ class FeatureBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    ImageProvider imageProvider;
-    if( backgroundimage != null && backgroundimage!.startsWith('http')) {
-      imageProvider = NetworkImage(backgroundimage!);
-    } else {
-      imageProvider = AssetImage(backgroundimage ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg');
-    }
     return Padding(
-      padding: EdgeInsets.only(top: 20.0, bottom: 20, right: 20),
+      padding: const EdgeInsets.only(top: 20.0, bottom: 20, right: 20),
       child: Container(
         width: 370,
         height: 150,
+        clipBehavior: Clip.antiAlias, // Important for CachedNetworkImage borders
         decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.5),
-              spreadRadius: 5,
-              blurRadius: 7,
-            ),
-          ],
-          image: DecorationImage(
-            image: imageProvider,
-            fit: BoxFit.cover,
-          ),
-
-          color: Colors.grey.withOpacity(0.2),
+          color: darkThemeSecondaryColor, // Fallback base color
           borderRadius: BorderRadius.circular(12),
+          // Removed expensive spread/blur shadow for performance
         ),
         child: Stack(
+          fit: StackFit.expand,
           children: [
+            // Background Image
+            (backgroundimage != null && backgroundimage!.startsWith('http'))
+                ? CachedNetworkImage(
+                    imageUrl: backgroundimage!,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      color: Colors.white.withValues(alpha: 0.05),
+                    ),
+                    errorWidget: (context, url, error) => const Icon(
+                      Icons.broken_image,
+                      color: Colors.white54,
+                    ),
+                  )
+                : Image.asset(
+                    backgroundimage ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg',
+                    fit: BoxFit.cover,
+                  ),
+
             Positioned(
               bottom: 0,
               left: 0,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
 import '../services/firestore_service.dart';
 import '../services/audio_player_service.dart';
@@ -195,12 +196,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       final firstSongUrl = snapshot.data!.first.thumbnailUrl;
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          firstSongUrl,
+                        child: CachedNetworkImage(
+                          imageUrl: firstSongUrl,
                           width: 50,
                           height: 50,
+                          memCacheWidth: 100, // 50 * 2
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => placeholder,
+                          placeholder: (context, url) => placeholder,
+                          errorWidget: (context, url, error) => placeholder,
                         ),
                       );
                     },

@@ -9,6 +9,7 @@ import '../widgets/add_song_search_sheet.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../widgets/_buildMiniPlayer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class LivePartyScreen extends StatefulWidget {
   final String partyId;
@@ -150,12 +151,21 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
                       return ListTile(
                         leading: CircleAvatar(
                           backgroundColor: darkThemeSecondaryColor,
-                          backgroundImage: p['photoUrl'] != ''
-                              ? NetworkImage(p['photoUrl'])
-                              : null,
-                          child: p['photoUrl'] == ''
-                              ? const Icon(Icons.person, color: Colors.white)
-                              : null,
+                          child: p['photoUrl'] != ''
+                              ? ClipOval(
+                                  child: CachedNetworkImage(
+                                    imageUrl: p['photoUrl'],
+                                    memCacheWidth: 80,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) =>
+                                        const CircularProgressIndicator(strokeWidth: 2),
+                                    errorWidget: (context, url, error) =>
+                                        const Icon(Icons.person, color: Colors.white),
+                                  ),
+                                )
+                              : const Icon(Icons.person, color: Colors.white),
                         ),
                         title: Text(
                           p['name'] ?? 'User',
@@ -327,12 +337,18 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.network(
-                  song.thumbnailUrl,
+                child: CachedNetworkImage(
+                  imageUrl: song.thumbnailUrl,
                   width: 60,
                   height: 60,
+                  memCacheWidth: 120, // 60 * 2
                   fit: BoxFit.cover,
-                  errorBuilder: (context, _, __) => Container(
+                  placeholder: (context, url) => Container(
+                    width: 60,
+                    height: 60,
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                  errorWidget: (context, _, __) => Container(
                     width: 60,
                     height: 60,
                     color: darkThemeSecondaryColor,
@@ -494,16 +510,29 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
                       child: CircleAvatar(
                         radius: 14,
                         backgroundColor: darkThemeSecondaryColor,
-                        backgroundImage: senderPhotoUrl.isNotEmpty
-                            ? NetworkImage(senderPhotoUrl)
-                            : null,
-                        child: senderPhotoUrl.isEmpty
-                            ? const Icon(
+                        child: senderPhotoUrl.isNotEmpty
+                            ? ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: senderPhotoUrl,
+                                  memCacheWidth: 42,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) =>
+                                      const CircularProgressIndicator(strokeWidth: 2),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(
+                                        Icons.person,
+                                        size: 16,
+                                        color: Colors.white,
+                                      ),
+                                ),
+                              )
+                            : const Icon(
                                 Icons.person,
                                 size: 16,
                                 color: Colors.white,
-                              )
-                            : null,
+                              ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -647,11 +676,23 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
               key: ValueKey(key),
               leading: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: Image.network(
-                  song.thumbnailUrl,
+                child: CachedNetworkImage(
+                  imageUrl: song.thumbnailUrl,
                   width: 40,
                   height: 40,
+                  memCacheWidth: 80, // 40 * 2
                   fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    width: 40,
+                    height: 40,
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    width: 40,
+                    height: 40,
+                    color: darkThemeSecondaryColor,
+                    child: const Icon(Icons.music_note, color: Colors.white54),
+                  ),
                 ),
               ),
               title: Text(

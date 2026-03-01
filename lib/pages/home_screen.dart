@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../constant/my_constant.dart';
 import 'package:mobkit_dashed_border/mobkit_dashed_border.dart';
@@ -147,126 +148,162 @@ class _HomeScreenState extends State<HomeScreen>
         onRefresh: _refreshData,
         color: cyanAccent,
         backgroundColor: darkModeBackgroundColor,
-        child: ListView(
-          padding: const EdgeInsets.only(top: kToolbarHeight + 16, bottom: 180),
-          children: [
-            const SizedBox(height: 24),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.only(top: kToolbarHeight + 16, bottom: 180),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  const SizedBox(height: 24),
 
-            // ─── ACTIVE PARTY BANNER ───
-            if (currentPartyId != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: StreamBuilder<SongInfo?>(
-                  stream: _audioService.currentSongStream,
-                  initialData: _audioService.currentSong,
-                  builder: (context, snapshot) {
-                    return ModernFeatureBanner(
-                      title: 'Live Party ($currentPartyId)',
-                      subtitle: 'You are currently in a room.',
-                      imageUrl: snapshot.data?.thumbnailUrl,
-                      onPlay: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => LivePartyScreen(
-                              partyId: currentPartyId,
-                              isHost: _audioService.isHost,
-                            ),
-                          ),
-                        ).then((_) {
-                          setState(() {});
-                        });
-                      },
-                    ).animate().fade().slideY();
-                  },
-                ),
+                  // ─── ACTIVE PARTY BANNER ───
+                  if (currentPartyId != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: RepaintBoundary(
+                        child: StreamBuilder<SongInfo?>(
+                          stream: _audioService.currentSongStream,
+                          initialData: _audioService.currentSong,
+                          builder: (context, snapshot) {
+                            return ModernFeatureBanner(
+                              title: 'Live Party ($currentPartyId)',
+                              subtitle: 'You are currently in a room.',
+                              imageUrl: snapshot.data?.thumbnailUrl,
+                              onPlay: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => LivePartyScreen(
+                                      partyId: currentPartyId,
+                                      isHost: _audioService.isHost,
+                                    ),
+                                  ),
+                                ).then((_) {
+                                  setState(() {});
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ).animate().fade(),
+
+                  // ─── LIVE PARTIES ───
+                  RepaintBoundary(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionTitle(
+                              'Live Parties',
+                              Icons.podcasts_rounded,
+                              Colors.purpleAccent,
+                            )
+                            .animate()
+                            .fade(duration: 400.ms),
+                        const SizedBox(height: 16),
+                        _buildLiveParties()
+                            .animate()
+                            .fade(duration: 500.ms),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // ─── DAILY DISCOVERY ───
+                  RepaintBoundary(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionTitle(
+                              'Daily Discovery',
+                              CupertinoIcons.sparkles,
+                              cyanAccent,
+                            )
+                            .animate()
+                            .fade(duration: 400.ms),
+                        const SizedBox(height: 16),
+                        _buildTopRatedAlbums()
+                            .animate()
+                            .fade(duration: 500.ms),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // ─── RECENTLY PLAYED ───
+                  RepaintBoundary(child: _buildRecentlyPlayedSection()),
+                  const SizedBox(height: 32),
+
+                  // ─── POPULAR CIRCLES ───
+                  RepaintBoundary(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionTitle(
+                              'Popular Circles',
+                              Icons.people_alt_rounded,
+                              Colors.greenAccent,
+                            )
+                            .animate()
+                            .fade(duration: 400.ms),
+                        const SizedBox(height: 16),
+                        _buildPopularCircles()
+                            .animate()
+                            .fade(duration: 500.ms),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // ─── RECOMMENDED FOR YOU ───
+                  RepaintBoundary(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionTitle(
+                              'Recommended for You',
+                              CupertinoIcons.music_note_list,
+                              cyanAccent,
+                            )
+                            .animate()
+                            .fade(duration: 400.ms),
+                        const SizedBox(height: 4),
+                        _buildRecommendedSongs()
+                            .animate()
+                            .fade(duration: 500.ms),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ─── BROWSE BY GENRE ───
+                  RepaintBoundary(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionTitle(
+                          'Browse by Genre',
+                          CupertinoIcons.tags_solid,
+                          Colors.purpleAccent,
+                        ).animate().fade(),
+                        const SizedBox(height: 12),
+                        _buildChips().animate().fade(),
+                        const SizedBox(height: 4),
+                        _buildGenreSongs().animate().fade(),
+                      ],
+                    ),
+                  ),
+                ]),
               ),
-
-            // ─── LIVE PARTIES ───
-            _buildSectionTitle(
-                  'Live Parties',
-                  Icons.podcasts_rounded,
-                  Colors.purpleAccent,
-                )
-                .animate()
-                .fade(duration: 400.ms, delay: 150.ms)
-                .slideX(begin: 0.05),
-            const SizedBox(height: 16),
-            _buildLiveParties()
-                .animate()
-                .fade(duration: 500.ms, delay: 200.ms)
-                .slideY(begin: 0.08),
-
-            const SizedBox(height: 32),
-
-            // ─── DAILY DISCOVERY (Was Top Rated Albums) ───
-            _buildSectionTitle(
-                  'Daily Discovery',
-                  CupertinoIcons.sparkles,
-                  cyanAccent,
-                )
-                .animate()
-                .fade(duration: 400.ms, delay: 300.ms)
-                .slideX(begin: 0.05),
-            const SizedBox(height: 16),
-            _buildTopRatedAlbums()
-                .animate()
-                .fade(duration: 500.ms, delay: 350.ms)
-                .slideY(begin: 0.08),
-
-            const SizedBox(height: 32),
-
-            // ─── RECENTLY PLAYED ───
-            _buildRecentlyPlayedSection(),
-            const SizedBox(height: 32),
-
-            // ─── POPULAR CIRCLES ───
-            _buildSectionTitle(
-                  'Popular Circles',
-                  Icons.people_alt_rounded,
-                  Colors.greenAccent,
-                )
-                .animate()
-                .fade(duration: 400.ms, delay: 420.ms)
-                .slideX(begin: 0.05),
-            const SizedBox(height: 16),
-            _buildPopularCircles()
-                .animate()
-                .fade(duration: 500.ms, delay: 450.ms)
-                .slideY(begin: 0.08),
-
-            const SizedBox(height: 32),
-
-            // ─── RECOMMENDED FOR YOU ───
-            _buildSectionTitle(
-                  'Recommended for You',
-                  CupertinoIcons.music_note_list,
-                  cyanAccent,
-                )
-                .animate()
-                .fade(duration: 400.ms, delay: 450.ms)
-                .slideX(begin: 0.05),
-            const SizedBox(height: 16),
-            _buildRecommendedSongs()
-                .animate()
-                .fade(duration: 500.ms, delay: 500.ms)
-                .slideY(begin: 0.08),
-
-            const SizedBox(height: 36),
-
-            // ─── BROWSE BY GENRE ───
-            _buildSectionTitle(
-              'Browse by Genre',
-              CupertinoIcons.tags_solid,
-              Colors.purpleAccent,
-            ).animate().fade().slideX(),
-            const SizedBox(height: 16),
-            _buildChips().animate().fade().slideX(),
-            const SizedBox(height: 16),
-            _buildGenreSongs().animate().fade().slideY(),
+            ),
           ],
         ),
       ),
@@ -438,40 +475,34 @@ class _HomeScreenState extends State<HomeScreen>
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.15),
-                width: 1.2,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.15),
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: bodyTextStyle.copyWith(
+                color: cyanAccent,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: bodyTextStyle.copyWith(
-                    color: cyanAccent,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: cyanAccent,
-                  size: 11,
-                ),
-              ],
+            const SizedBox(width: 6),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: cyanAccent,
+              size: 11,
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -574,12 +605,22 @@ class _HomeScreenState extends State<HomeScreen>
                       CircleAvatar(
                         radius: 40,
                         backgroundColor: darkThemeSecondaryColor,
-                        backgroundImage: circle.imageUrl.isNotEmpty
-                            ? NetworkImage(circle.imageUrl)
-                            : null,
-                        child: circle.imageUrl.isEmpty
-                            ? Icon(Icons.person, color: darkThemeTextColor)
-                            : null,
+                        child: circle.imageUrl.isNotEmpty
+                            ? ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: circle.imageUrl,
+                                  memCacheWidth: 160,
+                                  width: 80,
+                                  height: 80,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => Container(
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      Icon(Icons.person, color: darkThemeTextColor),
+                                ),
+                              )
+                            : Icon(Icons.person, color: darkThemeTextColor),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -872,10 +913,13 @@ class _HomeScreenState extends State<HomeScreen>
           final songs = snapshot.data!;
           final queue = songs;
 
-          return Column(
-            children: queue.asMap().entries.map((entry) {
-              final index = entry.key;
-              final song = entry.value;
+          return ListView.builder(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: queue.length,
+            itemBuilder: (context, index) {
+              final song = queue[index];
 
               return ModernSongListTile(
                     title: song.title,
@@ -899,7 +943,7 @@ class _HomeScreenState extends State<HomeScreen>
                   .animate()
                   .fade(duration: 300.ms, delay: (550 + index * 80).ms)
                   .slideX(begin: 0.05);
-            }).toList(),
+            },
           );
         },
       ),
@@ -931,10 +975,13 @@ class _HomeScreenState extends State<HomeScreen>
         final songs = snapshot.data!;
         final queue = songs;
 
-        return Column(
-          children: songs.asMap().entries.map((entry) {
-            final index = entry.key;
-            final song = entry.value;
+        return ListView.builder(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: songs.length,
+          itemBuilder: (context, index) {
+            final song = songs[index];
 
             return ModernSongListTile(
                   title: song.title,
@@ -958,7 +1005,7 @@ class _HomeScreenState extends State<HomeScreen>
                 .animate()
                 .fade(duration: 300.ms, delay: (index * 80).ms)
                 .slideX(begin: 0.05);
-          }).toList(),
+          },
         );
       },
     );
@@ -1048,12 +1095,16 @@ class _HomeScreenState extends State<HomeScreen>
                     padding: const EdgeInsets.all(8.0),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(4),
-                      child: Image.network(
-                        song.thumbnailUrl,
+                      child: CachedNetworkImage(
+                        imageUrl: song.thumbnailUrl,
                         width: 40,
                         height: 40,
+                        memCacheWidth: 80,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
+                        placeholder: (context, url) => Container(
+                          color: Colors.white.withValues(alpha: 0.05),
+                        ),
+                        errorWidget: (context, url, error) =>
                             const Icon(Icons.music_note, color: Colors.grey),
                       ),
                     ),
@@ -1214,12 +1265,14 @@ class _HomeScreenState extends State<HomeScreen>
                               }
                               return ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  songSnap.data!.first.thumbnailUrl,
+                                child: CachedNetworkImage(
+                                  imageUrl: songSnap.data!.first.thumbnailUrl,
                                   width: 50,
                                   height: 50,
+                                  memCacheWidth: 100,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => placeholder,
+                                  placeholder: (context, url) => placeholder,
+                                  errorWidget: (context, url, error) => placeholder,
                                 ),
                               );
                             },

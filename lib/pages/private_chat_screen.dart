@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
 import '../services/realtime_database_service.dart';
 import '../services/audio_player_service.dart';
@@ -191,12 +192,21 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
               child: CircleAvatar(
                 radius: 14,
                 backgroundColor: darkThemeSecondaryColor,
-                backgroundImage: senderPhotoUrl.isNotEmpty
-                    ? NetworkImage(senderPhotoUrl)
-                    : null,
-                child: senderPhotoUrl.isEmpty
-                    ? const Icon(Icons.person, size: 16, color: Colors.white)
-                    : null,
+                child: senderPhotoUrl.isNotEmpty
+                    ? ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: senderPhotoUrl,
+                          memCacheWidth: 42,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) =>
+                              const CircularProgressIndicator(strokeWidth: 2),
+                          errorWidget: (context, url, error) =>
+                              const Icon(Icons.person, size: 16, color: Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.person, size: 16, color: Colors.white),
               ),
             ),
             Expanded(
@@ -282,10 +292,24 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                     top: Radius.circular(16),
                   ),
                   child: song['thumbnailUrl'] != null
-                      ? Image.network(
-                          song['thumbnailUrl'],
+                      ? CachedNetworkImage(
+                          imageUrl: song['thumbnailUrl'],
                           height: 135,
+                          memCacheWidth: 480, // Optimize memory for ~240w box
                           fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            height: 135,
+                            color: Colors.white.withValues(alpha: 0.05),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            height: 135,
+                            color: Colors.grey[800],
+                            child: const Icon(
+                              Icons.music_note,
+                              color: Colors.white,
+                              size: 40,
+                            ),
+                          ),
                         )
                       : Container(
                           height: 135,
@@ -368,16 +392,23 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundImage:
-                  widget.friendData['photoUrl'] != null &&
+              backgroundColor: darkThemeSecondaryColor,
+              child: widget.friendData['photoUrl'] != null &&
                       widget.friendData['photoUrl'].toString().isNotEmpty
-                  ? NetworkImage(widget.friendData['photoUrl'])
-                  : null,
-              child:
-                  widget.friendData['photoUrl'] == null ||
-                      widget.friendData['photoUrl'].toString().isEmpty
-                  ? const Icon(Icons.person, size: 20)
-                  : null,
+                  ? ClipOval(
+                      child: CachedNetworkImage(
+                        imageUrl: widget.friendData['photoUrl'],
+                        memCacheWidth: 54,
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) =>
+                            const CircularProgressIndicator(strokeWidth: 2),
+                        errorWidget: (context, url, error) =>
+                            const Icon(Icons.person, size: 20, color: Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.person, size: 20, color: Colors.white),
             ),
             const SizedBox(width: 12),
             Expanded(

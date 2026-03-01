@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../constant/my_constant.dart';
 
+import 'package:cached_network_image/cached_network_image.dart';
+
 class ModernSongCard extends StatelessWidget {
   final String title;
   final String? viewerCount;
@@ -17,15 +19,6 @@ class ModernSongCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    ImageProvider imageProvider;
-    if (imageUrl != null && imageUrl!.startsWith('http')) {
-      imageProvider = NetworkImage(imageUrl!);
-    } else {
-      imageProvider = AssetImage(
-        imageUrl ?? 'lib/pages/images/SongBanner/COOL&CREATE.jpg',
-      );
-    }
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -45,18 +38,27 @@ class ModernSongCard extends StatelessWidget {
                   height: 140,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    image: DecorationImage(
-                      image: imageProvider,
-                      fit: BoxFit.cover,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    color: darkThemeSecondaryColor, // Base color helps with loading
                   ),
+                  clipBehavior: Clip.antiAlias,
+                  child: (imageUrl != null && imageUrl!.startsWith('http'))
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl!,
+                          memCacheWidth: 280, // Same optimization as ResizeImage
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: Colors.white.withValues(alpha: 0.05),
+                          ),
+                          errorWidget: (context, url, error) => const Icon(
+                            Icons.broken_image,
+                            color: Colors.white54,
+                          ),
+                        )
+                      : Image.asset(
+                          imageUrl ??
+                              'lib/pages/images/SongBanner/COOL&CREATE.jpg',
+                          fit: BoxFit.cover,
+                        ),
                 ),
 
                 // Viewer Count Badge (Optional, mostly for Live Parties)

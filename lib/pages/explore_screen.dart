@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
 import '../models/song_info.dart';
 import '../data/touhoudb_service.dart';
@@ -315,7 +316,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         borderRadius: isCircular ? null : BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -325,10 +326,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
         borderRadius: isCircular
             ? BorderRadius.circular(28)
             : BorderRadius.circular(8),
-        child: Image.network(
-          imageUrl,
+        child: CachedNetworkImage(
+          imageUrl: imageUrl,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(
+          memCacheWidth: 112, // 56 * 2 for retina
+          placeholder: (context, url) => Container(
+            color: Colors.white.withValues(alpha: 0.05),
+          ),
+          errorWidget: (context, url, error) => Container(
             color: darkThemeSecondaryColor,
             child: const Icon(Icons.music_note, color: Colors.white54),
           ),

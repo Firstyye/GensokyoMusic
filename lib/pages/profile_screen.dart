@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:ui';
 import '../pages/playlist_detail_screen.dart'; // To view playlists
 import '../pages/full_player_screen.dart'; // To play favorites
 import '../pages/settings_screen.dart';
@@ -261,12 +261,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                 ),
               ),
-              ClipRRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-                  child: Container(color: Colors.transparent),
-                ),
-              ),
             ],
           ),
         ),
@@ -294,10 +288,25 @@ class _ProfileScreenState extends State<ProfileScreen>
                         backgroundColor: darkThemeSecondaryColor,
                         child: CircleAvatar(
                           radius: 52,
-                          backgroundImage: (_photoUrl != null)
-                              ? NetworkImage(_photoUrl!)
-                              : const AssetImage('lib/pages/images/avatar.jpg')
-                                    as ImageProvider,
+                          backgroundColor: Colors.transparent,
+                          child: ClipOval(
+                            child: (_photoUrl != null)
+                                ? CachedNetworkImage(
+                                    imageUrl: _photoUrl!,
+                                    memCacheWidth: 160,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) =>
+                                        const CircularProgressIndicator(),
+                                    errorWidget: (context, url, error) =>
+                                        const Icon(Icons.person, size: 50),
+                                  )
+                                : Image.asset(
+                                    'lib/pages/images/avatar.jpg',
+                                    fit: BoxFit.cover,
+                                  ),
+                          ),
                         ),
                       ),
                     )
@@ -553,12 +562,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                   final firstSongUrl = songSnap.data!.first.thumbnailUrl;
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      firstSongUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: firstSongUrl,
                       width: 50,
                       height: 50,
+                      memCacheWidth: 100, // 50 * 2
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => placeholder,
+                      placeholder: (context, url) => placeholder,
+                      errorWidget: (_, __, ___) => placeholder,
                     ),
                   );
                 },
@@ -623,11 +634,23 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
               leading: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  song.thumbnailUrl,
+                child: CachedNetworkImage(
+                  imageUrl: song.thumbnailUrl,
                   width: 50,
                   height: 50,
+                  memCacheWidth: 100, // 50 * 2
                   fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    width: 50,
+                    height: 50,
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    width: 50,
+                    height: 50,
+                    color: darkThemeSecondaryColor,
+                    child: const Icon(Icons.music_note, color: Colors.white54),
+                  ),
                 ),
               ),
               title: Text(

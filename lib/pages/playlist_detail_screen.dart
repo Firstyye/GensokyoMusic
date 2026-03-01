@@ -4,7 +4,7 @@ import '../services/firestore_service.dart';
 import '../services/audio_player_service.dart';
 import '../models/song_info.dart';
 import '../widgets/modern_song_list_tile.dart';
-import '../components/animated_bg.dart';
+import '../components/static_bg.dart';
 import '../widgets/_buildMiniPlayer.dart';
 
 class PlaylistDetailScreen extends StatefulWidget {
@@ -41,7 +41,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          AnimatedBackground(
+          StaticBackground(
             child: SafeArea(
               child: StreamBuilder<List<SongInfo>>(
                 stream: _firestoreService.getPlaylistSongsStream(

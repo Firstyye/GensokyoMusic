@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:yo/constant/my_constant.dart';
-import '../components/animated_bg.dart';
+import '../components/static_bg.dart';
 
 class ForgetPasswordScreen extends StatefulWidget {
   const ForgetPasswordScreen({super.key});
@@ -91,7 +91,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
           },
         ),
       ),
-      body: AnimatedBackground(
+      body: StaticBackground(
         child: Center(
           child: SingleChildScrollView(
             child: Padding(
@@ -125,13 +125,11 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                     children: [
                       SafeArea(
                         bottom: false,
-                        child: Flexible(
-                          child: FractionallySizedBox(
-                            widthFactor: 0.9,
-                            child: Image(
-                              image: AssetImage('assets/images/forgetpass.png'),
-                              fit: BoxFit.contain,
-                            ),
+                        child: FractionallySizedBox(
+                          widthFactor: 0.9,
+                          child: Image(
+                            image: const AssetImage('assets/images/forgetpass.png'),
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),

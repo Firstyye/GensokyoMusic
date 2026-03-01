@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
 import '../services/firestore_service.dart';
 import '../services/realtime_database_service.dart';
@@ -103,16 +104,22 @@ class _SocialScreenState extends State<SocialScreen> {
             children: [
               CircleAvatar(
                 backgroundColor: Colors.white12,
-                backgroundImage:
-                    user['photoUrl'] != null &&
+                child: user['photoUrl'] != null &&
                         user['photoUrl'].toString().isNotEmpty
-                    ? NetworkImage(user['photoUrl'])
-                    : null,
-                child:
-                    user['photoUrl'] == null ||
-                        user['photoUrl'].toString().isEmpty
-                    ? const Icon(Icons.person, color: Colors.white)
-                    : null,
+                    ? ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: user['photoUrl'],
+                          memCacheWidth: 100, // Optimize memory for ~50x50 avatars
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) =>
+                              const CircularProgressIndicator(strokeWidth: 2),
+                          errorWidget: (context, url, error) =>
+                              const Icon(Icons.person, color: Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.person, color: Colors.white),
               ),
               Positioned(
                 bottom: 0,
@@ -218,12 +225,21 @@ class _SocialScreenState extends State<SocialScreen> {
                     CircleAvatar(
                       radius: 20,
                       backgroundColor: cyanAccent.withValues(alpha: 0.2),
-                      backgroundImage: currentUser?.photoURL != null
-                          ? NetworkImage(currentUser!.photoURL!)
-                          : null,
-                      child: currentUser?.photoURL == null
-                          ? Icon(Icons.person, color: cyanAccent)
-                          : null,
+                      child: currentUser?.photoURL != null
+                          ? ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: currentUser!.photoURL!,
+                                memCacheWidth: 60,
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) =>
+                                    const CircularProgressIndicator(strokeWidth: 2),
+                                errorWidget: (context, url, error) =>
+                                    Icon(Icons.person, color: cyanAccent),
+                              ),
+                            )
+                          : Icon(Icons.person, color: cyanAccent),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -331,16 +347,23 @@ class _SocialScreenState extends State<SocialScreen> {
                   child: Row(
                     children: [
                       CircleAvatar(
-                        backgroundImage:
-                            _searchedUser!['photoUrl'] != null &&
+                        backgroundColor: Colors.white12,
+                        child: _searchedUser!['photoUrl'] != null &&
                                 _searchedUser!['photoUrl'].toString().isNotEmpty
-                            ? NetworkImage(_searchedUser!['photoUrl'])
-                            : null,
-                        child:
-                            _searchedUser!['photoUrl'] == null ||
-                                _searchedUser!['photoUrl'].toString().isEmpty
-                            ? Icon(Icons.person)
-                            : null,
+                            ? ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: _searchedUser!['photoUrl'],
+                                  memCacheWidth: 80,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) =>
+                                      const CircularProgressIndicator(strokeWidth: 2),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(Icons.person, color: Colors.white),
+                                ),
+                              )
+                            : const Icon(Icons.person, color: Colors.white),
                       ),
                       const SizedBox(width: 12),
                       Expanded(

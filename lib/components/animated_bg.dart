@@ -58,7 +58,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
           color: darkModeBackgroundColor, // Deep Midnight Base
         ),
 
-        // Animated Orb 1 (Top Left to Bottom Right)
+        // Animated Orb 1 (Top Left to Bottom Right) - Pre-blurred
         AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
@@ -70,16 +70,21 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
                 height: size.width * 0.8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: cyanAccent.withValues(
-                    alpha: 0.15,
-                  ), // Subtle Light Blue
+                  // Use RadialGradient for a cheap, pre-blurred orb effect
+                  gradient: RadialGradient(
+                    colors: [
+                      cyanAccent.withValues(alpha: 0.15),
+                      cyanAccent.withValues(alpha: 0.0),
+                    ],
+                    stops: const [0.0, 1.0],
+                  ),
                 ),
               ),
             );
           },
         ),
 
-        // Animated Orb 2 (Bottom Right to Top Left)
+        // Animated Orb 2 (Bottom Right to Top Left) - Pre-blurred
         AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
@@ -92,16 +97,20 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
                 height: size.width * 0.9,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: darkElevatedButtonColor.withValues(
-                    alpha: 0.1,
-                  ), // Subtle Coral
+                  gradient: RadialGradient(
+                    colors: [
+                      darkElevatedButtonColor.withValues(alpha: 0.1),
+                      darkElevatedButtonColor.withValues(alpha: 0.0),
+                    ],
+                    stops: const [0.0, 1.0],
+                  ),
                 ),
               ),
             );
           },
         ),
 
-        // Animated Orb 3 (Center subtle pulse)
+        // Animated Orb 3 (Center subtle pulse) - Pre-blurred
         AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
@@ -113,24 +122,23 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
                 height: size.width * 0.6,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: cyanAccent.withValues(
-                    alpha: 0.08,
-                  ), // Very light highlight
+                  gradient: RadialGradient(
+                    colors: [
+                      cyanAccent.withValues(alpha: 0.08),
+                      cyanAccent.withValues(alpha: 0.0),
+                    ],
+                    stops: const [0.0, 1.0],
+                  ),
                 ),
               ),
             );
           },
         ),
 
-        // Glassmorphism Blur Layer (This is the magic)
+        // Dark Frost Base Layer overlay
         Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
-            child: Container(
-              color: darkThemeSecondaryColor.withValues(
-                alpha: 0.3,
-              ), // Dark frost
-            ),
+          child: Container(
+            color: darkThemeSecondaryColor.withValues(alpha: 0.3),
           ),
         ),
 
@@ -139,22 +147,26 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
           bottom: -70,
           left: 0,
           right: 0,
-          child: WaveWidget(
-            config: CustomConfig(
-              colors: [
-                darkModeBackgroundColor.withValues(alpha: 0.5),
-                cyanAccent.withValues(alpha: 0.05),
-              ],
-              durations: [10000, 8000], // Slower waves
-              heightPercentages: [0.65, 0.66],
+          child: RepaintBoundary( // Prevent Wave redraws from affecting other layers
+            child: WaveWidget(
+              config: CustomConfig(
+                colors: [
+                  darkModeBackgroundColor.withValues(alpha: 0.5),
+                  cyanAccent.withValues(alpha: 0.05),
+                ],
+                durations: [10000, 8000], // Slower waves
+                heightPercentages: [0.65, 0.66],
+              ),
+              backgroundColor: Colors.transparent,
+              size: const Size(2000, 500),
             ),
-            backgroundColor: Colors.transparent,
-            size: const Size(2000, 500),
           ),
         ),
 
-        // The actual content of the screen
-        SafeArea(child: widget.child),
+        // The actual content of the screen — isolated from background repaints
+        RepaintBoundary(
+          child: SafeArea(child: widget.child),
+        ),
       ],
     );
   }

@@ -3,7 +3,7 @@ import 'package:introduction_screen/introduction_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yo/pages/main_layout.dart';
 import 'package:yo/constant/my_constant.dart';
-import '../components/animated_bg.dart';
+import '../components/static_bg.dart';
 
 class IntroScreen extends StatefulWidget {
   const IntroScreen({super.key});
@@ -110,7 +110,7 @@ class _IntroScreenState extends State<IntroScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      body: AnimatedBackground(
+      body: StaticBackground(
         child: SafeArea(
           child: Column(
             children: [

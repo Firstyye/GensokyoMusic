@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/song_info.dart';
 import '../constant/my_constant.dart';
 import '../services/firestore_service.dart';
@@ -144,12 +145,18 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
                     return ListTile(
                       leading: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          song.thumbnailUrl,
+                        child: CachedNetworkImage(
+                          imageUrl: song.thumbnailUrl,
                           width: 50,
                           height: 50,
+                          memCacheWidth: 100, // 50 * 2
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
+                          placeholder: (context, url) => Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.white.withValues(alpha: 0.05),
+                          ),
+                          errorWidget: (context, url, error) =>
                               const Icon(Icons.music_note, color: Colors.white),
                         ),
                       ),
@@ -212,12 +219,18 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
                 return ListTile(
                   leading: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      song.thumbnailUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: song.thumbnailUrl,
                       width: 50,
                       height: 50,
+                      memCacheWidth: 100, // 50 * 2
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
+                      placeholder: (context, url) => Container(
+                        width: 50,
+                        height: 50,
+                        color: Colors.white.withValues(alpha: 0.05),
+                      ),
+                      errorWidget: (context, url, error) =>
                           const Icon(Icons.music_note, color: Colors.white),
                     ),
                   ),
@@ -295,12 +308,14 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
                             }
                             return ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                songSnap.data!.first.thumbnailUrl,
+                              child: CachedNetworkImage(
+                                imageUrl: songSnap.data!.first.thumbnailUrl,
                                 width: 50,
                                 height: 50,
+                                memCacheWidth: 100, // 50 * 2
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => placeholder,
+                                placeholder: (context, url) => placeholder,
+                                errorWidget: (_, __, ___) => placeholder,
                               ),
                             );
                           },
@@ -389,12 +404,18 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
                             return ListTile(
                               leading: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  song.thumbnailUrl,
+                                child: CachedNetworkImage(
+                                  imageUrl: song.thumbnailUrl,
                                   width: 50,
                                   height: 50,
+                                  memCacheWidth: 100, // 50 * 2
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
+                                  placeholder: (context, url) => Container(
+                                    width: 50,
+                                    height: 50,
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                  ),
+                                  errorWidget: (context, error, stackTrace) =>
                                       const Icon(
                                         Icons.music_note,
                                         color: Colors.white,

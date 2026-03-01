@@ -5,7 +5,7 @@ import 'loginscreen.dart';
 import 'about_screen.dart';
 import 'help_feedback_screen.dart';
 
-import '../components/animated_bg.dart';
+import '../components/static_bg.dart';
 import '../constant/my_constant.dart';
 
 // Import Screens
@@ -21,6 +21,7 @@ import '../widgets/_buildMiniPlayer.dart';
 import '../services/audio_player_service.dart';
 import '../services/realtime_database_service.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -52,19 +53,19 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
     _NavItem(Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
   ];
 
-  final List<Widget> _pages = [
+  // Lazy-loaded pages to prevent eager building and save massive amounts of memory
+  final List<Widget?> _pages = [
     HomeScreen(),
-    const ExploreScreen(),
-    const LibraryScreen(),
-    const SocialScreen(),
-    const ProfileScreen(),
+    null, // Explore
+    null, // Library
+    null, // Social
+    null, // Profile
   ];
 
   @override
   void initState() {
     super.initState();
     RealtimeDatabaseService().updateUserPresence();
-    _pageController = PageController(initialPage: _selectedIndex);
     _navAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -73,19 +74,33 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _pageController.dispose();
     _navAnimController.dispose();
     super.dispose();
   }
 
   void _onItemTapped(int index) {
     if (index == _selectedIndex) return;
-    setState(() => _selectedIndex = index);
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeInOutCubic,
-    );
+    setState(() {
+      _selectedIndex = index;
+      
+      // Lazy load the page if it hasn't been instantiated yet
+      if (_pages[index] == null) {
+        switch (index) {
+          case 1:
+            _pages[1] = const ExploreScreen();
+            break;
+          case 2:
+            _pages[2] = const LibraryScreen();
+            break;
+          case 3:
+            _pages[3] = const SocialScreen();
+            break;
+          case 4:
+            _pages[4] = const ProfileScreen();
+            break;
+        }
+      }
+    });
     // Pulse the nav animation
     _navAnimController.reset();
     _navAnimController.forward();
@@ -98,7 +113,7 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
       builder: (context, snapshot) {
         final user = snapshot.data;
 
-        return AnimatedBackground(
+        return StaticBackground(
           child: Scaffold(
             key: _scaffoldKey,
             backgroundColor: Colors.transparent,
@@ -107,12 +122,9 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
             appBar: AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
-              flexibleSpace: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                  child: Container(
-                    color: darkModeBackgroundColor.withValues(alpha: 0.6),
-                  ),
+              flexibleSpace: RepaintBoundary(
+                child: Container(
+                  color: darkModeBackgroundColor, // No blur, pure performance
                 ),
               ),
               leading: IconButton(
@@ -181,25 +193,42 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
                   width: 320,
                   height: 240,
                   child: IgnorePointer(
-                    child: YoutubePlayer(
-                      controller: AudioPlayerService().controller,
+                    child: RepaintBoundary(
+                      child: YoutubePlayer(
+                        controller: AudioPlayerService().controller,
+                      ),
                     ),
                   ),
                 ),
-                // PageView — each page handles its own bottom padding internally
-                PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: _pages,
+                // Custom Stack with AnimatedOpacity: Restores smooth transitions between tabs
+                // while fully preserving lazy-loading and state-retention benefits.
+                Stack(
+                  children: List.generate(5, (index) {
+                    final page = _pages[index];
+                    if (page == null) return const SizedBox.shrink();
+
+                    final isActive = _selectedIndex == index;
+                    return IgnorePointer(
+                      ignoring: !isActive, // Prevent taps on hidden pages
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOutCubic,
+                        opacity: isActive ? 1.0 : 0.0,
+                        child: page,
+                      ),
+                    );
+                  }),
                 ),
                 // MiniPlayer + BottomNav stacked flush together
                 Positioned(
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [MiniPlayer(), _buildBottomNav(context)],
+                  child: RepaintBoundary(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [MiniPlayer(), _buildBottomNav(context)],
+                    ),
                   ),
                 ),
               ],
@@ -215,27 +244,22 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
   // ══════════════════════════════════════════
   Widget _buildBottomNav(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: darkModeBackgroundColor.withValues(alpha: 0.85),
-            border: Border(
-              top: BorderSide(
-                color: Colors.white.withValues(alpha: 0.08),
-                width: 0.5,
-              ),
-            ),
-          ),
-          padding: EdgeInsets.only(bottom: bottomPadding),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(_navItems.length, (index) {
-              return _buildNavItem(index);
-            }),
+    return Container(
+      decoration: BoxDecoration(
+        color: darkModeBackgroundColor.withValues(alpha: 0.95),
+        border: Border(
+          top: BorderSide(
+            color: Colors.white.withValues(alpha: 0.08),
+            width: 0.5,
           ),
         ),
+      ),
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: List.generate(_navItems.length, (index) {
+          return _buildNavItem(index);
+        }),
       ),
     );
   }
@@ -314,11 +338,25 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
         ),
         child: CircleAvatar(
           radius: 14,
-          backgroundColor: Colors.grey[800],
-          backgroundImage: (user?.photoURL != null)
-              ? NetworkImage(user!.photoURL!)
-              : const AssetImage('lib/pages/images/avatar.jpg')
-                    as ImageProvider,
+          backgroundColor: Colors.transparent,
+          child: ClipOval(
+            child: (user?.photoURL != null)
+                ? CachedNetworkImage(
+                    imageUrl: user!.photoURL!,
+                    memCacheWidth: 42,
+                    width: double.infinity,
+                    height: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) =>
+                        const CircularProgressIndicator(strokeWidth: 2),
+                    errorWidget: (context, url, error) =>
+                        const Icon(Icons.person, size: 16),
+                  )
+                : Image.asset(
+                    'lib/pages/images/avatar.jpg',
+                    fit: BoxFit.cover,
+                  ),
+          ),
         ),
       ),
     );

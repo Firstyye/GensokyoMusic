@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
 import '../models/song_info.dart';
 import '../services/audio_player_service.dart';
@@ -22,6 +24,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
   late SongInfo _currentSong;
   bool _isFavorite = false;
+  StreamSubscription<bool>? _favoriteSub;
 
   @override
   void initState() {
@@ -30,8 +33,15 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
     _checkFavoriteStatus();
   }
 
-  Future<void> _checkFavoriteStatus() async {
-    _firestoreService.isFavoriteStream(_currentSong.youtubeVideoId).listen((
+  @override
+  void dispose() {
+    _favoriteSub?.cancel();
+    super.dispose();
+  }
+
+  void _checkFavoriteStatus() {
+    _favoriteSub?.cancel();
+    _favoriteSub = _firestoreService.isFavoriteStream(_currentSong.youtubeVideoId).listen((
       isFav,
     ) {
       if (mounted) {
@@ -130,14 +140,23 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(24.0),
-                      child: Image.network(
-                        'https://img.youtube.com/vi/${_currentSong.youtubeVideoId}/maxresdefault.jpg',
+                      child: CachedNetworkImage(
+                        imageUrl: 'https://img.youtube.com/vi/${_currentSong.youtubeVideoId}/maxresdefault.jpg',
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
+                        memCacheWidth: 800, // High quality for player
+                        placeholder: (context, url) => Container(
+                          color: Colors.black26,
+                          child: const Center(child: CircularProgressIndicator()),
+                        ),
+                        errorWidget: (context, error, stackTrace) {
                           // Fallback to standard thumbnail if maxresdefault doesn't exist
-                          return Image.network(
-                            _currentSong.thumbnailUrl,
+                          return CachedNetworkImage(
+                            imageUrl: _currentSong.thumbnailUrl,
                             fit: BoxFit.cover,
+                            memCacheWidth: 800,
+                            placeholder: (context, url) => Container(
+                              color: Colors.black26,
+                            ),
                           );
                         },
                       ),
@@ -199,77 +218,79 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // ── Seek Bar ──
-                StreamBuilder<Duration?>(
-                  stream: _audioService.durationStream,
-                  builder: (context, durationSnapshot) {
-                    final duration = durationSnapshot.data ?? Duration.zero;
+                // ── Seek Bar (isolated to prevent full-tree rebuilds) ──
+                RepaintBoundary(
+                  child: StreamBuilder<Duration?>(
+                    stream: _audioService.durationStream,
+                    builder: (context, durationSnapshot) {
+                      final duration = durationSnapshot.data ?? Duration.zero;
 
-                    return StreamBuilder<Duration>(
-                      stream: _audioService.positionStream,
-                      builder: (context, positionSnapshot) {
-                        var position = positionSnapshot.data ?? Duration.zero;
-                        if (position > duration) position = duration;
+                      return StreamBuilder<Duration>(
+                        stream: _audioService.positionStream,
+                        builder: (context, positionSnapshot) {
+                          var position = positionSnapshot.data ?? Duration.zero;
+                          if (position > duration) position = duration;
 
-                        return Column(
-                          children: [
-                            SliderTheme(
-                              data: SliderTheme.of(context).copyWith(
-                                activeTrackColor: cyanAccent,
-                                inactiveTrackColor: Colors.white24,
-                                thumbColor: cyanAccent,
-                                trackHeight: 4.0,
-                                thumbShape: const RoundSliderThumbShape(
-                                  enabledThumbRadius: 6.0,
-                                ),
-                                overlayShape: const RoundSliderOverlayShape(
-                                  overlayRadius: 16.0,
-                                ),
-                              ),
-                              child: Slider(
-                                min: 0.0,
-                                max: duration.inMilliseconds.toDouble(),
-                                value: position.inMilliseconds.toDouble().clamp(
-                                  0.0,
-                                  duration.inMilliseconds.toDouble(),
-                                ),
-                                onChanged: isListener
-                                    ? null
-                                    : (value) {
-                                        _audioService.seek(
-                                          Duration(milliseconds: value.toInt()),
-                                        );
-                                      },
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    _formatDuration(position),
-                                    style: GoogleFonts.inter(
-                                      color: Colors.white70,
-                                    ),
+                          return Column(
+                            children: [
+                              SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  activeTrackColor: cyanAccent,
+                                  inactiveTrackColor: Colors.white24,
+                                  thumbColor: cyanAccent,
+                                  trackHeight: 4.0,
+                                  thumbShape: const RoundSliderThumbShape(
+                                    enabledThumbRadius: 6.0,
                                   ),
-                                  Text(
-                                    _formatDuration(duration),
-                                    style: GoogleFonts.inter(
-                                      color: Colors.white70,
-                                    ),
+                                  overlayShape: const RoundSliderOverlayShape(
+                                    overlayRadius: 16.0,
                                   ),
-                                ],
+                                ),
+                                child: Slider(
+                                  min: 0.0,
+                                  max: duration.inMilliseconds.toDouble(),
+                                  value: position.inMilliseconds.toDouble().clamp(
+                                    0.0,
+                                    duration.inMilliseconds.toDouble(),
+                                  ),
+                                  onChanged: isListener
+                                      ? null
+                                      : (value) {
+                                          _audioService.seek(
+                                            Duration(milliseconds: value.toInt()),
+                                          );
+                                        },
+                                ),
                               ),
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      _formatDuration(position),
+                                      style: GoogleFonts.inter(
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                    Text(
+                                      _formatDuration(duration),
+                                      style: GoogleFonts.inter(
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 16),
 
@@ -517,11 +538,23 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                         return ListTile(
                           leading: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              song.thumbnailUrl,
+                            child: CachedNetworkImage(
+                              imageUrl: song.thumbnailUrl,
                               width: 50,
                               height: 50,
+                              memCacheWidth: 100, // 50 * 2
                               fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                width: 50,
+                                height: 50,
+                                color: Colors.white.withValues(alpha: 0.05),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                width: 50,
+                                height: 50,
+                                color: Colors.white10,
+                                child: const Icon(Icons.music_note, color: Colors.white54),
+                              ),
                             ),
                           ),
                           title: Text(
@@ -648,12 +681,14 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                               }
                               return ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  songSnap.data!.first.thumbnailUrl,
+                                child: CachedNetworkImage(
+                                  imageUrl: songSnap.data!.first.thumbnailUrl,
                                   width: 50,
                                   height: 50,
+                                  memCacheWidth: 100, // 50 * 2
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => placeholder,
+                                  placeholder: (context, url) => placeholder,
+                                  errorWidget: (_, __, ___) => placeholder,
                                 ),
                               );
                             },

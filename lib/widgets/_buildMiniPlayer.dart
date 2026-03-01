@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
 import '../services/audio_player_service.dart';
 import '../services/firestore_service.dart';
@@ -173,14 +174,10 @@ class _MiniPlayerState extends State<MiniPlayer>
       child: Container(
         width: 44,
         height: 44,
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          image: DecorationImage(
-            image: hasImage
-                ? NetworkImage(song.thumbnailUrl) as ImageProvider
-                : const AssetImage('lib/pages/images/banner.jpg'),
-            fit: BoxFit.cover,
-          ),
+          color: darkThemeSecondaryColor,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.3),
@@ -189,6 +186,24 @@ class _MiniPlayerState extends State<MiniPlayer>
             ),
           ],
         ),
+        child: hasImage
+            ? CachedNetworkImage(
+                imageUrl: song.thumbnailUrl,
+                memCacheWidth: 88, // 44 * 2 exactly
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  color: Colors.white.withValues(alpha: 0.05),
+                ),
+                errorWidget: (context, url, error) => const Icon(
+                  Icons.album,
+                  color: Colors.white54,
+                  size: 24,
+                ),
+              )
+            : Image.asset(
+                'lib/pages/images/banner.jpg',
+                fit: BoxFit.cover,
+              ),
       ),
     );
   }
@@ -232,27 +247,29 @@ class _MiniPlayerState extends State<MiniPlayer>
   }
 
   Widget _buildProgressBar() {
-    return StreamBuilder<Duration>(
-      stream: _audioService.positionStream,
-      builder: (context, posSnap) {
-        return StreamBuilder<Duration?>(
-          stream: _audioService.durationStream,
-          builder: (context, durSnap) {
-            final position = posSnap.data ?? Duration.zero;
-            final duration = durSnap.data ?? Duration.zero;
-            final progress = duration.inMilliseconds > 0
-                ? position.inMilliseconds / duration.inMilliseconds
-                : 0.0;
+    return RepaintBoundary(
+      child: StreamBuilder<Duration>(
+        stream: _audioService.positionStream,
+        builder: (context, posSnap) {
+          return StreamBuilder<Duration?>(
+            stream: _audioService.durationStream,
+            builder: (context, durSnap) {
+              final position = posSnap.data ?? Duration.zero;
+              final duration = durSnap.data ?? Duration.zero;
+              final progress = duration.inMilliseconds > 0
+                  ? position.inMilliseconds / duration.inMilliseconds
+                  : 0.0;
 
-            return LinearProgressIndicator(
-              value: progress.clamp(0.0, 1.0),
-              minHeight: 2,
-              backgroundColor: Colors.white.withValues(alpha: 0.1),
-              valueColor: AlwaysStoppedAnimation<Color>(cyanAccent),
-            );
-          },
-        );
-      },
+              return LinearProgressIndicator(
+                value: progress.clamp(0.0, 1.0),
+                minHeight: 2,
+                backgroundColor: Colors.white.withValues(alpha: 0.1),
+                valueColor: AlwaysStoppedAnimation<Color>(cyanAccent),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

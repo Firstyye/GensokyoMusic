@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../data/product.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -93,7 +94,19 @@ class _ProductScreenState extends State<ProductScreen> {
               print("Product's ID : $index");
             },
             
-            leading: Image.network("${product['mainPicture']}", width: 80, height: 80),
+            leading: CachedNetworkImage(
+              imageUrl: "${product['mainPicture']}",
+              width: 80,
+              height: 80,
+              memCacheWidth: 160, // 80 * 2
+              fit: BoxFit.cover,
+              placeholder: (context, url) => Container(
+                width: 80,
+                height: 80,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+              errorWidget: (context, url, error) => const Icon(Icons.error),
+            ),
             title: Text(product['name']),
             subtitle: Text("\$${product['price'].toStringAsFixed(2)}"),
             trailing: product['inStock']

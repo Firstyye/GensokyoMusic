@@ -8,7 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:yo/pages/main_layout.dart';
 import 'package:delightful_toast/delight_toast.dart';
 import 'package:yo/pages/loginscreen.dart';
-import '../components/animated_bg.dart';
+import '../components/static_bg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -326,7 +326,7 @@ class _SignupScreenState extends State<SignupScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       resizeToAvoidBottomInset: false,
-      body: AnimatedBackground(
+      body: StaticBackground(
         child: Center(
           child: SingleChildScrollView(
             child: Padding(
@@ -362,14 +362,11 @@ class _SignupScreenState extends State<SignupScreen> {
                     children: [
                       SafeArea(
                         bottom: false,
-                        child: Flexible(
-                          child: FractionallySizedBox(
-                            widthFactor: 0.9,
-                            child: Image(
-                              image: AssetImage('assets/images/CirnoLogin.png'),
-                              fit: BoxFit
-                                  .contain, // Maintain aspect ratio within bounds
-                            ),
+                        child: FractionallySizedBox(
+                          widthFactor: 0.9,
+                          child: Image(
+                            image: const AssetImage('assets/images/CirnoLogin.png'),
+                            fit: BoxFit.contain, // Maintain aspect ratio within bounds
                           ),
                         ),
                       ),

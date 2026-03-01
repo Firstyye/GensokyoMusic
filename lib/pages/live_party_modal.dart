@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constant/my_constant.dart';
 import '../models/song_info.dart';
@@ -558,11 +559,23 @@ class _LivePartyModalState extends State<LivePartyModal> {
                     return ListTile(
                       leading: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          song.thumbnailUrl,
+                        child: CachedNetworkImage(
+                          imageUrl: song.thumbnailUrl,
                           width: 50,
                           height: 50,
+                          memCacheWidth: 100, // 50 * 2
                           fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.white.withValues(alpha: 0.05),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 50,
+                            height: 50,
+                            color: darkThemeSecondaryColor,
+                            child: const Icon(Icons.music_note, color: Colors.white54),
+                          ),
                         ),
                       ),
                       title: Text(
@@ -628,11 +641,23 @@ class _LivePartyModalState extends State<LivePartyModal> {
                 return ListTile(
                   leading: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      song.thumbnailUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: song.thumbnailUrl,
                       width: 50,
                       height: 50,
+                      memCacheWidth: 100, // 50 * 2
                       fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        width: 50,
+                        height: 50,
+                        color: Colors.white.withValues(alpha: 0.05),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        width: 50,
+                        height: 50,
+                        color: darkThemeSecondaryColor,
+                        child: const Icon(Icons.music_note, color: Colors.white54),
+                      ),
                     ),
                   ),
                   title: Text(
@@ -713,12 +738,14 @@ class _LivePartyModalState extends State<LivePartyModal> {
                             }
                             return ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                songSnap.data!.first.thumbnailUrl,
+                              child: CachedNetworkImage(
+                                imageUrl: songSnap.data!.first.thumbnailUrl,
                                 width: 50,
                                 height: 50,
+                                memCacheWidth: 100, // 50 * 2
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => placeholder,
+                                placeholder: (context, url) => placeholder,
+                                errorWidget: (_, __, ___) => placeholder,
                               ),
                             );
                           },
