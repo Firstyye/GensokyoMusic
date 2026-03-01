@@ -365,6 +365,8 @@ class FirestoreService {
 
   /// Adds a song to the user's recently_played subcollection.
   /// If it exists, merges the new timestamp. Limits to 20 items.
+  int _recentPlayCount = 0;
+
   Future<void> addRecentlyPlayedSong(SongInfo song) async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -381,17 +383,24 @@ class FirestoreService {
 
       await docRef.set(data, SetOptions(merge: true));
 
-      // Optional: Clean up old items, keep latest 20
-      final snapshot = await _db
-          .collection('users')
-          .doc(user.uid)
-          .collection('recently_played')
-          .orderBy('playedAt', descending: true)
-          .get();
+      // Only run cleanup every 5 plays to reduce Firestore reads
+      _recentPlayCount++;
+      if (_recentPlayCount % 5 == 0) {
+        // Fetch only items beyond the 20th to delete them
+        final overflow = await _db
+            .collection('users')
+            .doc(user.uid)
+            .collection('recently_played')
+            .orderBy('playedAt', descending: true)
+            .limit(50) // safety cap
+            .get();
 
-      if (snapshot.docs.length > 20) {
-        for (int i = 20; i < snapshot.docs.length; i++) {
-          await snapshot.docs[i].reference.delete();
+        if (overflow.docs.length > 20) {
+          final batch = _db.batch();
+          for (int i = 20; i < overflow.docs.length; i++) {
+            batch.delete(overflow.docs[i].reference);
+          }
+          await batch.commit();
         }
       }
     } catch (e) {

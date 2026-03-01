@@ -39,8 +39,10 @@ Color dangerDarkColor = const Color(0xFFFF4D4D);
 Color dangerTransparentDarkColor = const Color(0x33FF0000);
 
 // ─── TYPOGRAPHY ───
+final String _poppinsFamily = GoogleFonts.poppins().fontFamily!;
+
 TextStyle headerTextStyle = TextStyle(
-  fontFamily: GoogleFonts.poppins().fontFamily,
+  fontFamily: _poppinsFamily,
   // Force pure white by default for the dark theme aesthetic
   color: darkThemeTextColor,
   fontSize: 18,
@@ -49,7 +51,7 @@ TextStyle headerTextStyle = TextStyle(
 );
 
 TextStyle bodyTextStyle = TextStyle(
-  fontFamily: GoogleFonts.poppins().fontFamily,
+  fontFamily: _poppinsFamily,
   color: darkThemeTextColor,
   fontSize: 14,
   fontWeight: FontWeight.w400,

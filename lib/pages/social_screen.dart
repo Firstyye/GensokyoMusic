@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
 import '../services/firestore_service.dart';
@@ -191,7 +191,7 @@ class _SocialScreenState extends State<SocialScreen> {
                 ),
               );
             },
-    ).animate().fade().slideX(begin: 0.05);
+    );
   }
 
   @override
@@ -271,7 +271,7 @@ class _SocialScreenState extends State<SocialScreen> {
                     ),
                   ],
                 ),
-              ).animate().fade().slideY(begin: 0.1),
+              ),
 
               const SizedBox(height: 24),
 
@@ -330,7 +330,7 @@ class _SocialScreenState extends State<SocialScreen> {
                     ),
                   ),
                 ],
-              ).animate().fade(delay: 100.ms).slideY(begin: 0.1),
+              ),
 
               // ─── SEARCH RESULT ───
               if (_searchedUser != null) ...[
@@ -388,7 +388,7 @@ class _SocialScreenState extends State<SocialScreen> {
                       ),
                     ],
                   ),
-                ).animate().scale(duration: 200.ms, curve: Curves.easeOutBack),
+                ),
               ],
 
               const SizedBox(height: 32),

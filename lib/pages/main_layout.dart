@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import 'loginscreen.dart';
 import 'about_screen.dart';
 import 'help_feedback_screen.dart';
@@ -33,7 +32,6 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
   int _selectedIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  late PageController _pageController;
   late AnimationController _navAnimController;
 
   // Bottom nav items
@@ -183,37 +181,35 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
             body: Stack(
               alignment: Alignment.bottomCenter,
               children: [
+                // Use Offstage instead of AnimatedOpacity to prevent painting
+                // hidden pages. AnimatedOpacity(opacity: 0.0) still lays out and
+                // paints every page every frame, which kills mid-range GPUs.
+                // Offstage keeps pages mounted (preserving state) but skips paint.
                 // Hidden Youtube Player acting as our global audio engine.
-                // We move it completely off-screen (-1000) instead of using Opacity,
-                // because Android WebViews sometimes ignore opacity and render on top anyway.
-                // Must retain a decent size (320x240) so YouTube doesn't block it as a "hidden background player".
+                // Positioned off-screen because Android WebViews ignore opacity.
+                // Size must stay at 320x240 — YouTube iframe needs this to reliably
+                // report position/duration/state via JavaScript bridge.
                 Positioned(
                   top: -1000,
                   left: -1000,
                   width: 320,
                   height: 240,
                   child: IgnorePointer(
-                    child: RepaintBoundary(
-                      child: YoutubePlayer(
-                        controller: AudioPlayerService().controller,
-                      ),
+                    child: YoutubePlayer(
+                      controller: AudioPlayerService().controller,
                     ),
                   ),
                 ),
-                // Custom Stack with AnimatedOpacity: Restores smooth transitions between tabs
-                // while fully preserving lazy-loading and state-retention benefits.
                 Stack(
                   children: List.generate(5, (index) {
                     final page = _pages[index];
                     if (page == null) return const SizedBox.shrink();
 
                     final isActive = _selectedIndex == index;
-                    return IgnorePointer(
-                      ignoring: !isActive, // Prevent taps on hidden pages
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOutCubic,
-                        opacity: isActive ? 1.0 : 0.0,
+                    return Offstage(
+                      offstage: !isActive,
+                      child: TickerMode(
+                        enabled: isActive, // Pause animations on hidden pages
                         child: page,
                       ),
                     );

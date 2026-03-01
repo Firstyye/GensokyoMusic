@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -25,6 +26,7 @@ class _MiniPlayerState extends State<MiniPlayer>
   final FirestoreService _firestoreService = FirestoreService();
 
   late final AnimationController _spinController;
+  StreamSubscription<PlayerState>? _playerStateSub;
 
   @override
   void initState() {
@@ -35,7 +37,7 @@ class _MiniPlayerState extends State<MiniPlayer>
     );
 
     // Sync spin with playing state
-    _audioService.playerStateStream.listen((state) {
+    _playerStateSub = _audioService.playerStateStream.listen((state) {
       if (!mounted) return;
       if (state == PlayerState.playing) {
         _spinController.repeat();
@@ -47,6 +49,7 @@ class _MiniPlayerState extends State<MiniPlayer>
 
   @override
   void dispose() {
+    _playerStateSub?.cancel();
     _spinController.dispose();
     super.dispose();
   }
@@ -169,41 +172,43 @@ class _MiniPlayerState extends State<MiniPlayer>
 
   Widget _buildAlbumArt(SongInfo song) {
     final hasImage = song.thumbnailUrl.isNotEmpty;
-    return RotationTransition(
-      turns: _spinController,
-      child: Container(
-        width: 44,
-        height: 44,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: darkThemeSecondaryColor,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: hasImage
-            ? CachedNetworkImage(
-                imageUrl: song.thumbnailUrl,
-                memCacheWidth: 88, // 44 * 2 exactly
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  color: Colors.white.withValues(alpha: 0.05),
-                ),
-                errorWidget: (context, url, error) => const Icon(
-                  Icons.album,
-                  color: Colors.white54,
-                  size: 24,
-                ),
-              )
-            : Image.asset(
-                'lib/pages/images/banner.jpg',
-                fit: BoxFit.cover,
+    return RepaintBoundary(
+      child: RotationTransition(
+        turns: _spinController,
+        child: Container(
+          width: 44,
+          height: 44,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: darkThemeSecondaryColor,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
+            ],
+          ),
+          child: hasImage
+              ? CachedNetworkImage(
+                  imageUrl: song.thumbnailUrl,
+                  memCacheWidth: 88, // 44 * 2 exactly
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                  errorWidget: (context, url, error) => const Icon(
+                    Icons.album,
+                    color: Colors.white54,
+                    size: 24,
+                  ),
+                )
+              : Image.asset(
+                  'lib/pages/images/banner.jpg',
+                  fit: BoxFit.cover,
+                ),
+        ),
       ),
     );
   }
@@ -211,6 +216,7 @@ class _MiniPlayerState extends State<MiniPlayer>
   Widget _buildPlayPauseButton() {
     return StreamBuilder<PlayerState>(
       stream: _audioService.playerStateStream,
+      initialData: _audioService.playerState,
       builder: (context, snapshot) {
         final playerState = snapshot.data;
         final isPlaying = playerState == PlayerState.playing;
@@ -248,28 +254,65 @@ class _MiniPlayerState extends State<MiniPlayer>
 
   Widget _buildProgressBar() {
     return RepaintBoundary(
-      child: StreamBuilder<Duration>(
-        stream: _audioService.positionStream,
-        builder: (context, posSnap) {
-          return StreamBuilder<Duration?>(
-            stream: _audioService.durationStream,
-            builder: (context, durSnap) {
-              final position = posSnap.data ?? Duration.zero;
-              final duration = durSnap.data ?? Duration.zero;
-              final progress = duration.inMilliseconds > 0
-                  ? position.inMilliseconds / duration.inMilliseconds
-                  : 0.0;
+      child: _MiniProgressBar(audioService: _audioService),
+    );
+  }
+}
 
-              return LinearProgressIndicator(
-                value: progress.clamp(0.0, 1.0),
-                minHeight: 2,
-                backgroundColor: Colors.white.withValues(alpha: 0.1),
-                valueColor: AlwaysStoppedAnimation<Color>(cyanAccent),
-              );
-            },
-          );
-        },
-      ),
+/// Extracted stateful widget for the progress bar so it can manage its own
+/// subscriptions and only repaint itself — never the parent MiniPlayer tree.
+class _MiniProgressBar extends StatefulWidget {
+  final AudioPlayerService audioService;
+  const _MiniProgressBar({required this.audioService});
+
+  @override
+  State<_MiniProgressBar> createState() => _MiniProgressBarState();
+}
+
+class _MiniProgressBarState extends State<_MiniProgressBar> {
+  double _progress = 0.0;
+  StreamSubscription<Duration>? _posSub;
+  StreamSubscription<Duration?>? _durSub;
+  Duration _duration = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    // Seed with current values so the bar doesn't start at 0
+    _duration = widget.audioService.duration;
+    final pos = widget.audioService.position;
+    if (_duration.inMilliseconds > 0) {
+      _progress = (pos.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0);
+    }
+    _durSub = widget.audioService.durationStream.listen((d) {
+      _duration = d ?? Duration.zero;
+    });
+    _posSub = widget.audioService.positionStream
+        .listen((pos) {
+      final newProgress = _duration.inMilliseconds > 0
+          ? (pos.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
+          : 0.0;
+      // Only rebuild if progress changed visually (>0.5% difference)
+      if ((newProgress - _progress).abs() > 0.005) {
+        if (mounted) setState(() => _progress = newProgress);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _posSub?.cancel();
+    _durSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LinearProgressIndicator(
+      value: _progress,
+      minHeight: 2,
+      backgroundColor: Colors.white.withValues(alpha: 0.1),
+      valueColor: AlwaysStoppedAnimation<Color>(cyanAccent),
     );
   }
 }

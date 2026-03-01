@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../widgets/universal_image.dart';
 import '../constant/my_constant.dart';
 import '../data/touhoudb_service.dart';
 import '../data/albumsList.dart';
@@ -150,15 +150,15 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
           fit: StackFit.expand,
           children: [
             widget.imageUrl.isNotEmpty
-                ? CachedNetworkImage(
+                ? UniversalImage(
                     imageUrl: widget.imageUrl,
+                    width: double.infinity,
+                    height: 300,
                     fit: BoxFit.cover,
-                    memCacheWidth: 600, // 300 * 2
-                    placeholder: (context, url) => Container(
+                    placeholder: Container(
                       color: Colors.white.withValues(alpha: 0.05),
                     ),
-                    errorWidget: (context, url, error) =>
-                        Container(color: darkThemeSecondaryColor),
+                    errorWidget: Container(color: darkThemeSecondaryColor),
                   )
                 : Container(color: darkThemeSecondaryColor),
             Container(
@@ -222,26 +222,27 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                                 ),
                                 leading: ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                  child: CachedNetworkImage(
-                                  imageUrl: album.image,
-                                  width: 60,
-                                  height: 60,
-                                  memCacheWidth: 120, // 60 * 2
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => Container(
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                  ),
-                                  errorWidget: (context, url, error) =>
-                                      Container(
-                                        color: darkThemeSecondaryColor,
-                                        width: 60,
-                                        height: 60,
-                                        child: const Icon(
-                                          Icons.album,
-                                          color: Colors.white54,
-                                        ),
+                                  child: UniversalImage(
+                                    imageUrl: album.image,
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.cover,
+                                    placeholder: Container(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.05,
                                       ),
-                                ),  ),
+                                    ),
+                                    errorWidget: Container(
+                                      color: darkThemeSecondaryColor,
+                                      width: 60,
+                                      height: 60,
+                                      child: const Icon(
+                                        Icons.album,
+                                        color: Colors.white54,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                                 title: Text(
                                   album.name,
                                   style: bodyTextStyle.copyWith(
@@ -315,21 +316,21 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                           borderRadius: BorderRadius.circular(12),
                           child: AspectRatio(
                             aspectRatio: 1,
-                            child: CachedNetworkImage(
+                            child: UniversalImage(
                               imageUrl: album.image,
+                              width: 130,
+                              height: 130,
                               fit: BoxFit.cover,
-                              memCacheWidth: 260, // 130 * 2
-                              placeholder: (context, url) => Container(
+                              placeholder: Container(
                                 color: Colors.white.withValues(alpha: 0.05),
                               ),
-                              errorWidget: (context, url, error) =>
-                                  Container(
-                                    color: darkThemeSecondaryColor,
-                                    child: const Icon(
-                                      Icons.album,
-                                      color: Colors.white54,
-                                    ),
-                                  ),
+                              errorWidget: Container(
+                                color: darkThemeSecondaryColor,
+                                child: const Icon(
+                                  Icons.album,
+                                  color: Colors.white54,
+                                ),
+                              ),
                             ),
                           ),
                         ),

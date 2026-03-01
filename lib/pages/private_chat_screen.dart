@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -179,7 +179,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
     if (isMe) {
       return Align(
         alignment: Alignment.centerRight,
-        child: bubble.animate().fade().slideY(begin: 0.1),
+        child: bubble,
       );
     } else {
       return Align(
@@ -228,7 +228,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
               ),
             ),
           ],
-        ).animate().fade().slideY(begin: 0.1),
+        ),
       );
     }
   }

@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:yo/pages/product_screen.dart';
-import 'pages/home_screen.dart';
-import 'pages/introscreen.dart';
 import 'pages/loginscreen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';

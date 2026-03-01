@@ -19,9 +19,9 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      await FirebaseAuth.instance.signInWithCredential(credential);
-     
-    }on FirebaseAuthException catch (e) {
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      return userCredential.user;
+    } on FirebaseAuthException catch (e) {
       print("Error signing in with Google: $e");
       return null;
     }

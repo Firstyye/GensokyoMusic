@@ -8,7 +8,6 @@ import '../services/firestore_service.dart';
 import '../services/audio_player_service.dart';
 import '../models/song_info.dart';
 import '../constant/my_constant.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../widgets/_buildMiniPlayer.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -141,17 +140,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                   _buildProfileHeader(),
                   const SizedBox(height: 24),
                   if (_isOwner || !_isTargetPrivate) ...[
-                    _buildStatsRow()
-                        .animate()
-                        .fade(duration: 400.ms, delay: 200.ms)
-                        .slideY(begin: 0.08),
+                    _buildStatsRow(),
                     const SizedBox(height: 32),
                   ],
                   if (_isOwner)
-                    _buildActionButtons()
-                        .animate()
-                        .fade(duration: 400.ms, delay: 300.ms)
-                        .slideY(begin: 0.08),
+                    _buildActionButtons(),
                   if (_isOwner) const SizedBox(height: 32),
                 ],
               ),
@@ -278,8 +271,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                         boxShadow: [
                           BoxShadow(
                             color: cyanAccent.withValues(alpha: 0.4),
-                            blurRadius: 36,
-                            spreadRadius: 4,
+                            blurRadius: 16,
+                            spreadRadius: 2,
                           ),
                         ],
                       ),
@@ -309,13 +302,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                         ),
                       ),
-                    )
-                    .animate()
-                    .fade(duration: 500.ms)
-                    .scale(
-                      begin: const Offset(0.8, 0.8),
-                      duration: 500.ms,
-                      curve: Curves.easeOutBack,
                     ),
                 const SizedBox(height: 16),
                 Text(
@@ -326,7 +312,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     letterSpacing: -0.5,
                   ),
                   textAlign: TextAlign.center,
-                ).animate().fade(duration: 400.ms, delay: 100.ms),
+                ),
                 if (_joinDateText != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
@@ -349,7 +335,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                       ],
                     ),
-                  ).animate().fade(duration: 400.ms, delay: 150.ms),
+                  ),
                 const SizedBox(height: 8),
               ],
             ),
@@ -378,14 +364,14 @@ class _ProfileScreenState extends State<ProfileScreen>
           boxShadow: [
             BoxShadow(
               color: cyanAccent.withValues(alpha: 0.08),
-              blurRadius: 24,
-              spreadRadius: 2,
+              blurRadius: 10,
+              spreadRadius: 1,
               offset: const Offset(0, 4),
             ),
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+              blurRadius: 6,
+              offset: const Offset(0, 4),
             ),
           ],
         ),

@@ -327,8 +327,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             color: cyanAccent.withValues(
                               alpha: 0.4,
                             ), // Using new Light Blue accent
-                            blurRadius: 36,
-                            spreadRadius: 4,
+                            blurRadius: 16,
+                            spreadRadius: 2,
                           ),
                         ],
                       ),
@@ -445,14 +445,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           boxShadow: [
             BoxShadow(
               color: cyanAccent.withValues(alpha: 0.08),
-              blurRadius: 24,
-              spreadRadius: 2,
+              blurRadius: 10,
+              spreadRadius: 1,
               offset: const Offset(0, 4),
             ),
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+              blurRadius: 6,
+              offset: const Offset(0, 4),
             ),
           ],
         ),

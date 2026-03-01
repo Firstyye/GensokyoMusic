@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -17,7 +16,6 @@ import '../widgets/modern_song_card.dart';
 import 'package:yo/data/touhoudb_service.dart';
 import 'package:yo/data/albumsList.dart';
 import 'package:yo/data/popular_circle.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../services/audio_player_service.dart';
 import '../services/realtime_database_service.dart';
 import '../services/firestore_service.dart';
@@ -190,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen>
                           },
                         ),
                       ),
-                    ).animate().fade(),
+                    ),
 
                   // ─── LIVE PARTIES ───
                   RepaintBoundary(
@@ -201,13 +199,9 @@ class _HomeScreenState extends State<HomeScreen>
                               'Live Parties',
                               Icons.podcasts_rounded,
                               Colors.purpleAccent,
-                            )
-                            .animate()
-                            .fade(duration: 400.ms),
+                            ),
                         const SizedBox(height: 16),
-                        _buildLiveParties()
-                            .animate()
-                            .fade(duration: 500.ms),
+                        _buildLiveParties(),
                       ],
                     ),
                   ),
@@ -223,13 +217,9 @@ class _HomeScreenState extends State<HomeScreen>
                               'Daily Discovery',
                               CupertinoIcons.sparkles,
                               cyanAccent,
-                            )
-                            .animate()
-                            .fade(duration: 400.ms),
+                            ),
                         const SizedBox(height: 16),
-                        _buildTopRatedAlbums()
-                            .animate()
-                            .fade(duration: 500.ms),
+                        _buildTopRatedAlbums(),
                       ],
                     ),
                   ),
@@ -249,13 +239,9 @@ class _HomeScreenState extends State<HomeScreen>
                               'Popular Circles',
                               Icons.people_alt_rounded,
                               Colors.greenAccent,
-                            )
-                            .animate()
-                            .fade(duration: 400.ms),
+                            ),
                         const SizedBox(height: 16),
-                        _buildPopularCircles()
-                            .animate()
-                            .fade(duration: 500.ms),
+                        _buildPopularCircles(),
                       ],
                     ),
                   ),
@@ -271,13 +257,9 @@ class _HomeScreenState extends State<HomeScreen>
                               'Recommended for You',
                               CupertinoIcons.music_note_list,
                               cyanAccent,
-                            )
-                            .animate()
-                            .fade(duration: 400.ms),
+                            ),
                         const SizedBox(height: 4),
-                        _buildRecommendedSongs()
-                            .animate()
-                            .fade(duration: 500.ms),
+                        _buildRecommendedSongs(),
                       ],
                     ),
                   ),
@@ -293,11 +275,11 @@ class _HomeScreenState extends State<HomeScreen>
                           'Browse by Genre',
                           CupertinoIcons.tags_solid,
                           Colors.purpleAccent,
-                        ).animate().fade(),
+                        ),
                         const SizedBox(height: 12),
-                        _buildChips().animate().fade(),
+                        _buildChips(),
                         const SizedBox(height: 4),
-                        _buildGenreSongs().animate().fade(),
+                        _buildGenreSongs(),
                       ],
                     ),
                   ),
@@ -319,6 +301,7 @@ class _HomeScreenState extends State<HomeScreen>
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
+        addAutomaticKeepAlives: false,
         itemCount: _chipLabels.length,
         itemBuilder: (context, index) {
           final isSelected = _selectedChip == index;
@@ -392,7 +375,7 @@ class _HomeScreenState extends State<HomeScreen>
                   onTap: () => _showAllRecentlyPlayed(allSongs),
                 )
               : null,
-        ).animate().fade(duration: 400.ms, delay: 380.ms).slideX(begin: 0.05);
+        );
 
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Column(
@@ -440,6 +423,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
+                    addAutomaticKeepAlives: false,
                     itemCount: displaySongs.length,
                     itemBuilder: (context, index) {
                       final song = displaySongs[index];
@@ -460,9 +444,6 @@ class _HomeScreenState extends State<HomeScreen>
                     },
                   ),
                 )
-                .animate()
-                .fade(duration: 500.ms, delay: 420.ms)
-                .slideY(begin: 0.08),
           ],
         );
       },
@@ -590,6 +571,7 @@ class _HomeScreenState extends State<HomeScreen>
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12),
+            addAutomaticKeepAlives: false,
             itemCount: circles.length,
             itemBuilder: (context, index) {
               final circle = circles[index];
@@ -726,6 +708,7 @@ class _HomeScreenState extends State<HomeScreen>
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
+        addAutomaticKeepAlives: false,
         itemCount: _activeParties.length + 1,
         itemBuilder: (context, index) {
           if (index == 0) {
@@ -846,13 +829,16 @@ class _HomeScreenState extends State<HomeScreen>
         }
 
         final albums = snapshot.data!;
-        // Shuffle already happened once in initState via .then()
+        final displayAlbums = albums.take(5).toList();
 
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: albums.take(5).map((album) {
+        return SizedBox(
+          height: 200,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: displayAlbums.length,
+            itemBuilder: (context, index) {
+              final album = displayAlbums[index];
               return GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -877,7 +863,7 @@ class _HomeScreenState extends State<HomeScreen>
                   },
                 ),
               );
-            }).toList(),
+            },
           ),
         );
       },
@@ -888,65 +874,52 @@ class _HomeScreenState extends State<HomeScreen>
   //  RECOMMENDED SONGS
   // ══════════════════════════════════════════
   Widget _buildRecommendedSongs() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 0,
-      ), // ModernSongListTile has its own padding
-      child: FutureBuilder<List<SongInfo>>(
-        future: _recommendedSongsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return _buildShimmerList();
-          } else if (snapshot.hasError ||
-              !snapshot.hasData ||
-              (snapshot.data?.isEmpty ?? true)) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Text(
-                  'No recommended songs found.',
-                  style: bodyTextStyle.copyWith(color: Colors.grey),
-                ),
+    return FutureBuilder<List<SongInfo>>(
+      future: _recommendedSongsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildShimmerList();
+        } else if (snapshot.hasError ||
+            !snapshot.hasData ||
+            (snapshot.data?.isEmpty ?? true)) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Text(
+                'No recommended songs found.',
+                style: bodyTextStyle.copyWith(color: Colors.grey),
               ),
-            );
-          }
-          final songs = snapshot.data!;
-          final queue = songs;
-
-          return ListView.builder(
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: queue.length,
-            itemBuilder: (context, index) {
-              final song = queue[index];
-
-              return ModernSongListTile(
-                    title: song.title,
-                    artist: song.artist,
-                    imageUrl: song.thumbnailUrl,
-                    indexNumber: (index + 1).toString(),
-                    onTap: () async {
-                      final result = await _audioService.playQueue(
-                        queue,
-                        startIndex: index,
-                        queueTitle: 'Recommended',
-                      );
-                      if (result == PlayResult.blockedAsListener && mounted) {
-                        showListenerBlockedDialog(context);
-                      }
-                    },
-                    onMoreTap: () {
-                      _showSongOptionsBottomSheet(context, song);
-                    },
-                  )
-                  .animate()
-                  .fade(duration: 300.ms, delay: (550 + index * 80).ms)
-                  .slideX(begin: 0.05);
-            },
+            ),
           );
-        },
-      ),
+        }
+        final songs = snapshot.data!;
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(songs.length, (index) {
+            final song = songs[index];
+            return ModernSongListTile(
+              title: song.title,
+              artist: song.artist,
+              imageUrl: song.thumbnailUrl,
+              indexNumber: (index + 1).toString(),
+              onTap: () async {
+                final result = await _audioService.playQueue(
+                  songs,
+                  startIndex: index,
+                  queueTitle: 'Recommended',
+                );
+                if (result == PlayResult.blockedAsListener && mounted) {
+                  showListenerBlockedDialog(context);
+                }
+              },
+              onMoreTap: () {
+                _showSongOptionsBottomSheet(context, song);
+              },
+            );
+          }),
+        );
+      },
     );
   }
 
@@ -973,39 +946,31 @@ class _HomeScreenState extends State<HomeScreen>
           );
         }
         final songs = snapshot.data!;
-        final queue = songs;
 
-        return ListView.builder(
-          shrinkWrap: true,
-          padding: EdgeInsets.zero,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: songs.length,
-          itemBuilder: (context, index) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(songs.length, (index) {
             final song = songs[index];
-
             return ModernSongListTile(
-                  title: song.title,
-                  artist: song.artist,
-                  imageUrl: song.thumbnailUrl,
-                  indexNumber: (index + 1).toString(),
-                  onTap: () async {
-                    final result = await _audioService.playQueue(
-                      queue,
-                      startIndex: index,
-                      queueTitle: _chipLabels[_selectedChip],
-                    );
-                    if (result == PlayResult.blockedAsListener && mounted) {
-                      showListenerBlockedDialog(context);
-                    }
-                  },
-                  onMoreTap: () {
-                    _showSongOptionsBottomSheet(context, song);
-                  },
-                )
-                .animate()
-                .fade(duration: 300.ms, delay: (index * 80).ms)
-                .slideX(begin: 0.05);
-          },
+              title: song.title,
+              artist: song.artist,
+              imageUrl: song.thumbnailUrl,
+              indexNumber: (index + 1).toString(),
+              onTap: () async {
+                final result = await _audioService.playQueue(
+                  songs,
+                  startIndex: index,
+                  queueTitle: _chipLabels[_selectedChip],
+                );
+                if (result == PlayResult.blockedAsListener && mounted) {
+                  showListenerBlockedDialog(context);
+                }
+              },
+              onMoreTap: () {
+                _showSongOptionsBottomSheet(context, song);
+              },
+            );
+          }),
         );
       },
     );
@@ -1021,21 +986,15 @@ class _HomeScreenState extends State<HomeScreen>
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: 4,
-        itemBuilder: (_, __) =>
-            Container(
-                  width: width,
-                  height: height,
-                  margin: const EdgeInsets.only(right: 16),
-                  decoration: BoxDecoration(
-                    color: darkThemeSecondaryColor,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                )
-                .animate(onPlay: (c) => c.repeat())
-                .shimmer(
-                  duration: 1200.ms,
-                  color: Colors.white.withValues(alpha: 0.05),
-                ),
+        itemBuilder: (_, __) => Container(
+              width: width,
+              height: height,
+              margin: const EdgeInsets.only(right: 16),
+              decoration: BoxDecoration(
+                color: darkThemeSecondaryColor,
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
       ),
     );
   }
@@ -1044,20 +1003,14 @@ class _HomeScreenState extends State<HomeScreen>
     return Column(
       children: List.generate(
         5,
-        (_) =>
-            Container(
-                  height: 72, // Match ModernSongListTile rough height
-                  margin: const EdgeInsets.only(bottom: 8, left: 16, right: 16),
-                  decoration: BoxDecoration(
-                    color: darkThemeSecondaryColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                )
-                .animate(onPlay: (c) => c.repeat())
-                .shimmer(
-                  duration: 1200.ms,
-                  color: Colors.white.withValues(alpha: 0.05),
-                ),
+        (_) => Container(
+              height: 72,
+              margin: const EdgeInsets.only(bottom: 8, left: 16, right: 16),
+              decoration: BoxDecoration(
+                color: darkThemeSecondaryColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
       ),
     );
   }

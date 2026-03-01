@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constant/my_constant.dart';
-
-import 'package:cached_network_image/cached_network_image.dart';
+import 'universal_image.dart';
 
 class ModernSongCard extends StatelessWidget {
   final String title;
@@ -38,27 +37,25 @@ class ModernSongCard extends StatelessWidget {
                   height: 140,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    color: darkThemeSecondaryColor, // Base color helps with loading
+                    color:
+                        darkThemeSecondaryColor, // Base color helps with loading
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: (imageUrl != null && imageUrl!.startsWith('http'))
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl!,
-                          memCacheWidth: 280, // Same optimization as ResizeImage
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            color: Colors.white.withValues(alpha: 0.05),
-                          ),
-                          errorWidget: (context, url, error) => const Icon(
-                            Icons.broken_image,
-                            color: Colors.white54,
-                          ),
-                        )
-                      : Image.asset(
-                          imageUrl ??
-                              'lib/pages/images/SongBanner/COOL&CREATE.jpg',
-                          fit: BoxFit.cover,
-                        ),
+                  child: UniversalImage(
+                    imageUrl:
+                        imageUrl ??
+                        'lib/pages/images/SongBanner/COOL&CREATE.jpg',
+                    width: 140,
+                    height: 140,
+                    fit: BoxFit.cover,
+                    placeholder: Container(
+                      color: Colors.white.withValues(alpha: 0.05),
+                    ),
+                    errorWidget: const Icon(
+                      Icons.broken_image,
+                      color: Colors.white54,
+                    ),
+                  ),
                 ),
 
                 // Viewer Count Badge (Optional, mostly for Live Parties)

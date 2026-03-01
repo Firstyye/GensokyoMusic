@@ -25,21 +25,37 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
   late SongInfo _currentSong;
   bool _isFavorite = false;
   StreamSubscription<bool>? _favoriteSub;
+  StreamSubscription<SongInfo?>? _songChangeSub;
+  String _lastCheckedVideoId = '';
 
   @override
   void initState() {
     super.initState();
     _currentSong = widget.initialSong;
     _checkFavoriteStatus();
+
+    // Listen to song changes once, not inside build()
+    _songChangeSub = _audioService.currentSongStream.listen((song) {
+      if (song != null && song.youtubeVideoId != _currentSong.youtubeVideoId) {
+        _currentSong = song;
+        _checkFavoriteStatus();
+        if (mounted) setState(() {});
+      }
+    });
   }
 
   @override
   void dispose() {
     _favoriteSub?.cancel();
+    _songChangeSub?.cancel();
     super.dispose();
   }
 
   void _checkFavoriteStatus() {
+    // Only re-subscribe if the video ID actually changed
+    if (_lastCheckedVideoId == _currentSong.youtubeVideoId) return;
+    _lastCheckedVideoId = _currentSong.youtubeVideoId;
+
     _favoriteSub?.cancel();
     _favoriteSub = _firestoreService.isFavoriteStream(_currentSong.youtubeVideoId).listen((
       isFav,
@@ -76,54 +92,46 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
     final bool isListener =
         _audioService.currentPartyId != null && !_audioService.isHost;
 
-    return StreamBuilder<SongInfo?>(
-      stream: _audioService.currentSongStream,
-      builder: (context, songSnapshot) {
-        if (songSnapshot.hasData && songSnapshot.data != null) {
-          _currentSong = songSnapshot.data!;
-          // Re-check favorite if song changed
-          _checkFavoriteStatus();
-        }
-
-        return Scaffold(
-          backgroundColor: darkModeBackgroundColor,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 32,
-                color: Colors.white,
-              ),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: Text(
-              isListener ? 'Listening to Party...' : 'Now Playing',
-              style: GoogleFonts.inter(
-                color: isListener ? cyanAccent : Colors.white,
-                fontSize: 14,
-                fontWeight: isListener ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-            centerTitle: true,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
-                onPressed: () {
-                  // TODO: Options menu
-                },
-              ),
-            ],
+    // Song changes are now handled by _songChangeSub in initState()
+    return Scaffold(
+      backgroundColor: darkModeBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 32,
+            color: Colors.white,
           ),
-          body: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // ── Album Art ──
-                Spacer(flex: 1),
-                Hero(
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          isListener ? 'Listening to Party...' : 'Now Playing',
+          style: GoogleFonts.inter(
+            color: isListener ? cyanAccent : Colors.white,
+            fontSize: 14,
+            fontWeight: isListener ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+            onPressed: () {
+              // TODO: Options menu
+            },
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // ── Album Art ──
+            Spacer(flex: 1),
+            Hero(
                   tag: 'album_art_${_currentSong.youtubeVideoId}',
                   child: Container(
                     width: MediaQuery.of(context).size.width * 0.8,
@@ -133,8 +141,8 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                       boxShadow: [
                         BoxShadow(
                           color: cyanAccent.withValues(alpha: 0.3),
-                          blurRadius: 30,
-                          offset: const Offset(0, 10),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
                         ),
                       ],
                     ),
@@ -222,11 +230,13 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                 RepaintBoundary(
                   child: StreamBuilder<Duration?>(
                     stream: _audioService.durationStream,
+                    initialData: _audioService.duration,
                     builder: (context, durationSnapshot) {
                       final duration = durationSnapshot.data ?? Duration.zero;
 
                       return StreamBuilder<Duration>(
                         stream: _audioService.positionStream,
+                        initialData: _audioService.position,
                         builder: (context, positionSnapshot) {
                           var position = positionSnapshot.data ?? Duration.zero;
                           if (position > duration) position = duration;
@@ -329,6 +339,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                     // Play/Pause
                     StreamBuilder<PlayerState>(
                       stream: _audioService.playerStateStream,
+                      initialData: _audioService.playerState,
                       builder: (context, snapshot) {
                         final isPlaying = snapshot.data == PlayerState.playing;
                         return GestureDetector(
@@ -454,8 +465,6 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
               ],
             ),
           ),
-        );
-      },
     );
   }
 

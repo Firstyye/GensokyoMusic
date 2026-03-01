@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../widgets/universal_image.dart';
 import '../constant/my_constant.dart';
 import '../models/song_info.dart';
 import '../data/touhoudb_service.dart';
@@ -21,11 +21,27 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState extends State<ExploreScreen> {
   final TextEditingController _searchController = TextEditingController();
   final TouhouDBService _touhouDB = TouhouDBService();
+  final ValueNotifier<bool> _hasText = ValueNotifier(false);
 
   List<dynamic> _searchResults = [];
   bool _isLoading = false;
   bool _hasSearched = false;
   SearchCategory _selectedCategory = SearchCategory.songs;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      _hasText.value = _searchController.text.isNotEmpty;
+    });
+  }
+
+  @override
+  void dispose() {
+    _hasText.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _performSearch(String query) async {
     if (query.trim().isEmpty) {
@@ -124,18 +140,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         Icons.search,
                         color: Colors.white54,
                       ),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(
-                                Icons.clear,
-                                color: Colors.white54,
-                              ),
-                              onPressed: () {
-                                _searchController.clear();
-                                _performSearch("");
-                              },
-                            )
-                          : null,
+                      suffixIcon: ValueListenableBuilder<bool>(
+                        valueListenable: _hasText,
+                        builder: (context, hasText, _) {
+                          if (!hasText) return const SizedBox.shrink();
+                          return IconButton(
+                            icon: const Icon(
+                              Icons.clear,
+                              color: Colors.white54,
+                            ),
+                            onPressed: () {
+                              _searchController.clear();
+                              _performSearch("");
+                            },
+                          );
+                        },
+                      ),
                       filled: true,
                       fillColor: darkThemeSecondaryColor,
                       border: OutlineInputBorder(
@@ -147,8 +167,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         vertical: 16,
                       ),
                     ),
-                    onChanged: (val) =>
-                        setState(() {}), // To update suffix icon visibility
+                    // suffix icon visibility handled by ValueListenableBuilder
                   ),
                   const SizedBox(height: 16),
 
@@ -316,7 +335,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         borderRadius: isCircular ? null : BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
+            color: Colors.black.withOpacity(0.15),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -326,14 +345,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
         borderRadius: isCircular
             ? BorderRadius.circular(28)
             : BorderRadius.circular(8),
-        child: CachedNetworkImage(
+        child: UniversalImage(
           imageUrl: imageUrl,
+          width: 56,
+          height: 56,
           fit: BoxFit.cover,
-          memCacheWidth: 112, // 56 * 2 for retina
-          placeholder: (context, url) => Container(
-            color: Colors.white.withValues(alpha: 0.05),
-          ),
-          errorWidget: (context, url, error) => Container(
+          placeholder: Container(color: Colors.white.withOpacity(0.05)),
+          errorWidget: Container(
             color: darkThemeSecondaryColor,
             child: const Icon(Icons.music_note, color: Colors.white54),
           ),

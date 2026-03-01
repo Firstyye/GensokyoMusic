@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../widgets/universal_image.dart';
 import '../constant/my_constant.dart';
 import '../models/song_info.dart';
 import '../data/touhoudb_service.dart';
@@ -94,15 +94,15 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        CachedNetworkImage(
+                        UniversalImage(
                           imageUrl: widget.album.image,
+                          width: double.infinity,
+                          height: 300,
                           fit: BoxFit.cover,
-                          memCacheWidth: 600, // 300 * 2
-                          placeholder: (context, url) => Container(
+                          placeholder: Container(
                             color: Colors.white.withValues(alpha: 0.05),
                           ),
-                          errorWidget: (_, __, ___) =>
-                              Container(color: Colors.grey),
+                          errorWidget: Container(color: Colors.grey),
                         ),
                         Container(
                           decoration: const BoxDecoration(
@@ -162,18 +162,17 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
                               ),
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
-                                child: CachedNetworkImage(
+                                child: UniversalImage(
                                   imageUrl: widget.album.image,
                                   width: 40,
                                   height: 40,
-                                  memCacheWidth: 80, // 40 * 2
                                   fit: BoxFit.cover,
-                                  placeholder: (context, url) => Container(
+                                  placeholder: Container(
                                     width: 40,
                                     height: 40,
                                     color: Colors.white10,
                                   ),
-                                  errorWidget: (_, __, ___) => Container(
+                                  errorWidget: Container(
                                     width: 40,
                                     height: 40,
                                     color: Colors.white10,

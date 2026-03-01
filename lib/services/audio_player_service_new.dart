@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/song_info.dart';
 import '../services/realtime_database_service.dart';
 import '../services/firestore_service.dart';
@@ -10,28 +11,24 @@ enum LoopMode { off, all, one }
 
 enum PlayResult { ok, blockedAsListener }
 
-/// Singleton service managing the entire audio pipeline via youtube_player_flutter.
-/// This bypasses 403 Forbidden errors by using a Native WebView wrapping the official IFrame API.
+// Re-export PlayerState-like enum so consumers don't need just_audio import
+enum PlayerState { unStarted, buffering, playing, paused, ended, unknown }
+
+/// Singleton service managing audio via youtube_explode_dart + just_audio.
+/// No WebView — extracts the audio stream URL and plays it natively.
+/// This eliminates Android Hybrid Composition overhead (~10fps → 60fps).
 class AudioPlayerService {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
   factory AudioPlayerService() => _instance;
 
   AudioPlayerService._internal() {
-    _controller = YoutubePlayerController(
-      initialVideoId: 'jNQXAC9IVRw',
-      flags: const YoutubePlayerFlags(
-        autoPlay: false,
-        hideControls: true,
-        mute: false,
-        disableDragSeek: true,
-        loop: false,
-        isLive: false,
-        forceHD: false,
-      ),
-    )..addListener(_listener);
+    _player = AudioPlayer();
+    _bindPlayerListeners();
   }
 
-  late final YoutubePlayerController _controller;
+  late final AudioPlayer _player;
+  final _yt = YoutubeExplode();
+
   bool _isPlaying = false;
   bool _isHandlingEnd = false;
   SongInfo? _currentSong;
@@ -50,7 +47,13 @@ class AudioPlayerService {
   bool _isShuffle = false;
   LoopMode _loopMode = LoopMode.off;
 
-  YoutubePlayerController get controller => _controller;
+  // ── Sync state for deduplication ──
+  PlayerState _lastEmittedState = PlayerState.unknown;
+  int _lastEmittedPositionSec = -1;
+  Duration? _lastEmittedDuration;
+  Duration _currentPosition = Duration.zero;
+  Duration _currentDuration = Duration.zero;
+  PlayerState _currentPlayerState = PlayerState.unStarted;
 
   Stream<SongInfo?> get currentSongStream => _currentSongController.stream;
   Stream<PlayerState> get playerStateStream => _playerStateController.stream;
@@ -62,15 +65,15 @@ class AudioPlayerService {
   bool get isPlaying => _isPlaying;
   bool get isShuffle => _isShuffle;
   LoopMode get loopMode => _loopMode;
-  Duration get position => _controller.value.position;
-  Duration get duration => _controller.value.metaData.duration;
-  PlayerState get playerState => _controller.value.playerState;
+  Duration get position => _currentPosition;
+  Duration get duration => _currentDuration;
+  PlayerState get playerState => _currentPlayerState;
 
   List<SongInfo> get queue => _queue;
   int get currentIndex => _currentIndex;
   String get queueTitle => _queueTitle;
 
-  // ── Party Sync & Firestore ──
+  // ── Party Sync ──
   String? _currentPartyId;
   bool _isHost = false;
   StreamSubscription? _partyStateSub;
@@ -82,59 +85,70 @@ class AudioPlayerService {
   String? get currentPartyId => _currentPartyId;
   bool get isHost => _isHost;
 
-  // Deduplication state for _listener to avoid redundant stream emissions
-  PlayerState? _lastEmittedState;
-  int _lastEmittedPositionSec = -1;
-  Duration? _lastEmittedDuration;
+  // Dummy getter for backward-compat with main_layout.dart — no WebView needed
+  // ignore: null_check_on_nullable_type_parameter
+  dynamic get controller => null;
 
-  void _listener() {
-    if (!_controller.value.isReady) return;
-
-    final value = _controller.value;
-
-    if (value.playerState == PlayerState.playing) {
-      _isPlaying = true;
-      _isHandlingEnd = false;
-    } else if (value.playerState == PlayerState.paused ||
-        value.playerState == PlayerState.ended) {
-      _isPlaying = false;
-    }
-
-    // Only emit when values actually change to reduce UI rebuilds
-    if (value.playerState != _lastEmittedState) {
-      _lastEmittedState = value.playerState;
-      _playerStateController.add(value.playerState);
-    }
-
-    final positionSec = value.position.inSeconds;
-    if (positionSec != _lastEmittedPositionSec) {
-      _lastEmittedPositionSec = positionSec;
-      _positionController.add(value.position);
-    }
-
-    if (value.metaData.duration != _lastEmittedDuration) {
-      _lastEmittedDuration = value.metaData.duration;
-      _durationController.add(value.metaData.duration);
-    }
-
-    // Sync to RTDB if Host
-    _syncStateToParty();
-
-    // Auto-advance to next song if ended
-    if (value.playerState == PlayerState.ended) {
-      if (_isHandlingEnd) {
-        return;
+  void _bindPlayerListeners() {
+    // Position updates
+    _player.positionStream.listen((pos) {
+      _currentPosition = pos;
+      final sec = pos.inSeconds;
+      if (sec != _lastEmittedPositionSec) {
+        _lastEmittedPositionSec = sec;
+        _positionController.add(pos);
       }
-      _isHandlingEnd = true;
+      _syncStateToParty();
+    });
 
-      if (_loopMode == LoopMode.one) {
-        Future.delayed(const Duration(milliseconds: 300), () {
-          seek(Duration.zero);
-          play();
-        });
+    // Duration updates
+    _player.durationStream.listen((dur) {
+      _currentDuration = dur ?? Duration.zero;
+      if (dur != _lastEmittedDuration) {
+        _lastEmittedDuration = dur;
+        _durationController.add(dur);
+      }
+    });
+
+    // Player state updates
+    _player.playerStateStream.listen((state) {
+      PlayerState mapped;
+      if (state.processingState == ProcessingState.loading ||
+          state.processingState == ProcessingState.buffering) {
+        mapped = PlayerState.buffering;
+        _isPlaying = false;
+      } else if (state.processingState == ProcessingState.completed) {
+        mapped = PlayerState.ended;
+        _isPlaying = false;
+        _handleSongEnd();
+      } else if (state.playing) {
+        mapped = PlayerState.playing;
+        _isPlaying = true;
+        _isHandlingEnd = false;
       } else {
-        skipToNext();
+        mapped = PlayerState.paused;
+        _isPlaying = false;
       }
+
+      _currentPlayerState = mapped;
+      if (mapped != _lastEmittedState) {
+        _lastEmittedState = mapped;
+        _playerStateController.add(mapped);
+      }
+    });
+  }
+
+  void _handleSongEnd() {
+    if (_isHandlingEnd) return;
+    _isHandlingEnd = true;
+
+    if (_loopMode == LoopMode.one) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        seek(Duration.zero);
+        play();
+      });
+    } else {
+      skipToNext();
     }
   }
 
@@ -195,14 +209,30 @@ class AudioPlayerService {
   Future<void> _playQueueItem() async {
     if (_currentIndex < 0 || _currentIndex >= _queue.length) return;
 
+    final songInfo = _queue[_currentIndex];
+    _currentSong = songInfo;
+    _currentSongController.add(songInfo);
+
+    // Signal buffering immediately
+    _currentPlayerState = PlayerState.buffering;
+    _playerStateController.add(PlayerState.buffering);
+
     try {
-      final songInfo = _queue[_currentIndex];
-      _currentSong = songInfo;
-      _currentSongController.add(songInfo);
-      _controller.load(songInfo.youtubeVideoId);
+      final manifest = await _yt.videos.streamsClient.getManifest(songInfo.youtubeVideoId);
+      // Prefer audio-only stream (smallest bandwidth, best for audio apps)
+      final audioStreams = manifest.audioOnly;
+      if (audioStreams.isEmpty) throw Exception('No audio streams found');
+
+      // Pick highest bitrate audio-only stream
+      final stream = audioStreams.withHighestBitrate();
+      await _player.setUrl(stream.url.toString());
+      await _player.play();
+
       _firestoreService.addRecentlyPlayedSong(songInfo);
     } catch (e) {
       debugPrint('AudioPlayerService error: $e');
+      _currentPlayerState = PlayerState.paused;
+      _playerStateController.add(PlayerState.paused);
     }
   }
 
@@ -210,9 +240,9 @@ class AudioPlayerService {
   //  PLAYBACK CONTROLS
   // ═══════════════════════════════════════════
 
-  Future<void> play() async => _controller.play();
+  Future<void> play() async => _player.play();
 
-  Future<void> pause() async => _controller.pause();
+  Future<void> pause() async => _player.pause();
 
   Future<void> togglePlayPause() async {
     if (_currentPartyId != null && !_isHost) return;
@@ -231,7 +261,7 @@ class AudioPlayerService {
       if (_loopMode == LoopMode.all) {
         _currentIndex = 0;
       } else {
-        pause();
+        await pause();
         return;
       }
     } else {
@@ -251,8 +281,7 @@ class AudioPlayerService {
     if (_currentPartyId != null && !_isHost) return;
     if (_queue.isEmpty) return;
 
-    final position = _controller.value.position;
-    if (position.inSeconds > 3) {
+    if (_currentPosition.inSeconds > 3) {
       await seek(Duration.zero);
       return;
     }
@@ -295,6 +324,12 @@ class AudioPlayerService {
     leaveParty();
   }
 
+  Future<void> seek(Duration position) async {
+    if (_currentPartyId != null && !_isHost) return;
+    await _player.seek(position);
+    _syncStateToParty();
+  }
+
   // ═══════════════════════════════════════════
   //  PARTY LOGIC (RTDB)
   // ═══════════════════════════════════════════
@@ -308,7 +343,7 @@ class AudioPlayerService {
         partyId: _currentPartyId!,
         song: _currentSong,
         isPlaying: _isPlaying,
-        positionSeconds: _controller.value.position.inSeconds,
+        positionSeconds: _currentPosition.inSeconds,
       );
     });
   }
@@ -345,20 +380,18 @@ class AudioPlayerService {
           hostSong.youtubeVideoId != _currentSong?.youtubeVideoId) {
         _currentSong = hostSong;
         _currentSongController.add(hostSong);
-        _controller.load(hostSong.youtubeVideoId);
+        _playQueueItem();
       }
 
-      if (_controller.value.isReady) {
-        if (hostIsPlaying && !_isPlaying) {
-          play();
-        } else if (!hostIsPlaying && _isPlaying) {
-          pause();
-        }
+      if (hostIsPlaying && !_isPlaying) {
+        play();
+      } else if (!hostIsPlaying && _isPlaying) {
+        pause();
+      }
 
-        final int myPosSecs = _controller.value.position.inSeconds;
-        if ((hostPosSecs - myPosSecs).abs() > 3) {
-          _controller.seekTo(Duration(seconds: hostPosSecs));
-        }
+      final myPosSecs = _currentPosition.inSeconds;
+      if ((hostPosSecs - myPosSecs).abs() > 3) {
+        seek(Duration(seconds: hostPosSecs));
       }
     });
 
@@ -413,12 +446,6 @@ class AudioPlayerService {
     _isHost = false;
   }
 
-  Future<void> seek(Duration position) async {
-    if (_currentPartyId != null && !_isHost) return;
-    _controller.seekTo(position);
-    _syncStateToParty();
-  }
-
   // ═══════════════════════════════════════════
   //  CLEANUP
   // ═══════════════════════════════════════════
@@ -429,6 +456,7 @@ class AudioPlayerService {
     _positionController.close();
     _durationController.close();
     _loopModeController.close();
-    _controller.dispose();
+    _player.dispose();
+    _yt.close();
   }
 }

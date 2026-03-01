@@ -12,7 +12,7 @@ import '../pages/introscreen.dart';
 import '../components/static_bg.dart';
 import 'package:delightful_toast/delight_toast.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:yo/data/authService.dart';
+
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import '../services/firestore_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,7 +28,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool isSwitch = false;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final AuthService _authService = AuthService();
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   bool _googleInitialized = false;
 
@@ -624,10 +623,10 @@ class _BuildTextField extends StatefulWidget {
   final TextEditingController controller;
   final String labelText;
   final String? hintText;
-  bool isObscureText;
-  bool isPassword;
+  final bool isObscureText;
+  final bool isPassword;
   final IconData icon;
-  bool isHidden;
+  final bool isHidden;
   _BuildTextField({
     Key? key,
     required this.controller,
@@ -644,6 +643,16 @@ class _BuildTextField extends StatefulWidget {
 }
 
 class _BuildTextFieldState extends State<_BuildTextField> {
+  late bool _isObscure;
+  late bool _isHidden;
+
+  @override
+  void initState() {
+    super.initState();
+    _isObscure = widget.isObscureText;
+    _isHidden = widget.isHidden;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -662,7 +671,7 @@ class _BuildTextFieldState extends State<_BuildTextField> {
           ],
         ),
         child: TextField(
-          obscureText: widget.isObscureText,
+          obscureText: _isObscure,
           controller: widget.controller,
           style: bodyTextStyle.copyWith(fontSize: 14),
           decoration: InputDecoration(
@@ -695,14 +704,14 @@ class _BuildTextFieldState extends State<_BuildTextField> {
                 ? GestureDetector(
                     onTap: () {
                       setState(() {
-                        widget.isObscureText = !widget.isObscureText;
-                        widget.isHidden = !widget.isHidden;
+                        _isObscure = !_isObscure;
+                        _isHidden = !_isHidden;
                       });
                     },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12.0),
                       child: Icon(
-                        widget.isHidden
+                        _isHidden
                             ? Icons.visibility_off
                             : Icons.visibility,
                         color: Colors.grey.shade400,
@@ -713,15 +722,15 @@ class _BuildTextFieldState extends State<_BuildTextField> {
             labelText: widget.labelText,
             labelStyle: bodyTextStyle.copyWith(
               fontSize: 14,
-              color: Colors.grey.withOpacity(0.7),
+              color: Colors.grey.withValues(alpha: 0.7),
             ),
             hintText: widget.hintText,
             hintStyle: bodyTextStyle.copyWith(
               fontSize: 14,
-              color: Colors.grey.withOpacity(0.5),
+              color: Colors.grey.withValues(alpha: 0.5),
             ),
           ),
-          keyboardType: widget.isObscureText
+          keyboardType: _isObscure
               ? TextInputType.text
               : TextInputType.emailAddress,
           onChanged: (value) {},
