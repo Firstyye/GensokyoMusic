@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
 import '../models/song_info.dart';
@@ -118,7 +117,69 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
           IconButton(
             icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
             onPressed: () {
-              // TODO: Options menu
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: const Color(0xFF1E1E2C),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                builder: (ctx) => SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ListTile(
+                          leading: Icon(
+                            _isFavorite
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            color: _isFavorite
+                                ? Colors.redAccent
+                                : Colors.white70,
+                          ),
+                          title: Text(
+                            _isFavorite
+                                ? 'Remove from Favorites'
+                                : 'Add to Favorites',
+                            style: bodyTextStyle.copyWith(color: Colors.white),
+                          ),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _firestoreService.toggleFavorite(_currentSong);
+                          },
+                        ),
+                        ListTile(
+                          leading: const Icon(
+                            Icons.playlist_add_rounded,
+                            color: Colors.white70,
+                          ),
+                          title: Text(
+                            'Add to Playlist',
+                            style: bodyTextStyle.copyWith(color: Colors.white),
+                          ),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _showAddToPlaylistBottomSheet(
+                              context,
+                              _currentSong,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
             },
           ),
         ],

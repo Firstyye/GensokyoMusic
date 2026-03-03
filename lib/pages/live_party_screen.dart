@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
 import '../models/song_info.dart';
 import '../services/realtime_database_service.dart';
@@ -8,7 +8,8 @@ import '../services/audio_player_service.dart';
 import '../widgets/add_song_search_sheet.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/_buildMiniPlayer.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../widgets/custom_page_route.dart';
+import 'full_player_screen.dart';
 
 class LivePartyScreen extends StatefulWidget {
   final String partyId;
@@ -77,12 +78,48 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
     });
   }
 
-  void _sendMessage() {
+  void _sendMessage({SongInfo? song}) {
     final msg = _msgController.text.trim();
-    if (msg.isEmpty) return;
+    if (msg.isEmpty && song == null) return;
 
-    _dbService.sendMessage(widget.partyId, msg);
+    _dbService.sendMessage(widget.partyId, msg, songData: song?.toMap());
     _msgController.clear();
+  }
+
+  void _showAddSongSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, controller) {
+          return AddSongSearchSheet(
+            scrollController: controller,
+            onSongSelected: (song) {
+              Navigator.pop(context);
+              _sendMessage(song: song);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  void _playSongFromChat(Map<dynamic, dynamic> songMap) {
+    final song = SongInfo(
+      title: songMap['title'] ?? 'Unknown',
+      artist: songMap['artist'] ?? 'Unknown',
+      youtubeVideoId: songMap['youtubeVideoId'] ?? '',
+      thumbnailUrl: songMap['thumbnailUrl'] ?? '',
+    );
+    _audioService.playFromYoutubeId(song.youtubeVideoId, song);
+    Navigator.push(
+      context,
+      SlideFadeRoute(page: FullPlayerScreen(initialSong: song)),
+    );
   }
 
   void _leaveParty(bool endPartyForAll) {
@@ -458,10 +495,144 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
           itemBuilder: (context, index) {
             final msg = msgs[index];
             final isMe = msg['uid'] == myUid;
+            final hasSong = msg['song'] != null;
+            final text = msg['message']?.toString() ?? '';
+
+            Widget bubbleContent;
+            if (hasSong) {
+              final song = Map<String, dynamic>.from(msg['song']);
+              bubbleContent = Column(
+                crossAxisAlignment: isMe
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
+                children: [
+                  if (text.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        text,
+                        style: bodyTextStyle.copyWith(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  GestureDetector(
+                    onTap: () => _playSongFromChat(song),
+                    child: Container(
+                      width: 220,
+                      decoration: BoxDecoration(
+                        color: darkThemeSecondaryColor,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: cyanAccent.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(12),
+                            ),
+                            child: (song['thumbnailUrl'] ?? '').isNotEmpty
+                                ? CachedNetworkImage(
+                                    imageUrl: song['thumbnailUrl'],
+                                    height: 120,
+                                    memCacheWidth: 440,
+                                    fit: BoxFit.cover,
+                                    placeholder: (_, __) => Container(
+                                      height: 120,
+                                      color: Colors.white10,
+                                    ),
+                                    errorWidget: (_, __, ___) => Container(
+                                      height: 120,
+                                      color: Colors.grey[800],
+                                      child: const Icon(
+                                        Icons.music_note,
+                                        color: Colors.white,
+                                        size: 36,
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    height: 120,
+                                    color: Colors.grey[800],
+                                    child: const Icon(
+                                      Icons.music_note,
+                                      color: Colors.white,
+                                      size: 36,
+                                    ),
+                                  ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: cyanAccent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: Colors.black,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        song['title'] ?? 'Unknown',
+                                        style: bodyTextStyle.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        song['artist'] ?? 'Unknown',
+                                        style: bodyTextStyle.copyWith(
+                                          color: Colors.white54,
+                                          fontSize: 11,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            } else {
+              bubbleContent = Text(
+                text,
+                style: bodyTextStyle.copyWith(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              );
+            }
 
             Widget bubble = Container(
               margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: hasSong
+                  ? const EdgeInsets.all(8)
+                  : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.75,
               ),
@@ -481,18 +652,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
                     ? Border.all(color: cyanAccent.withValues(alpha: 0.5))
                     : null,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    msg['message'] ?? '',
-                    style: bodyTextStyle.copyWith(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
+              child: bubbleContent,
             );
 
             if (isMe) {
@@ -585,6 +745,18 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
       ),
       child: Row(
         children: [
+          Container(
+            decoration: BoxDecoration(
+              color: cyanAccent,
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.music_note_rounded, color: Colors.black),
+              onPressed: _showAddSongSheet,
+              tooltip: 'Attach a song',
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: _msgController,

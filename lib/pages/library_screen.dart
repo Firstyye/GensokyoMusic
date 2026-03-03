@@ -5,6 +5,7 @@ import '../services/firestore_service.dart';
 import '../services/audio_player_service.dart';
 import '../models/song_info.dart';
 import '../widgets/modern_song_list_tile.dart';
+import '../widgets/custom_page_route.dart';
 import 'playlist_detail_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -221,14 +222,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     size: 16,
                   ),
                   onTap: () {
-                    Navigator.push(
+                    pushRoute(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => PlaylistDetailScreen(
-                          playlistId: id,
-                          playlistName: name,
-                        ),
-                      ),
+                      PlaylistDetailScreen(playlistId: id, playlistName: name),
                     );
                   },
                 );

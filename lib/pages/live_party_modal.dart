@@ -8,6 +8,7 @@ import '../services/realtime_database_service.dart';
 import '../services/audio_player_service.dart';
 import '../services/firestore_service.dart';
 import 'live_party_screen.dart';
+import '../widgets/custom_page_route.dart';
 
 class LivePartyModal extends StatefulWidget {
   const LivePartyModal({super.key});
@@ -140,14 +141,13 @@ class _LivePartyModalState extends State<LivePartyModal> {
 
     if (partyId != null && mounted) {
       _audioService.setHostParty(partyId);
-      await _audioService.playFromYoutubeId(song.youtubeVideoId, song);
+      // Start download in background — navigate immediately
+      _audioService.playFromYoutubeId(song.youtubeVideoId, song);
 
       Navigator.pop(context); // Close modal
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => LivePartyScreen(partyId: partyId, isHost: true),
-        ),
+        SlideFadeRoute(page: LivePartyScreen(partyId: partyId, isHost: true)),
       );
     } else {
       if (mounted) {
@@ -283,13 +283,11 @@ class _LivePartyModalState extends State<LivePartyModal> {
 
     if (exists && mounted) {
       _joinController.clear();
-      _audioService.joinPartyAsListener(code);
+      await _audioService.joinPartyAsListener(code);
       Navigator.pop(context); // Close modal
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => LivePartyScreen(partyId: code, isHost: false),
-        ),
+        SlideFadeRoute(page: LivePartyScreen(partyId: code, isHost: false)),
       );
     } else {
       if (mounted) {
@@ -574,7 +572,10 @@ class _LivePartyModalState extends State<LivePartyModal> {
                             width: 50,
                             height: 50,
                             color: darkThemeSecondaryColor,
-                            child: const Icon(Icons.music_note, color: Colors.white54),
+                            child: const Icon(
+                              Icons.music_note,
+                              color: Colors.white54,
+                            ),
                           ),
                         ),
                       ),
@@ -656,7 +657,10 @@ class _LivePartyModalState extends State<LivePartyModal> {
                         width: 50,
                         height: 50,
                         color: darkThemeSecondaryColor,
-                        child: const Icon(Icons.music_note, color: Colors.white54),
+                        child: const Icon(
+                          Icons.music_note,
+                          color: Colors.white54,
+                        ),
                       ),
                     ),
                   ),

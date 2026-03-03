@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../pages/playlist_detail_screen.dart'; // To view playlists
-import '../pages/full_player_screen.dart'; // To play favorites
+import '../pages/playlist_detail_screen.dart';
+import '../pages/full_player_screen.dart';
 import '../pages/settings_screen.dart';
 import '../services/firestore_service.dart';
 import '../services/audio_player_service.dart';
 import '../models/song_info.dart';
 import '../constant/my_constant.dart';
 import '../widgets/_buildMiniPlayer.dart';
+import '../widgets/custom_page_route.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
@@ -143,8 +144,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     _buildStatsRow(),
                     const SizedBox(height: 32),
                   ],
-                  if (_isOwner)
-                    _buildActionButtons(),
+                  if (_isOwner) _buildActionButtons(),
                   if (_isOwner) const SizedBox(height: 32),
                 ],
               ),
@@ -266,43 +266,43 @@ class _ProfileScreenState extends State<ProfileScreen>
             child: Column(
               children: [
                 Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: cyanAccent.withValues(alpha: 0.4),
-                            blurRadius: 16,
-                            spreadRadius: 2,
-                          ),
-                        ],
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: cyanAccent.withValues(alpha: 0.4),
+                        blurRadius: 16,
+                        spreadRadius: 2,
                       ),
-                      child: CircleAvatar(
-                        radius: 56,
-                        backgroundColor: darkThemeSecondaryColor,
-                        child: CircleAvatar(
-                          radius: 52,
-                          backgroundColor: Colors.transparent,
-                          child: ClipOval(
-                            child: (_photoUrl != null)
-                                ? CachedNetworkImage(
-                                    imageUrl: _photoUrl!,
-                                    memCacheWidth: 160,
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) =>
-                                        const CircularProgressIndicator(),
-                                    errorWidget: (context, url, error) =>
-                                        const Icon(Icons.person, size: 50),
-                                  )
-                                : Image.asset(
-                                    'lib/pages/images/avatar.jpg',
-                                    fit: BoxFit.cover,
-                                  ),
-                          ),
-                        ),
+                    ],
+                  ),
+                  child: CircleAvatar(
+                    radius: 56,
+                    backgroundColor: darkThemeSecondaryColor,
+                    child: CircleAvatar(
+                      radius: 52,
+                      backgroundColor: Colors.transparent,
+                      child: ClipOval(
+                        child: (_photoUrl != null)
+                            ? CachedNetworkImage(
+                                imageUrl: _photoUrl!,
+                                memCacheWidth: 160,
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) =>
+                                    const CircularProgressIndicator(),
+                                errorWidget: (context, url, error) =>
+                                    const Icon(Icons.person, size: 50),
+                              )
+                            : Image.asset(
+                                'lib/pages/images/avatar.jpg',
+                                fit: BoxFit.cover,
+                              ),
                       ),
                     ),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Text(
                   _displayName,
@@ -455,7 +455,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               onTap: () async {
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  SlideFadeRoute(page: const SettingsScreen()),
                 );
                 if (mounted) setState(() {});
               },
@@ -500,9 +500,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       stream: _firestoreService.getPlaylistsStream(targetUserId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: Colors.cyanAccent),
-          );
+          return Center(child: CircularProgressIndicator(color: cyanAccent));
         }
         if (snapshot.hasError) {
           return Center(
@@ -573,14 +571,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                 size: 16,
               ),
               onTap: () {
-                Navigator.push(
+                pushRoute(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => PlaylistDetailScreen(
-                      playlistId: id,
-                      playlistName: name,
-                    ),
-                  ),
+                  PlaylistDetailScreen(playlistId: id, playlistName: name),
                 );
               },
             );
@@ -595,9 +588,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       stream: _firestoreService.getFavoriteSongsStream(targetUserId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: Colors.cyanAccent),
-          );
+          return Center(child: CircularProgressIndicator(color: cyanAccent));
         }
 
         final songs = snapshot.data ?? [];

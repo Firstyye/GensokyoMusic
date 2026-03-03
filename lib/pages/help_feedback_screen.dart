@@ -80,9 +80,9 @@ class HelpFeedbackScreen extends StatelessWidget {
             question: 'How does music streaming work?',
             answer:
                 'GensokyoMusic retrieves song metadata from the TouhouDB API, '
-                'then plays videos via youtube_player_flutter — a native WebView '
-                'wrapping YouTube\'s official IFrame Player API. This approach '
-                'avoids 403 errors and ensures reliable playback.',
+                'then extracts YouTube audio streams using youtube_explode_dart '
+                'and plays them natively via just_audio — no WebView needed. '
+                'This ensures smooth, high-performance playback.',
           ),
           _buildFAQItem(
             question: 'What are Live Parties?',

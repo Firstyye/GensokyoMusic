@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
 import '../services/firestore_service.dart';
 import '../services/realtime_database_service.dart';
+import '../widgets/custom_page_route.dart';
 import 'private_chat_screen.dart';
 
 class SocialScreen extends StatefulWidget {
@@ -104,12 +105,14 @@ class _SocialScreenState extends State<SocialScreen> {
             children: [
               CircleAvatar(
                 backgroundColor: Colors.white12,
-                child: user['photoUrl'] != null &&
+                child:
+                    user['photoUrl'] != null &&
                         user['photoUrl'].toString().isNotEmpty
                     ? ClipOval(
                         child: CachedNetworkImage(
                           imageUrl: user['photoUrl'],
-                          memCacheWidth: 100, // Optimize memory for ~50x50 avatars
+                          memCacheWidth:
+                              100, // Optimize memory for ~50x50 avatars
                           width: double.infinity,
                           height: double.infinity,
                           fit: BoxFit.cover,
@@ -186,9 +189,7 @@ class _SocialScreenState extends State<SocialScreen> {
           : () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => PrivateChatScreen(friendData: user),
-                ),
+                SlideFadeRoute(page: PrivateChatScreen(friendData: user)),
               );
             },
     );
@@ -234,7 +235,9 @@ class _SocialScreenState extends State<SocialScreen> {
                                 height: double.infinity,
                                 fit: BoxFit.cover,
                                 placeholder: (context, url) =>
-                                    const CircularProgressIndicator(strokeWidth: 2),
+                                    const CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                 errorWidget: (context, url, error) =>
                                     Icon(Icons.person, color: cyanAccent),
                               ),
@@ -348,7 +351,8 @@ class _SocialScreenState extends State<SocialScreen> {
                     children: [
                       CircleAvatar(
                         backgroundColor: Colors.white12,
-                        child: _searchedUser!['photoUrl'] != null &&
+                        child:
+                            _searchedUser!['photoUrl'] != null &&
                                 _searchedUser!['photoUrl'].toString().isNotEmpty
                             ? ClipOval(
                                 child: CachedNetworkImage(
@@ -358,9 +362,14 @@ class _SocialScreenState extends State<SocialScreen> {
                                   height: double.infinity,
                                   fit: BoxFit.cover,
                                   placeholder: (context, url) =>
-                                      const CircularProgressIndicator(strokeWidth: 2),
+                                      const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                   errorWidget: (context, url, error) =>
-                                      const Icon(Icons.person, color: Colors.white),
+                                      const Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                      ),
                                 ),
                               )
                             : const Icon(Icons.person, color: Colors.white),

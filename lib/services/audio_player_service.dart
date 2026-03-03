@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:just_audio/just_audio.dart' as ja;
+import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import '../models/song_info.dart';
 import '../services/realtime_database_service.dart';
 import '../services/firestore_service.dart';
@@ -10,30 +11,29 @@ enum LoopMode { off, all, one }
 
 enum PlayResult { ok, blockedAsListener }
 
-/// Singleton service managing the entire audio pipeline via youtube_player_flutter.
-/// This bypasses 403 Forbidden errors by using a Native WebView wrapping the official IFrame API.
+/// Mirrors the old youtube_player_flutter PlayerState so that consumer
+/// widgets (MiniPlayer, FullPlayer, LiveParty) keep working unchanged.
+enum PlayerState { unStarted, ended, playing, paused, buffering, unknown }
+
+/// Singleton service managing the entire audio pipeline via just_audio + youtube_explode_dart.
+/// No WebView/PlatformView — pure native audio for maximum performance.
 class AudioPlayerService {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
   factory AudioPlayerService() => _instance;
 
   AudioPlayerService._internal() {
-    _controller = YoutubePlayerController(
-      initialVideoId: 'jNQXAC9IVRw',
-      flags: const YoutubePlayerFlags(
-        autoPlay: false,
-        hideControls: true,
-        mute: false,
-        disableDragSeek: true,
-        loop: false,
-        isLive: false,
-        forceHD: false,
-      ),
-    )..addListener(_listener);
+    _player = ja.AudioPlayer();
+    _yt = yt.YoutubeExplode();
+    _setupPlayerListeners();
   }
 
-  late final YoutubePlayerController _controller;
+  late final ja.AudioPlayer _player;
+  late yt.YoutubeExplode _yt;
   bool _isPlaying = false;
   bool _isHandlingEnd = false;
+  bool _isLoadingSong =
+      false; // Guard: suppress position/duration during download
+  int _loadToken = 0; // Cancellation token for stale downloads
   SongInfo? _currentSong;
 
   // ── Streams ──
@@ -50,8 +50,7 @@ class AudioPlayerService {
   bool _isShuffle = false;
   LoopMode _loopMode = LoopMode.off;
 
-  YoutubePlayerController get controller => _controller;
-
+  // ── Public getters (same API as before) ──
   Stream<SongInfo?> get currentSongStream => _currentSongController.stream;
   Stream<PlayerState> get playerStateStream => _playerStateController.stream;
   Stream<Duration> get positionStream => _positionController.stream;
@@ -62,9 +61,9 @@ class AudioPlayerService {
   bool get isPlaying => _isPlaying;
   bool get isShuffle => _isShuffle;
   LoopMode get loopMode => _loopMode;
-  Duration get position => _controller.value.position;
-  Duration get duration => _controller.value.metaData.duration;
-  PlayerState get playerState => _controller.value.playerState;
+  Duration get position => _player.position;
+  Duration get duration => _player.duration ?? Duration.zero;
+  PlayerState get playerState => _mapPlayerState(_player.processingState);
 
   List<SongInfo> get queue => _queue;
   int get currentIndex => _currentIndex;
@@ -82,69 +81,94 @@ class AudioPlayerService {
   String? get currentPartyId => _currentPartyId;
   bool get isHost => _isHost;
 
-  // Deduplication state for _listener to avoid redundant stream emissions
+  // ── Dedup + Throttle ──
   PlayerState? _lastEmittedState;
-  int _lastEmittedPositionSec = -1;
-  Duration? _lastEmittedDuration;
   Timer? _positionThrottle;
+  StreamSubscription? _playerStateSub;
+  StreamSubscription? _positionSub;
+  StreamSubscription? _durationSub;
 
-  void _listener() {
-    if (!_controller.value.isReady) return;
-
-    final value = _controller.value;
-
-    if (value.playerState == PlayerState.playing) {
-      _isPlaying = true;
-      _isHandlingEnd = false;
-    } else if (value.playerState == PlayerState.paused ||
-        value.playerState == PlayerState.ended) {
-      _isPlaying = false;
+  /// Convert just_audio's ProcessingState + playing flag into our PlayerState enum
+  PlayerState _mapPlayerState(ja.ProcessingState processingState) {
+    if (_player.playing) {
+      switch (processingState) {
+        case ja.ProcessingState.idle:
+          return PlayerState.unStarted;
+        case ja.ProcessingState.loading:
+        case ja.ProcessingState.buffering:
+          return PlayerState.buffering;
+        case ja.ProcessingState.ready:
+          return PlayerState.playing;
+        case ja.ProcessingState.completed:
+          return PlayerState.ended;
+      }
+    } else {
+      switch (processingState) {
+        case ja.ProcessingState.idle:
+          return PlayerState.unStarted;
+        case ja.ProcessingState.loading:
+        case ja.ProcessingState.buffering:
+          return PlayerState.buffering;
+        case ja.ProcessingState.ready:
+          return PlayerState.paused;
+        case ja.ProcessingState.completed:
+          return PlayerState.ended;
+      }
     }
+  }
 
-    // Player state changes are emitted INSTANTLY (play/pause must be responsive)
-    if (value.playerState != _lastEmittedState) {
-      _lastEmittedState = value.playerState;
-      _playerStateController.add(value.playerState);
-    }
+  void _setupPlayerListeners() {
+    // Listen to player state changes (instant)
+    _playerStateSub = _player.playerStateStream.listen((state) {
+      final mapped = _mapPlayerState(state.processingState);
 
-    // Position + duration updates are THROTTLED to 2Hz (every 500ms)
-    // to reduce StreamBuilder rebuilds from 60fps → 2fps for progress bars
-    _positionThrottle ??= Timer(const Duration(milliseconds: 500), () {
-      _positionThrottle = null;
-      if (!_controller.value.isReady) return;
-
-      final currentValue = _controller.value;
-      final positionSec = currentValue.position.inSeconds;
-      if (positionSec != _lastEmittedPositionSec) {
-        _lastEmittedPositionSec = positionSec;
-        _positionController.add(currentValue.position);
+      if (state.playing) {
+        _isPlaying = true;
+        _isHandlingEnd = false;
+      } else {
+        _isPlaying = false;
       }
 
-      if (currentValue.metaData.duration != _lastEmittedDuration) {
-        _lastEmittedDuration = currentValue.metaData.duration;
-        _durationController.add(currentValue.metaData.duration);
+      if (mapped != _lastEmittedState) {
+        _lastEmittedState = mapped;
+        _playerStateController.add(mapped);
+      }
+
+      // Sync to RTDB if Host
+      _syncStateToParty();
+
+      // Auto-advance on end
+      if (state.processingState == ja.ProcessingState.completed) {
+        if (_isHandlingEnd) return;
+        _isHandlingEnd = true;
+
+        if (_loopMode == LoopMode.one) {
+          Future.delayed(const Duration(milliseconds: 300), () {
+            seek(Duration.zero);
+            play();
+          });
+        } else {
+          skipToNext();
+        }
       }
     });
 
-    // Sync to RTDB if Host
-    _syncStateToParty();
+    // Position updates throttled to 2Hz
+    _positionSub = _player.positionStream.listen((pos) {
+      if (_isLoadingSong) return; // Don't emit old position during download
+      _positionThrottle ??= Timer(const Duration(milliseconds: 500), () {
+        _positionThrottle = null;
+        if (!_isLoadingSong) {
+          _positionController.add(_player.position);
+        }
+      });
+    });
 
-    // Auto-advance to next song if ended
-    if (value.playerState == PlayerState.ended) {
-      if (_isHandlingEnd) {
-        return;
-      }
-      _isHandlingEnd = true;
-
-      if (_loopMode == LoopMode.one) {
-        Future.delayed(const Duration(milliseconds: 300), () {
-          seek(Duration.zero);
-          play();
-        });
-      } else {
-        skipToNext();
-      }
-    }
+    // Duration updates (immediate, fires rarely)
+    _durationSub = _player.durationStream.listen((dur) {
+      if (_isLoadingSong) return; // Don't emit old duration during download
+      _durationController.add(dur);
+    });
   }
 
   // ═══════════════════════════════════════════
@@ -209,14 +233,88 @@ class AudioPlayerService {
   Future<void> _playQueueItem() async {
     if (_currentIndex < 0 || _currentIndex >= _queue.length) return;
 
+    final songInfo = _queue[_currentIndex];
+    _currentSong = songInfo;
+    _currentSongController.add(songInfo);
+
+    // Increment token — any in-flight download with an old token is stale
+    final token = ++_loadToken;
+
+    // Stop current playback + reset progress bar + show buffering
+    await _player.stop();
+    _isLoadingSong = true;
+    _positionController.add(Duration.zero);
+    _durationController.add(Duration.zero);
+    _playerStateController.add(PlayerState.buffering);
+
     try {
-      final songInfo = _queue[_currentIndex];
-      _currentSong = songInfo;
-      _currentSongController.add(songInfo);
-      _controller.load(songInfo.youtubeVideoId);
+      final source = await _buildAudioSource(songInfo.youtubeVideoId);
+      // Check if another song was requested during download
+      if (token != _loadToken) return;
+
+      if (source == null) {
+        debugPrint(
+          'AudioPlayerService: No playable stream for ${songInfo.youtubeVideoId}',
+        );
+        _isLoadingSong = false;
+        _playerStateController.add(PlayerState.paused);
+        return;
+      }
+
+      debugPrint('AudioPlayerService: Playing ${songInfo.title}');
+      await _player.setAudioSource(source);
+      // Check again after setAudioSource
+      if (token != _loadToken) return;
+
+      _isLoadingSong = false;
+      // Manually emit values that were blocked during download
+      _durationController.add(_player.duration ?? Duration.zero);
+      _positionController.add(_player.position);
+      _player.play();
       _firestoreService.addRecentlyPlayedSong(songInfo);
     } catch (e) {
+      if (token != _loadToken) return;
       debugPrint('AudioPlayerService error: $e');
+      _isLoadingSong = false;
+      _playerStateController.add(PlayerState.paused);
+    }
+  }
+
+  /// Builds an AudioSource by downloading bytes via youtube_explode_dart.
+  /// youtube_explode handles YouTube auth internally → no 403 from ExoPlayer.
+  Future<ja.AudioSource?> _buildAudioSource(String videoId) async {
+    try {
+      final manifest = await _yt.videos.streamsClient.getManifest(
+        videoId,
+        ytClients: [yt.YoutubeApiClient.safari, yt.YoutubeApiClient.androidVr],
+      );
+
+      // Prefer audio-only
+      yt.StreamInfo? streamInfo;
+      if (manifest.audioOnly.isNotEmpty) {
+        streamInfo = manifest.audioOnly.withHighestBitrate();
+        debugPrint(
+          'AudioPlayerService: audio-only ${(streamInfo as yt.AudioOnlyStreamInfo).bitrate.kiloBitsPerSecond}kbps',
+        );
+      } else if (manifest.muxed.isNotEmpty) {
+        streamInfo = manifest.muxed.withHighestBitrate();
+        debugPrint('AudioPlayerService: fallback to muxed stream');
+      }
+
+      if (streamInfo == null) return null;
+
+      // Download all bytes via youtube_explode's own HTTP client (handles auth)
+      final stream = _yt.videos.streamsClient.get(streamInfo);
+      final bytes = <int>[];
+      await for (final chunk in stream) {
+        bytes.addAll(chunk);
+      }
+      debugPrint('AudioPlayerService: Downloaded ${bytes.length} bytes');
+
+      return _YtStreamAudioSource(bytes, streamInfo.container.name);
+    } catch (e) {
+      debugPrint('AudioPlayerService: stream extraction failed: $e');
+      return null;
     }
   }
 
@@ -224,9 +322,9 @@ class AudioPlayerService {
   //  PLAYBACK CONTROLS
   // ═══════════════════════════════════════════
 
-  Future<void> play() async => _controller.play();
+  Future<void> play() async => _player.play();
 
-  Future<void> pause() async => _controller.pause();
+  Future<void> pause() async => _player.pause();
 
   Future<void> togglePlayPause() async {
     if (_currentPartyId != null && !_isHost) return;
@@ -265,8 +363,8 @@ class AudioPlayerService {
     if (_currentPartyId != null && !_isHost) return;
     if (_queue.isEmpty) return;
 
-    final position = _controller.value.position;
-    if (position.inSeconds > 3) {
+    final pos = _player.position;
+    if (pos.inSeconds > 3) {
       await seek(Duration.zero);
       return;
     }
@@ -314,19 +412,40 @@ class AudioPlayerService {
   // ═══════════════════════════════════════════
 
   void _syncStateToParty() {
-    if (_currentPartyId == null || !_isHost) return;
-    if (_syncDebounce?.isActive ?? false) return;
+    if (_currentPartyId == null || !_isHost) {
+      _syncDebounce?.cancel();
+      _syncDebounce = null;
+      return;
+    }
 
-    _syncDebounce = Timer(const Duration(seconds: 2), () {
-      // Re-check: _currentPartyId may have become null while the timer was waiting
-      if (_currentPartyId == null || !_isHost) return;
-      _rtdbService.updatePartyState(
-        partyId: _currentPartyId!,
-        song: _currentSong,
-        isPlaying: _isPlaying,
-        positionSeconds: _controller.value.position.inSeconds,
-      );
-    });
+    // Immediately sync current state
+    _rtdbService.updatePartyState(
+      partyId: _currentPartyId!,
+      song: _currentSong,
+      isPlaying: _isPlaying,
+      positionSeconds: _player.position.inSeconds,
+    );
+
+    // Start/stop periodic position sync based on playing state
+    if (_isPlaying) {
+      // Sync position every 1 second while playing
+      _syncDebounce ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (_currentPartyId == null || !_isHost || !_isPlaying) {
+          _syncDebounce?.cancel();
+          _syncDebounce = null;
+          return;
+        }
+        _rtdbService.updatePartyState(
+          partyId: _currentPartyId!,
+          song: _currentSong,
+          isPlaying: _isPlaying,
+          positionSeconds: _player.position.inSeconds,
+        );
+      });
+    } else {
+      _syncDebounce?.cancel();
+      _syncDebounce = null;
+    }
   }
 
   void setHostParty(String partyId) {
@@ -335,17 +454,28 @@ class AudioPlayerService {
     _syncStateToParty();
     _rtdbService.joinPartyUser(partyId, isHost: true);
     _listenToPartyQueue();
+    _loopMode = LoopMode.all; // Party queue defaults to loop all
   }
 
-  void joinPartyAsListener(String partyId) {
+  Future<void> joinPartyAsListener(String partyId) async {
     _currentPartyId = partyId;
     _isHost = false;
     _queue.clear();
+
+    // Cancel any in-flight _playQueueItem download
+    ++_loadToken;
+
+    // Stop whatever is currently playing immediately
+    await _player.stop();
+    _currentSong = null;
+    _isLoadingSong = true;
+    _loopMode = LoopMode.all; // Party queue defaults to loop all
+
     _rtdbService.joinPartyUser(partyId, isHost: false);
     _listenToPartyQueue();
 
     _partyStateSub?.cancel();
-    _partyStateSub = _rtdbService.getPartyStream(partyId).listen((event) {
+    _partyStateSub = _rtdbService.getPartyStream(partyId).listen((event) async {
       if (event.snapshot.value == null) return;
 
       final data = Map<String, dynamic>.from(event.snapshot.value as Map);
@@ -361,20 +491,31 @@ class AudioPlayerService {
           hostSong.youtubeVideoId != _currentSong?.youtubeVideoId) {
         _currentSong = hostSong;
         _currentSongController.add(hostSong);
-        _controller.load(hostSong.youtubeVideoId);
+        await _player.stop();
+        _isLoadingSong = true;
+        try {
+          await _loadAndPlayVideoId(
+            hostSong.youtubeVideoId,
+            shouldPlay: hostIsPlaying,
+          );
+        } finally {
+          _isLoadingSong = false;
+        }
+        return;
       }
 
-      if (_controller.value.isReady) {
-        if (hostIsPlaying && !_isPlaying) {
-          play();
-        } else if (!hostIsPlaying && _isPlaying) {
-          pause();
-        }
+      // Skip play/pause/seek while still downloading
+      if (_isLoadingSong) return;
 
-        final int myPosSecs = _controller.value.position.inSeconds;
-        if ((hostPosSecs - myPosSecs).abs() > 3) {
-          _controller.seekTo(Duration(seconds: hostPosSecs));
-        }
+      if (hostIsPlaying && !_isPlaying) {
+        play();
+      } else if (!hostIsPlaying && _isPlaying) {
+        pause();
+      }
+
+      final int myPosSecs = _player.position.inSeconds;
+      if ((hostPosSecs - myPosSecs).abs() > 3) {
+        _player.seek(Duration(seconds: hostPosSecs));
       }
     });
 
@@ -389,6 +530,52 @@ class AudioPlayerService {
         _syncStateToParty();
       }
     });
+  }
+
+  /// Helper to load a video by ID for party sync (listener side)
+  Future<void> _loadAndPlayVideoId(
+    String videoId, {
+    bool shouldPlay = true,
+  }) async {
+    try {
+      final source = await _buildAudioSource(videoId);
+      if (source == null) return;
+
+      await _player.setAudioSource(source);
+      await _player.seek(Duration.zero);
+      await _player.pause();
+
+      // Small delay to let native streams propagate the new duration
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Manually emit duration/position since native events were blocked
+      _isLoadingSong = false;
+      _durationController.add(_player.duration ?? Duration.zero);
+      _positionController.add(_player.position);
+
+      // Read FRESH host state after download
+      if (_currentPartyId != null) {
+        final freshData = await _rtdbService.getPartyState(_currentPartyId!);
+        if (freshData != null) {
+          final freshPosSecs = (freshData['positionSeconds'] ?? 0) as int;
+          final freshIsPlaying = (freshData['isPlaying'] ?? true) as bool;
+          if (freshPosSecs > 0) {
+            await _player.seek(Duration(seconds: freshPosSecs));
+          }
+          if (freshIsPlaying) {
+            _player.play();
+          }
+          return;
+        }
+      }
+
+      // Fallback: use the initial shouldPlay flag
+      if (shouldPlay) {
+        _player.play();
+      }
+    } catch (e) {
+      debugPrint('AudioPlayerService: Failed to load video $videoId: $e');
+    }
   }
 
   void _listenToPartyQueue() {
@@ -432,14 +619,13 @@ class AudioPlayerService {
     _currentPartyId = null;
     _isHost = false;
 
-    // Force re-emit so MiniPlayer's StreamBuilder refreshes its play/pause icon
-    // (prevents the spinner from sticking after a party kick)
-    _playerStateController.add(_controller.value.playerState);
+    // Force re-emit so MiniPlayer's StreamBuilder refreshes
+    _playerStateController.add(_mapPlayerState(_player.processingState));
   }
 
   Future<void> seek(Duration position) async {
     if (_currentPartyId != null && !_isHost) return;
-    _controller.seekTo(position);
+    _player.seek(position);
     _syncStateToParty();
   }
 
@@ -448,11 +634,39 @@ class AudioPlayerService {
   // ═══════════════════════════════════════════
 
   void dispose() {
+    _playerStateSub?.cancel();
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _positionThrottle?.cancel();
     _currentSongController.close();
     _playerStateController.close();
     _positionController.close();
     _durationController.close();
     _loopModeController.close();
-    _controller.dispose();
+    _player.dispose();
+    _yt.close();
+  }
+}
+
+/// Custom StreamAudioSource that feeds pre-downloaded YouTube bytes to just_audio.
+/// This bypasses the 403 issue because youtube_explode_dart handles its own HTTP
+/// authentication when downloading — ExoPlayer never contacts YouTube directly.
+class _YtStreamAudioSource extends ja.StreamAudioSource {
+  final List<int> _bytes;
+  final String _container;
+
+  _YtStreamAudioSource(this._bytes, this._container);
+
+  @override
+  Future<ja.StreamAudioResponse> request([int? start, int? end]) async {
+    start ??= 0;
+    end ??= _bytes.length;
+    return ja.StreamAudioResponse(
+      sourceLength: _bytes.length,
+      contentLength: end - start,
+      offset: start,
+      stream: Stream.value(_bytes.sublist(start, end)),
+      contentType: _container == 'webm' ? 'audio/webm' : 'audio/mp4',
+    );
   }
 }

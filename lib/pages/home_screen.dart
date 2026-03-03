@@ -25,6 +25,7 @@ import 'live_party_screen.dart';
 import 'album_details_screen.dart';
 import 'artist_details_screen.dart';
 import '../widgets/_buildMiniPlayer.dart';
+import '../widgets/custom_page_route.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -188,8 +189,8 @@ class _HomeScreenState extends State<HomeScreen>
                                 onPlay: () {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(
-                                      builder: (_) => LivePartyScreen(
+                                    SlideFadeRoute(
+                                      page: LivePartyScreen(
                                         partyId: currentPartyId,
                                         isHost: _audioService.isHost,
                                       ),
@@ -508,8 +509,8 @@ class _HomeScreenState extends State<HomeScreen>
     final displaySongs = songs.take(15).toList();
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
+      SlideFadeRoute(
+        page: Scaffold(
           backgroundColor: darkModeBackgroundColor,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
@@ -594,8 +595,8 @@ class _HomeScreenState extends State<HomeScreen>
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => ArtistDetailsScreen(
+                    SlideFadeRoute(
+                      page: ArtistDetailsScreen(
                         artistId: circle.id,
                         artistName: circle.name,
                         imageUrl: circle.imageUrl,
@@ -767,14 +768,14 @@ class _HomeScreenState extends State<HomeScreen>
             title: title,
             viewerCount: subTitle,
             imageUrl: imageUrl,
-            onTap: () {
+            onTap: () async {
               if (partyId != _audioService.currentPartyId) {
-                _audioService.joinPartyAsListener(partyId);
+                await _audioService.joinPartyAsListener(partyId);
               }
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => LivePartyScreen(
+                SlideFadeRoute(
+                  page: LivePartyScreen(
                     partyId: partyId,
                     isHost: partyId == _audioService.currentPartyId
                         ? _audioService.isHost
@@ -869,9 +870,7 @@ class _HomeScreenState extends State<HomeScreen>
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => AlbumDetailsScreen(album: album),
-                    ),
+                    SlideFadeRoute(page: AlbumDetailsScreen(album: album)),
                   );
                 },
                 child: ModernFeatureBanner(
@@ -882,9 +881,7 @@ class _HomeScreenState extends State<HomeScreen>
                   onPlay: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => AlbumDetailsScreen(album: album),
-                      ),
+                      SlideFadeRoute(page: AlbumDetailsScreen(album: album)),
                     );
                   },
                 ),

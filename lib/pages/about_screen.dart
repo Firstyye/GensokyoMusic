@@ -146,7 +146,7 @@ class AboutScreen extends StatelessWidget {
                 _featureRow(Icons.api_rounded, 'TouhouDB REST API'),
                 _featureRow(
                   Icons.play_circle_rounded,
-                  'youtube_player_flutter (IFrame-based WebView)',
+                  'just_audio + youtube_explode_dart (native audio)',
                 ),
               ],
             ),

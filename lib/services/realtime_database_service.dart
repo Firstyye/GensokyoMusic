@@ -190,6 +190,13 @@ class RealtimeDatabaseService {
     return _db.ref('parties/$partyId/state').onValue;
   }
 
+  /// One-time read of host's current playback state (used after download)
+  Future<Map<String, dynamic>?> getPartyState(String partyId) async {
+    final snap = await _db.ref('parties/$partyId/state').get();
+    if (!snap.exists || snap.value == null) return null;
+    return Map<String, dynamic>.from(snap.value as Map);
+  }
+
   /// Listeners subscribe to check if the party dies or metadata changes
   Stream<DatabaseEvent> getPartyMetadataStream(String partyId) {
     return _db.ref('parties/$partyId').onValue;
@@ -204,17 +211,27 @@ class RealtimeDatabaseService {
     return _db.ref('parties').onValue;
   }
 
-  Future<void> sendMessage(String partyId, String message) async {
+  Future<void> sendMessage(
+    String partyId,
+    String message, {
+    Map<String, dynamic>? songData,
+  }) async {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    await _db.ref('parties/$partyId/chat').push().set({
+    final messageData = <String, dynamic>{
       'uid': user.uid,
       'name': user.displayName ?? user.email?.split('@').first ?? 'Guest',
       'photoUrl': user.photoURL ?? '',
       'message': message,
       'timestamp': ServerValue.timestamp,
-    });
+    };
+
+    if (songData != null) {
+      messageData['song'] = songData;
+    }
+
+    await _db.ref('parties/$partyId/chat').push().set(messageData);
   }
 
   Stream<DatabaseEvent> getChatStream(String partyId) {

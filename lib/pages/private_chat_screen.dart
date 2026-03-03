@@ -12,6 +12,7 @@ import '../widgets/add_song_search_sheet.dart';
 import 'profile_screen.dart';
 import '../services/firestore_service.dart';
 import '../widgets/_buildMiniPlayer.dart';
+import '../widgets/custom_page_route.dart';
 
 class PrivateChatScreen extends StatefulWidget {
   final Map<String, dynamic> friendData;
@@ -104,7 +105,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
     if (mounted) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => FullPlayerScreen(initialSong: song)),
+        SlideFadeRoute(page: FullPlayerScreen(initialSong: song)),
       );
     }
   }
@@ -177,10 +178,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
     );
 
     if (isMe) {
-      return Align(
-        alignment: Alignment.centerRight,
-        child: bubble,
-      );
+      return Align(alignment: Alignment.centerRight, child: bubble);
     } else {
       return Align(
         alignment: Alignment.centerLeft,
@@ -202,8 +200,11 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                           fit: BoxFit.cover,
                           placeholder: (context, url) =>
                               const CircularProgressIndicator(strokeWidth: 2),
-                          errorWidget: (context, url, error) =>
-                              const Icon(Icons.person, size: 16, color: Colors.white),
+                          errorWidget: (context, url, error) => const Icon(
+                            Icons.person,
+                            size: 16,
+                            color: Colors.white,
+                          ),
                         ),
                       )
                     : const Icon(Icons.person, size: 16, color: Colors.white),
@@ -393,7 +394,8 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
             CircleAvatar(
               radius: 18,
               backgroundColor: darkThemeSecondaryColor,
-              child: widget.friendData['photoUrl'] != null &&
+              child:
+                  widget.friendData['photoUrl'] != null &&
                       widget.friendData['photoUrl'].toString().isNotEmpty
                   ? ClipOval(
                       child: CachedNetworkImage(
@@ -404,8 +406,11 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                         fit: BoxFit.cover,
                         placeholder: (context, url) =>
                             const CircularProgressIndicator(strokeWidth: 2),
-                        errorWidget: (context, url, error) =>
-                            const Icon(Icons.person, size: 20, color: Colors.white),
+                        errorWidget: (context, url, error) => const Icon(
+                          Icons.person,
+                          size: 20,
+                          color: Colors.white,
+                        ),
                       ),
                     )
                   : const Icon(Icons.person, size: 20, color: Colors.white),
@@ -430,8 +435,8 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => ProfileScreen(
+                SlideFadeRoute(
+                  page: ProfileScreen(
                     userId: widget.friendData['uid'],
                     userName: widget.friendData['displayName'],
                     userPhotoUrl: widget.friendData['photoUrl'],

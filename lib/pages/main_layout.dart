@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'loginscreen.dart';
 import 'about_screen.dart';
 import 'help_feedback_screen.dart';
+import '../widgets/custom_page_route.dart';
 
 import '../components/static_bg.dart';
 import '../constant/my_constant.dart';
@@ -19,7 +20,6 @@ import '../pages/settings_screen.dart';
 import '../widgets/_buildMiniPlayer.dart';
 import '../services/audio_player_service.dart';
 import '../services/realtime_database_service.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class MainLayout extends StatefulWidget {
@@ -33,6 +33,9 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
   int _selectedIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late AnimationController _navAnimController;
+  late AnimationController _pageAnimController;
+  late Animation<double> _pageFade;
+  late Animation<double> _pageScale;
 
   // Bottom nav items
   static const List<_NavItem> _navItems = [
@@ -68,11 +71,24 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 300),
     )..forward();
+
+    _pageAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    )..forward();
+
+    final curved = CurvedAnimation(
+      parent: _pageAnimController,
+      curve: Curves.easeOutCubic,
+    );
+    _pageFade = Tween<double>(begin: 0.0, end: 1.0).animate(curved);
+    _pageScale = Tween<double>(begin: 0.96, end: 1.0).animate(curved);
   }
 
   @override
   void dispose() {
     _navAnimController.dispose();
+    _pageAnimController.dispose();
     super.dispose();
   }
 
@@ -99,9 +115,11 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
         }
       }
     });
-    // Pulse the nav animation
+    // Pulse the nav animation + page transition
     _navAnimController.reset();
     _navAnimController.forward();
+    _pageAnimController.reset();
+    _pageAnimController.forward();
   }
 
   @override
@@ -185,23 +203,6 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
                 // hidden pages. AnimatedOpacity(opacity: 0.0) still lays out and
                 // paints every page every frame, which kills mid-range GPUs.
                 // Offstage keeps pages mounted (preserving state) but skips paint.
-                // Hidden Youtube Player acting as our global audio engine.
-                // Android WebViews IGNORE offscreen/opacity — they render their
-                // surface every frame. Shrinking to 1×1 eliminates GPU cost
-                // while keeping the JS bridge alive for position/duration/state.
-                Positioned(
-                  top: -10,
-                  left: -10,
-                  width: 1,
-                  height: 1,
-                  child: RepaintBoundary(
-                    child: IgnorePointer(
-                      child: YoutubePlayer(
-                        controller: AudioPlayerService().controller,
-                      ),
-                    ),
-                  ),
-                ),
                 Stack(
                   children: List.generate(5, (index) {
                     final page = _pages[index];
@@ -211,8 +212,16 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
                     return Offstage(
                       offstage: !isActive,
                       child: TickerMode(
-                        enabled: isActive, // Pause animations on hidden pages
-                        child: page,
+                        enabled: isActive,
+                        child: isActive
+                            ? FadeTransition(
+                                opacity: _pageFade,
+                                child: ScaleTransition(
+                                  scale: _pageScale,
+                                  child: page,
+                                ),
+                              )
+                            : page,
                       ),
                     );
                   }),
@@ -435,23 +444,21 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
                   Navigator.pop(context); // Close the drawer
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    SlideFadeRoute(page: const SettingsScreen()),
                   );
                 }),
                 _drawerTile(Icons.info_outline_rounded, 'About', () {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const AboutScreen()),
+                    SlideFadeRoute(page: const AboutScreen()),
                   );
                 }),
                 _drawerTile(Icons.help_outline_rounded, 'Help & Feedback', () {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => const HelpFeedbackScreen(),
-                    ),
+                    SlideFadeRoute(page: const HelpFeedbackScreen()),
                   );
                 }),
 

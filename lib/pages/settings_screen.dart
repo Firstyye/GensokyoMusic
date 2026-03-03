@@ -9,6 +9,7 @@ import '../pages/help_feedback_screen.dart';
 import '../constant/my_constant.dart';
 import '../services/firestore_service.dart';
 import '../models/song_info.dart';
+import '../widgets/custom_page_route.dart';
 
 // NEW WIDGET IMPORTS
 import '../widgets/modern_settings_tile.dart';
@@ -765,7 +766,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const AboutScreen()),
+                    SlideFadeRoute(page: const AboutScreen()),
                   );
                 },
               ),
@@ -776,9 +777,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => const HelpFeedbackScreen(),
-                    ),
+                    SlideFadeRoute(page: const HelpFeedbackScreen()),
                   );
                 },
               ),

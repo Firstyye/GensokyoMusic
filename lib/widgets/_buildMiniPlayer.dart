@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import '../services/audio_player_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
-import '../services/audio_player_service.dart';
 import '../services/firestore_service.dart';
 import '../models/song_info.dart';
 
@@ -195,19 +194,12 @@ class _MiniPlayerState extends State<MiniPlayer>
                   imageUrl: song.thumbnailUrl,
                   memCacheWidth: 88, // 44 * 2 exactly
                   fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: Colors.white.withValues(alpha: 0.05),
-                  ),
-                  errorWidget: (context, url, error) => const Icon(
-                    Icons.album,
-                    color: Colors.white54,
-                    size: 24,
-                  ),
+                  placeholder: (context, url) =>
+                      Container(color: Colors.white.withValues(alpha: 0.05)),
+                  errorWidget: (context, url, error) =>
+                      const Icon(Icons.album, color: Colors.white54, size: 24),
                 )
-              : Image.asset(
-                  'lib/pages/images/banner.jpg',
-                  fit: BoxFit.cover,
-                ),
+              : Image.asset('lib/pages/images/banner.jpg', fit: BoxFit.cover),
         ),
       ),
     );
@@ -282,13 +274,15 @@ class _MiniProgressBarState extends State<_MiniProgressBar> {
     _duration = widget.audioService.duration;
     final pos = widget.audioService.position;
     if (_duration.inMilliseconds > 0) {
-      _progress = (pos.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0);
+      _progress = (pos.inMilliseconds / _duration.inMilliseconds).clamp(
+        0.0,
+        1.0,
+      );
     }
     _durSub = widget.audioService.durationStream.listen((d) {
       _duration = d ?? Duration.zero;
     });
-    _posSub = widget.audioService.positionStream
-        .listen((pos) {
+    _posSub = widget.audioService.positionStream.listen((pos) {
       final newProgress = _duration.inMilliseconds > 0
           ? (pos.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
           : 0.0;
