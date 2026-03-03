@@ -33,7 +33,6 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
 
   late Stream<DatabaseEvent> _chatStream;
   late Stream<DatabaseEvent> _metadataStream;
-  late Stream<DatabaseEvent> _participantsStream;
   late Stream<DatabaseEvent> _queueStream;
 
   bool _isCurrentlyHost = false;
@@ -47,9 +46,6 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
     _metadataStream = _dbService
         .getPartyMetadataStream(widget.partyId)
         .asBroadcastStream();
-    _participantsStream = _dbService
-        .getPartyParticipantsStream(widget.partyId)
-        .asBroadcastStream();
     _queueStream = _dbService
         .getPartyQueueStream(widget.partyId)
         .asBroadcastStream();
@@ -57,7 +53,8 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
     // Listen to metadata to see if the host closes the party or transfers host
     _metadataStream.listen((event) {
       if (!event.snapshot.exists && mounted && !_isCurrentlyHost) {
-        // Party deleted
+        // Party deleted — clean up audio service state so HomeScreen banner disappears
+        _audioService.leaveParty();
         if (Navigator.canPop(context)) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('The host closed the party.')),
@@ -95,6 +92,11 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
   }
 
   void _showParticipantsMenu() {
+    // Create a fresh stream each time so the StreamBuilder gets the current
+    // value immediately (broadcast streams don't replay the last event).
+    final freshParticipantsStream = _dbService.getPartyParticipantsStream(
+      widget.partyId,
+    );
     showModalBottomSheet(
       context: context,
       backgroundColor: darkModeBackgroundColor,
@@ -103,7 +105,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
       ),
       builder: (context) {
         return StreamBuilder<DatabaseEvent>(
-          stream: _participantsStream,
+          stream: freshParticipantsStream,
           builder: (context, snapshot) {
             if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
               return const Center(
@@ -160,9 +162,14 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
                                     height: double.infinity,
                                     fit: BoxFit.cover,
                                     placeholder: (context, url) =>
-                                        const CircularProgressIndicator(strokeWidth: 2),
+                                        const CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
                                     errorWidget: (context, url, error) =>
-                                        const Icon(Icons.person, color: Colors.white),
+                                        const Icon(
+                                          Icons.person,
+                                          color: Colors.white,
+                                        ),
                                   ),
                                 )
                               : const Icon(Icons.person, color: Colors.white),
@@ -519,7 +526,9 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
                                   height: double.infinity,
                                   fit: BoxFit.cover,
                                   placeholder: (context, url) =>
-                                      const CircularProgressIndicator(strokeWidth: 2),
+                                      const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                   errorWidget: (context, url, error) =>
                                       const Icon(
                                         Icons.person,

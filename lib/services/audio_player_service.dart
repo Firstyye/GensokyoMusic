@@ -142,8 +142,12 @@ class AudioPlayerService {
   //  MAIN PIPELINE
   // ═══════════════════════════════════════════
 
-  Future<PlayResult> playFromYoutubeId(String videoId, SongInfo songInfo) async {
-    if (_currentPartyId != null && !_isHost) return PlayResult.blockedAsListener;
+  Future<PlayResult> playFromYoutubeId(
+    String videoId,
+    SongInfo songInfo,
+  ) async {
+    if (_currentPartyId != null && !_isHost)
+      return PlayResult.blockedAsListener;
 
     if (_currentPartyId != null && _isHost) {
       _queue.add(songInfo);
@@ -166,7 +170,8 @@ class AudioPlayerService {
     String? queueTitle,
   }) async {
     if (songs.isEmpty) return PlayResult.ok;
-    if (_currentPartyId != null && !_isHost) return PlayResult.blockedAsListener;
+    if (_currentPartyId != null && !_isHost)
+      return PlayResult.blockedAsListener;
 
     if (_currentPartyId != null && _isHost) {
       for (final song in songs) {
@@ -304,6 +309,8 @@ class AudioPlayerService {
     if (_syncDebounce?.isActive ?? false) return;
 
     _syncDebounce = Timer(const Duration(seconds: 2), () {
+      // Re-check: _currentPartyId may have become null while the timer was waiting
+      if (_currentPartyId == null || !_isHost) return;
       _rtdbService.updatePartyState(
         partyId: _currentPartyId!,
         song: _currentSong,
@@ -365,7 +372,8 @@ class AudioPlayerService {
     _rtdbService.getPartyMetadataStream(partyId).listen((event) {
       if (!event.snapshot.exists) return;
       final meta = Map<String, dynamic>.from(event.snapshot.value as Map);
-      if (meta['hostUid'] == FirebaseAuth.instance.currentUser?.uid && !_isHost) {
+      if (meta['hostUid'] == FirebaseAuth.instance.currentUser?.uid &&
+          !_isHost) {
         _isHost = true;
         _partyStateSub?.cancel();
         _partyStateSub = null;
@@ -378,10 +386,13 @@ class AudioPlayerService {
     _partyQueueSub?.cancel();
     if (_currentPartyId == null) return;
 
-    _partyQueueSub = _rtdbService.getPartyQueueStream(_currentPartyId!).listen((event) {
+    _partyQueueSub = _rtdbService.getPartyQueueStream(_currentPartyId!).listen((
+      event,
+    ) {
       _queue.clear();
       if (event.snapshot.value != null) {
-        final Map<dynamic, dynamic> qMap = event.snapshot.value as Map<dynamic, dynamic>;
+        final Map<dynamic, dynamic> qMap =
+            event.snapshot.value as Map<dynamic, dynamic>;
         final sortedKeys = qMap.keys.toList()..sort();
         for (var key in sortedKeys) {
           _queue.add(SongInfo.fromMap(Map<String, dynamic>.from(qMap[key])));
@@ -411,6 +422,10 @@ class AudioPlayerService {
     _partyQueueSub = null;
     _currentPartyId = null;
     _isHost = false;
+
+    // Force re-emit so MiniPlayer's StreamBuilder refreshes its play/pause icon
+    // (prevents the spinner from sticking after a party kick)
+    _playerStateController.add(_controller.value.playerState);
   }
 
   Future<void> seek(Duration position) async {

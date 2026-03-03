@@ -23,6 +23,7 @@ import '../models/song_info.dart';
 import 'live_party_modal.dart';
 import 'live_party_screen.dart';
 import 'album_details_screen.dart';
+import 'artist_details_screen.dart';
 import '../widgets/_buildMiniPlayer.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -150,7 +151,10 @@ class _HomeScreenState extends State<HomeScreen>
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.only(top: kToolbarHeight + 16, bottom: 180),
+              padding: const EdgeInsets.only(
+                top: kToolbarHeight + 16,
+                bottom: 180,
+              ),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   const SizedBox(height: 24),
@@ -196,10 +200,10 @@ class _HomeScreenState extends State<HomeScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildSectionTitle(
-                              'Live Parties',
-                              Icons.podcasts_rounded,
-                              Colors.purpleAccent,
-                            ),
+                          'Live Parties',
+                          Icons.podcasts_rounded,
+                          Colors.purpleAccent,
+                        ),
                         const SizedBox(height: 16),
                         _buildLiveParties(),
                       ],
@@ -214,10 +218,10 @@ class _HomeScreenState extends State<HomeScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildSectionTitle(
-                              'Daily Discovery',
-                              CupertinoIcons.sparkles,
-                              cyanAccent,
-                            ),
+                          'Daily Discovery',
+                          CupertinoIcons.sparkles,
+                          cyanAccent,
+                        ),
                         const SizedBox(height: 16),
                         _buildTopRatedAlbums(),
                       ],
@@ -236,10 +240,10 @@ class _HomeScreenState extends State<HomeScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildSectionTitle(
-                              'Popular Circles',
-                              Icons.people_alt_rounded,
-                              Colors.greenAccent,
-                            ),
+                          'Popular Circles',
+                          Icons.people_alt_rounded,
+                          Colors.greenAccent,
+                        ),
                         const SizedBox(height: 16),
                         _buildPopularCircles(),
                       ],
@@ -254,10 +258,10 @@ class _HomeScreenState extends State<HomeScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildSectionTitle(
-                              'Recommended for You',
-                              CupertinoIcons.music_note_list,
-                              cyanAccent,
-                            ),
+                          'Recommended for You',
+                          CupertinoIcons.music_note_list,
+                          cyanAccent,
+                        ),
                         const SizedBox(height: 4),
                         _buildRecommendedSongs(),
                       ],
@@ -419,31 +423,30 @@ class _HomeScreenState extends State<HomeScreen>
             titleWidget,
             const SizedBox(height: 16),
             SizedBox(
-                  height: 210,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    addAutomaticKeepAlives: false,
-                    itemCount: displaySongs.length,
-                    itemBuilder: (context, index) {
-                      final song = displaySongs[index];
-                      return ModernSongCard(
-                        title: song.title,
-                        imageUrl: song.thumbnailUrl,
-                        onTap: () async {
-                          final result = await _audioService.playFromYoutubeId(
-                            song.youtubeVideoId,
-                            song,
-                          );
-                          if (result == PlayResult.blockedAsListener &&
-                              mounted) {
-                            showListenerBlockedDialog(context);
-                          }
-                        },
+              height: 210,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                addAutomaticKeepAlives: false,
+                itemCount: displaySongs.length,
+                itemBuilder: (context, index) {
+                  final song = displaySongs[index];
+                  return ModernSongCard(
+                    title: song.title,
+                    imageUrl: song.thumbnailUrl,
+                    onTap: () async {
+                      final result = await _audioService.playFromYoutubeId(
+                        song.youtubeVideoId,
+                        song,
                       );
+                      if (result == PlayResult.blockedAsListener && mounted) {
+                        showListenerBlockedDialog(context);
+                      }
                     },
-                  ),
-                )
+                  );
+                },
+              ),
+            ),
           ],
         );
       },
@@ -478,11 +481,7 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
             const SizedBox(width: 6),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              color: cyanAccent,
-              size: 11,
-            ),
+            Icon(Icons.arrow_forward_ios_rounded, color: cyanAccent, size: 11),
           ],
         ),
       ),
@@ -577,7 +576,16 @@ class _HomeScreenState extends State<HomeScreen>
               final circle = circles[index];
               return GestureDetector(
                 onTap: () {
-                  // TODO: Navigate to artist detail or search
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ArtistDetailsScreen(
+                        artistId: circle.id,
+                        artistName: circle.name,
+                        imageUrl: circle.imageUrl,
+                      ),
+                    ),
+                  );
                 },
                 child: Container(
                   width: 100,
@@ -598,8 +606,10 @@ class _HomeScreenState extends State<HomeScreen>
                                   placeholder: (context, url) => Container(
                                     color: Colors.white.withValues(alpha: 0.05),
                                   ),
-                                  errorWidget: (context, url, error) =>
-                                      Icon(Icons.person, color: darkThemeTextColor),
+                                  errorWidget: (context, url, error) => Icon(
+                                    Icons.person,
+                                    color: darkThemeTextColor,
+                                  ),
                                 ),
                               )
                             : Icon(Icons.person, color: darkThemeTextColor),
@@ -987,14 +997,14 @@ class _HomeScreenState extends State<HomeScreen>
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: 4,
         itemBuilder: (_, __) => Container(
-              width: width,
-              height: height,
-              margin: const EdgeInsets.only(right: 16),
-              decoration: BoxDecoration(
-                color: darkThemeSecondaryColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
+          width: width,
+          height: height,
+          margin: const EdgeInsets.only(right: 16),
+          decoration: BoxDecoration(
+            color: darkThemeSecondaryColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
       ),
     );
   }
@@ -1004,13 +1014,13 @@ class _HomeScreenState extends State<HomeScreen>
       children: List.generate(
         5,
         (_) => Container(
-              height: 72,
-              margin: const EdgeInsets.only(bottom: 8, left: 16, right: 16),
-              decoration: BoxDecoration(
-                color: darkThemeSecondaryColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
+          height: 72,
+          margin: const EdgeInsets.only(bottom: 8, left: 16, right: 16),
+          decoration: BoxDecoration(
+            color: darkThemeSecondaryColor,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
       ),
     );
   }
@@ -1225,7 +1235,8 @@ class _HomeScreenState extends State<HomeScreen>
                                   memCacheWidth: 100,
                                   fit: BoxFit.cover,
                                   placeholder: (context, url) => placeholder,
-                                  errorWidget: (context, url, error) => placeholder,
+                                  errorWidget: (context, url, error) =>
+                                      placeholder,
                                 ),
                               );
                             },

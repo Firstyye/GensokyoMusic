@@ -255,7 +255,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 100), // padding for miniplayer
+      padding: const EdgeInsets.only(bottom: 160), // padding for miniplayer
       itemCount: _searchResults.length,
       itemBuilder: (context, index) {
         final item = _searchResults[index];
@@ -327,6 +327,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _buildImageLeading(String imageUrl, {bool isCircular = false}) {
+    final fallbackIcon = isCircular ? Icons.person : Icons.music_note;
+
     return Container(
       width: 56,
       height: 56,
@@ -345,17 +347,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
         borderRadius: isCircular
             ? BorderRadius.circular(28)
             : BorderRadius.circular(8),
-        child: UniversalImage(
-          imageUrl: imageUrl,
-          width: 56,
-          height: 56,
-          fit: BoxFit.cover,
-          placeholder: Container(color: Colors.white.withOpacity(0.05)),
-          errorWidget: Container(
-            color: darkThemeSecondaryColor,
-            child: const Icon(Icons.music_note, color: Colors.white54),
-          ),
-        ),
+        child: imageUrl.isEmpty
+            ? Container(
+                color: darkThemeSecondaryColor,
+                child: Icon(fallbackIcon, color: Colors.white54),
+              )
+            : UniversalImage(
+                imageUrl: imageUrl,
+                width: 56,
+                height: 56,
+                fit: BoxFit.cover,
+                placeholder: Container(color: Colors.white.withOpacity(0.05)),
+                errorWidget: Container(
+                  color: darkThemeSecondaryColor,
+                  child: Icon(fallbackIcon, color: Colors.white54),
+                ),
+              ),
       ),
     );
   }
