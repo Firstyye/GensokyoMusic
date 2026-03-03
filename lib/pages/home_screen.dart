@@ -156,138 +156,154 @@ class _HomeScreenState extends State<HomeScreen>
                 bottom: 180,
               ),
               sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  const SizedBox(height: 24),
-
-                  // ─── ACTIVE PARTY BANNER ───
-                  if (currentPartyId != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: RepaintBoundary(
-                        child: StreamBuilder<SongInfo?>(
-                          stream: _audioService.currentSongStream,
-                          initialData: _audioService.currentSong,
-                          builder: (context, snapshot) {
-                            return ModernFeatureBanner(
-                              title: 'Live Party ($currentPartyId)',
-                              subtitle: 'You are currently in a room.',
-                              imageUrl: snapshot.data?.thumbnailUrl,
-                              onPlay: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => LivePartyScreen(
-                                      partyId: currentPartyId,
-                                      isHost: _audioService.isHost,
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  // Section indices (lazy-built only when visible):
+                  // 0 = active party banner (may be empty)
+                  // 1 = live parties
+                  // 2 = daily discovery
+                  // 3 = recently played
+                  // 4 = popular circles
+                  // 5 = recommended for you
+                  // 6 = browse by genre
+                  switch (index) {
+                    case 0:
+                      if (currentPartyId == null)
+                        return const SizedBox(height: 24);
+                      return Padding(
+                        padding: const EdgeInsets.only(
+                          top: 24,
+                          left: 16,
+                          right: 16,
+                          bottom: 12,
+                        ),
+                        child: RepaintBoundary(
+                          child: StreamBuilder<SongInfo?>(
+                            stream: _audioService.currentSongStream,
+                            initialData: _audioService.currentSong,
+                            builder: (context, snapshot) {
+                              return ModernFeatureBanner(
+                                title: 'Live Party ($currentPartyId)',
+                                subtitle: 'You are currently in a room.',
+                                imageUrl: snapshot.data?.thumbnailUrl,
+                                onPlay: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => LivePartyScreen(
+                                        partyId: currentPartyId,
+                                        isHost: _audioService.isHost,
+                                      ),
                                     ),
-                                  ),
-                                ).then((_) {
-                                  setState(() {});
-                                });
-                              },
-                            );
-                          },
+                                  ).then((_) {
+                                    setState(() {});
+                                  });
+                                },
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                    ),
+                      );
 
-                  // ─── LIVE PARTIES ───
-                  RepaintBoundary(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionTitle(
-                          'Live Parties',
-                          Icons.podcasts_rounded,
-                          Colors.purpleAccent,
+                    case 1:
+                      return RepaintBoundary(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionTitle(
+                              'Live Parties',
+                              Icons.podcasts_rounded,
+                              Colors.purpleAccent,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildLiveParties(),
+                            const SizedBox(height: 32),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        _buildLiveParties(),
-                      ],
-                    ),
-                  ),
+                      );
 
-                  const SizedBox(height: 32),
-
-                  // ─── DAILY DISCOVERY ───
-                  RepaintBoundary(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionTitle(
-                          'Daily Discovery',
-                          CupertinoIcons.sparkles,
-                          cyanAccent,
+                    case 2:
+                      return RepaintBoundary(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionTitle(
+                              'Daily Discovery',
+                              CupertinoIcons.sparkles,
+                              cyanAccent,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildTopRatedAlbums(),
+                            const SizedBox(height: 32),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        _buildTopRatedAlbums(),
-                      ],
-                    ),
-                  ),
+                      );
 
-                  const SizedBox(height: 32),
-
-                  // ─── RECENTLY PLAYED ───
-                  RepaintBoundary(child: _buildRecentlyPlayedSection()),
-                  const SizedBox(height: 32),
-
-                  // ─── POPULAR CIRCLES ───
-                  RepaintBoundary(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionTitle(
-                          'Popular Circles',
-                          Icons.people_alt_rounded,
-                          Colors.greenAccent,
+                    case 3:
+                      return RepaintBoundary(
+                        child: Column(
+                          children: [
+                            _buildRecentlyPlayedSection(),
+                            const SizedBox(height: 32),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        _buildPopularCircles(),
-                      ],
-                    ),
-                  ),
+                      );
 
-                  const SizedBox(height: 32),
-
-                  // ─── RECOMMENDED FOR YOU ───
-                  RepaintBoundary(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionTitle(
-                          'Recommended for You',
-                          CupertinoIcons.music_note_list,
-                          cyanAccent,
+                    case 4:
+                      return RepaintBoundary(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionTitle(
+                              'Popular Circles',
+                              Icons.people_alt_rounded,
+                              Colors.greenAccent,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildPopularCircles(),
+                            const SizedBox(height: 32),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        _buildRecommendedSongs(),
-                      ],
-                    ),
-                  ),
+                      );
 
-                  const SizedBox(height: 20),
-
-                  // ─── BROWSE BY GENRE ───
-                  RepaintBoundary(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionTitle(
-                          'Browse by Genre',
-                          CupertinoIcons.tags_solid,
-                          Colors.purpleAccent,
+                    case 5:
+                      return RepaintBoundary(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionTitle(
+                              'Recommended for You',
+                              CupertinoIcons.music_note_list,
+                              cyanAccent,
+                            ),
+                            const SizedBox(height: 4),
+                            _buildRecommendedSongs(),
+                            const SizedBox(height: 20),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        _buildChips(),
-                        const SizedBox(height: 4),
-                        _buildGenreSongs(),
-                      ],
-                    ),
-                  ),
-                ]),
+                      );
+
+                    case 6:
+                      return RepaintBoundary(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionTitle(
+                              'Browse by Genre',
+                              CupertinoIcons.tags_solid,
+                              Colors.purpleAccent,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildChips(),
+                            const SizedBox(height: 4),
+                            _buildGenreSongs(),
+                          ],
+                        ),
+                      );
+
+                    default:
+                      return const SizedBox.shrink();
+                  }
+                }, childCount: 7),
               ),
             ),
           ],

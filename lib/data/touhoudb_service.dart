@@ -124,35 +124,43 @@ class TouhouDBService {
     if (genre == 'All') {
       final sortOptions = ['RatingScore', 'AdditionDate', 'PublishDate'];
       final randomSort = sortOptions[Random().nextInt(sortOptions.length)];
-      final randomOffset = Random().nextInt(100); // Variety from top 100
-      final response = await http.get(
-        Uri.parse(
-          "$baseUrl/songs?sort=$randomSort&start=$randomOffset&maxResults=10&fields=MainPicture,PVs",
-        ),
-      );
-      if (response.statusCode == 200) {
-        var data = json.decode(response.body);
-        List<dynamic> items = data['items'] ?? [];
-        List<SongInfo> results = [];
-        for (var song in items) {
-          final pvId = _extractYoutubePvId(song['pvs']);
-          if (pvId.isNotEmpty) {
-            results.add(
-              SongInfo(
-                youtubeVideoId: pvId,
-                title: song['defaultName'] ?? song['name'] ?? 'Unknown',
-                artist: song['artistString'] ?? 'Unknown Artist',
-                thumbnailUrl:
-                    song['mainPicture']?['urlOriginal'] ??
-                    song['mainPicture']?['urlThumb'] ??
-                    'https://i.ytimg.com/vi/$pvId/hqdefault.jpg',
-              ),
-            );
+
+      // Try up to 3 times with decreasing offsets.
+      // High offset = more variety, but may overshoot available songs.
+      // Each retry halves the offset; final attempt uses 0 (guaranteed results).
+      int offset = Random().nextInt(100);
+      for (int attempt = 0; attempt < 3; attempt++) {
+        final response = await http.get(
+          Uri.parse(
+            "$baseUrl/songs?sort=$randomSort&start=$offset&maxResults=10&fields=MainPicture,PVs",
+          ),
+        );
+        if (response.statusCode == 200) {
+          var data = json.decode(response.body);
+          List<dynamic> items = data['items'] ?? [];
+          List<SongInfo> results = [];
+          for (var song in items) {
+            final pvId = _extractYoutubePvId(song['pvs']);
+            if (pvId.isNotEmpty) {
+              results.add(
+                SongInfo(
+                  youtubeVideoId: pvId,
+                  title: song['defaultName'] ?? song['name'] ?? 'Unknown',
+                  artist: song['artistString'] ?? 'Unknown Artist',
+                  thumbnailUrl:
+                      song['mainPicture']?['urlOriginal'] ??
+                      song['mainPicture']?['urlThumb'] ??
+                      'https://i.ytimg.com/vi/$pvId/hqdefault.jpg',
+                ),
+              );
+            }
           }
+          if (results.isNotEmpty) return results;
         }
-        return results;
+        // Retry with a lower offset
+        offset = (offset ~/ 2);
       }
-      throw Exception("Failed to load recommended songs");
+      return []; // All retries exhausted
     } else {
       // Fetch by Tag for better accuracy in Genre
       // The API ignores tagName, so we must map exactly to tagId[]

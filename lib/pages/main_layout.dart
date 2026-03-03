@@ -80,7 +80,7 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
     if (index == _selectedIndex) return;
     setState(() {
       _selectedIndex = index;
-      
+
       // Lazy load the page if it hasn't been instantiated yet
       if (_pages[index] == null) {
         switch (index) {
@@ -186,17 +186,19 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
                 // paints every page every frame, which kills mid-range GPUs.
                 // Offstage keeps pages mounted (preserving state) but skips paint.
                 // Hidden Youtube Player acting as our global audio engine.
-                // Positioned off-screen because Android WebViews ignore opacity.
-                // Size must stay at 320x240 — YouTube iframe needs this to reliably
-                // report position/duration/state via JavaScript bridge.
+                // Android WebViews IGNORE offscreen/opacity — they render their
+                // surface every frame. Shrinking to 1×1 eliminates GPU cost
+                // while keeping the JS bridge alive for position/duration/state.
                 Positioned(
-                  top: -1000,
-                  left: -1000,
-                  width: 320,
-                  height: 240,
-                  child: IgnorePointer(
-                    child: YoutubePlayer(
-                      controller: AudioPlayerService().controller,
+                  top: -10,
+                  left: -10,
+                  width: 1,
+                  height: 1,
+                  child: RepaintBoundary(
+                    child: IgnorePointer(
+                      child: YoutubePlayer(
+                        controller: AudioPlayerService().controller,
+                      ),
                     ),
                   ),
                 ),
@@ -348,10 +350,7 @@ class _MainLayoutState extends State<MainLayout> with TickerProviderStateMixin {
                     errorWidget: (context, url, error) =>
                         const Icon(Icons.person, size: 16),
                   )
-                : Image.asset(
-                    'lib/pages/images/avatar.jpg',
-                    fit: BoxFit.cover,
-                  ),
+                : Image.asset('lib/pages/images/avatar.jpg', fit: BoxFit.cover),
           ),
         ),
       ),

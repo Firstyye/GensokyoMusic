@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../constant/my_constant.dart';
 import '../models/song_info.dart';
 import '../services/realtime_database_service.dart';
@@ -190,7 +189,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
                                 ),
                                 child: Text(
                                   "HOST",
-                                  style: GoogleFonts.inter(
+                                  style: interTextStyle.copyWith(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.black,
@@ -208,7 +207,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
                                 ),
                                 child: Text(
                                   "LISTENER",
-                                  style: GoogleFonts.inter(
+                                  style: interTextStyle.copyWith(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white70,
@@ -261,7 +260,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
             _isCurrentlyHost
                 ? 'Host: Room ${widget.partyId}'
                 : 'Guest: Room ${widget.partyId}',
-            style: GoogleFonts.inter(fontSize: 18, color: Colors.white),
+            style: interTextStyle.copyWith(fontSize: 18, color: Colors.white),
           ),
           actions: [
             IconButton(
@@ -382,7 +381,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
                       song.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
+                      style: interTextStyle.copyWith(
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -765,7 +764,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
               icon: const Icon(Icons.add_rounded, color: Colors.black),
               label: Text(
                 'Add Song',
-                style: GoogleFonts.inter(
+                style: interTextStyle.copyWith(
                   color: Colors.black,
                   fontWeight: FontWeight.bold,
                 ),
@@ -806,7 +805,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Party Options',
-          style: GoogleFonts.inter(
+          style: interTextStyle.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.bold,
           ),

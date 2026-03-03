@@ -40,6 +40,7 @@ Color dangerTransparentDarkColor = const Color(0x33FF0000);
 
 // ─── TYPOGRAPHY ───
 final String _poppinsFamily = GoogleFonts.poppins().fontFamily!;
+final String _interFamily = GoogleFonts.inter().fontFamily!;
 
 TextStyle headerTextStyle = TextStyle(
   fontFamily: _poppinsFamily,
@@ -55,6 +56,13 @@ TextStyle bodyTextStyle = TextStyle(
   color: darkThemeTextColor,
   fontSize: 14,
   fontWeight: FontWeight.w400,
+);
+
+/// Pre-cached Inter style — use `.copyWith()` instead of `GoogleFonts.inter()`
+/// to avoid repeated font-family HashMap lookups in build methods.
+TextStyle interTextStyle = TextStyle(
+  fontFamily: _interFamily,
+  color: darkThemeTextColor,
 );
 
 /// Shows a dialog informing a listener they must leave the party before playing.

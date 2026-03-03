@@ -86,6 +86,7 @@ class AudioPlayerService {
   PlayerState? _lastEmittedState;
   int _lastEmittedPositionSec = -1;
   Duration? _lastEmittedDuration;
+  Timer? _positionThrottle;
 
   void _listener() {
     if (!_controller.value.isReady) return;
@@ -100,22 +101,30 @@ class AudioPlayerService {
       _isPlaying = false;
     }
 
-    // Only emit when values actually change to reduce UI rebuilds
+    // Player state changes are emitted INSTANTLY (play/pause must be responsive)
     if (value.playerState != _lastEmittedState) {
       _lastEmittedState = value.playerState;
       _playerStateController.add(value.playerState);
     }
 
-    final positionSec = value.position.inSeconds;
-    if (positionSec != _lastEmittedPositionSec) {
-      _lastEmittedPositionSec = positionSec;
-      _positionController.add(value.position);
-    }
+    // Position + duration updates are THROTTLED to 2Hz (every 500ms)
+    // to reduce StreamBuilder rebuilds from 60fps → 2fps for progress bars
+    _positionThrottle ??= Timer(const Duration(milliseconds: 500), () {
+      _positionThrottle = null;
+      if (!_controller.value.isReady) return;
 
-    if (value.metaData.duration != _lastEmittedDuration) {
-      _lastEmittedDuration = value.metaData.duration;
-      _durationController.add(value.metaData.duration);
-    }
+      final currentValue = _controller.value;
+      final positionSec = currentValue.position.inSeconds;
+      if (positionSec != _lastEmittedPositionSec) {
+        _lastEmittedPositionSec = positionSec;
+        _positionController.add(currentValue.position);
+      }
+
+      if (currentValue.metaData.duration != _lastEmittedDuration) {
+        _lastEmittedDuration = currentValue.metaData.duration;
+        _durationController.add(currentValue.metaData.duration);
+      }
+    });
 
     // Sync to RTDB if Host
     _syncStateToParty();
