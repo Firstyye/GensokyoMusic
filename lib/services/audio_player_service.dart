@@ -82,6 +82,10 @@ class AudioPlayerService {
   String? get currentPartyId => _currentPartyId;
   bool get isHost => _isHost;
 
+  // ── Pre-buffer Cache ──
+  final Map<String, ja.AudioSource> _prefetchCache = {};
+  bool _isPrefetching = false;
+
   // ── Dedup + Throttle ──
   PlayerState? _lastEmittedState;
   Timer? _positionThrottle;
@@ -194,6 +198,7 @@ class AudioPlayerService {
     _queue.clear();
     _queue.add(songInfo);
     _currentIndex = 0;
+    _prefetchCache.clear();
     await _playQueueItem();
     return PlayResult.ok;
   }
@@ -221,6 +226,7 @@ class AudioPlayerService {
     _queueTitle = queueTitle ?? 'Queue';
     _queue.clear();
     _queue.addAll(songs);
+    _prefetchCache.clear();
     if (_isShuffle) {
       _queue.shuffle();
       _currentIndex = 0;
@@ -241,8 +247,7 @@ class AudioPlayerService {
     // Increment token — any in-flight download with an old token is stale
     final token = ++_loadToken;
 
-    // Stop current playback + reset progress bar + show buffering
-    await _player.stop();
+    // Reset progress bar + show buffering (don't stop player — keeps audio session alive)
     _isLoadingSong = true;
     _positionController.add(Duration.zero);
     _durationController.add(Duration.zero);
@@ -255,10 +260,21 @@ class AudioPlayerService {
         artist: songInfo.artist,
         artUri: Uri.parse(songInfo.thumbnailUrl),
       );
-      final source = await _buildAudioSource(
-        songInfo.youtubeVideoId,
-        tag: mediaTag,
-      );
+
+      // Check prefetch cache first
+      ja.AudioSource? source = _prefetchCache.remove(songInfo.youtubeVideoId);
+      if (source != null) {
+        debugPrint('AudioPlayerService: Cache HIT for ${songInfo.title}');
+      } else {
+        debugPrint(
+          'AudioPlayerService: Cache MISS — downloading ${songInfo.title}',
+        );
+        source = await _buildAudioSource(
+          songInfo.youtubeVideoId,
+          tag: mediaTag,
+        );
+      }
+
       // Check if another song was requested during download
       if (token != _loadToken) return;
 
@@ -282,12 +298,68 @@ class AudioPlayerService {
       _positionController.add(_player.position);
       _player.play();
       _firestoreService.addRecentlyPlayedSong(songInfo);
+
+      // Pre-buffer the next song in background
+      _prefetchNextSong();
     } catch (e) {
       if (token != _loadToken) return;
       debugPrint('AudioPlayerService error: $e');
       _isLoadingSong = false;
       _playerStateController.add(PlayerState.paused);
     }
+  }
+
+  /// Pre-downloads the next song in the queue so it's ready instantly.
+  void _prefetchNextSong() {
+    if (_isPrefetching) return;
+    if (_queue.isEmpty) return;
+
+    // Determine next index
+    int nextIndex = _currentIndex + 1;
+    if (nextIndex >= _queue.length) {
+      if (_loopMode == LoopMode.all) {
+        nextIndex = 0;
+      } else {
+        return; // No next song to prefetch
+      }
+    }
+
+    final nextSong = _queue[nextIndex];
+    // Already cached?
+    if (_prefetchCache.containsKey(nextSong.youtubeVideoId)) return;
+
+    _isPrefetching = true;
+    final prefetchToken = _loadToken; // Snapshot current token
+
+    debugPrint('AudioPlayerService: Pre-buffering ${nextSong.title}');
+
+    _buildAudioSource(
+          nextSong.youtubeVideoId,
+          tag: MediaItem(
+            id: nextSong.youtubeVideoId,
+            title: nextSong.title,
+            artist: nextSong.artist,
+            artUri: Uri.parse(nextSong.thumbnailUrl),
+          ),
+        )
+        .then((source) {
+          _isPrefetching = false;
+          // Only cache if the queue hasn't changed
+          if (prefetchToken != _loadToken) {
+            debugPrint('AudioPlayerService: Prefetch stale, discarding');
+            return;
+          }
+          if (source != null) {
+            // Keep cache small: only 1 entry
+            _prefetchCache.clear();
+            _prefetchCache[nextSong.youtubeVideoId] = source;
+            debugPrint('AudioPlayerService: Pre-buffered ${nextSong.title} ✓');
+          }
+        })
+        .catchError((e) {
+          _isPrefetching = false;
+          debugPrint('AudioPlayerService: Prefetch failed: $e');
+        });
   }
 
   /// Builds an AudioSource by downloading bytes via youtube_explode_dart.
@@ -391,6 +463,7 @@ class AudioPlayerService {
 
   void toggleShuffle() {
     _isShuffle = !_isShuffle;
+    _prefetchCache.clear();
     if (_isShuffle && _queue.isNotEmpty && _currentIndex >= 0) {
       final current = _queue[_currentIndex];
       _queue.shuffle();
@@ -398,6 +471,8 @@ class AudioPlayerService {
       _queue.insert(0, current);
       _currentIndex = 0;
     }
+    // Re-prefetch for the new order
+    _prefetchNextSong();
   }
 
   void toggleLoop() {
@@ -545,6 +620,15 @@ class AudioPlayerService {
     });
   }
 
+  /// Ensures _currentIndex matches _currentSong's position in _queue.
+  void _syncCurrentIndex() {
+    if (_currentSong == null || _queue.isEmpty) return;
+    final idx = _queue.indexWhere(
+      (s) => s.youtubeVideoId == _currentSong!.youtubeVideoId,
+    );
+    if (idx != -1) _currentIndex = idx;
+  }
+
   /// Helper to load a video by ID for party sync (listener side)
   Future<void> _loadAndPlayVideoId(
     String videoId, {
@@ -561,7 +645,16 @@ class AudioPlayerService {
           artUri: Uri.parse(_currentSong!.thumbnailUrl),
         );
       }
-      final source = await _buildAudioSource(videoId, tag: mediaTag);
+      // Check prefetch cache first
+      ja.AudioSource? source = _prefetchCache.remove(videoId);
+      if (source != null) {
+        debugPrint('AudioPlayerService: Listener cache HIT for $videoId');
+      } else {
+        debugPrint(
+          'AudioPlayerService: Listener cache MISS — downloading $videoId',
+        );
+        source = await _buildAudioSource(videoId, tag: mediaTag);
+      }
       if (source == null) return;
 
       await _player.setAudioSource(source);
@@ -588,6 +681,9 @@ class AudioPlayerService {
           if (freshIsPlaying) {
             _player.play();
           }
+          // Sync index before prefetching
+          _syncCurrentIndex();
+          _prefetchNextSong();
           return;
         }
       }
@@ -596,6 +692,9 @@ class AudioPlayerService {
       if (shouldPlay) {
         _player.play();
       }
+      // Sync index before prefetching
+      _syncCurrentIndex();
+      _prefetchNextSong();
     } catch (e) {
       debugPrint('AudioPlayerService: Failed to load video $videoId: $e');
     }
@@ -623,6 +722,8 @@ class AudioPlayerService {
         );
         if (idx != -1) _currentIndex = idx;
       }
+      // Pre-buffer next song when party queue updates
+      _prefetchNextSong();
     });
   }
 
