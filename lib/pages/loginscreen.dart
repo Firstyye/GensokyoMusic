@@ -53,6 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('rememberMe', isSwitch);
     bool seen = prefs.getBool('seen') ?? false;
 
     if (!mounted) return;
@@ -711,9 +712,7 @@ class _BuildTextFieldState extends State<_BuildTextField> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12.0),
                       child: Icon(
-                        _isHidden
-                            ? Icons.visibility_off
-                            : Icons.visibility,
+                        _isHidden ? Icons.visibility_off : Icons.visibility,
                         color: Colors.grey.shade400,
                       ),
                     ),

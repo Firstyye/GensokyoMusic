@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:just_audio/just_audio.dart' as ja;
+import 'package:audio_service/audio_service.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import '../models/song_info.dart';
 import '../services/realtime_database_service.dart';
@@ -248,7 +249,16 @@ class AudioPlayerService {
     _playerStateController.add(PlayerState.buffering);
 
     try {
-      final source = await _buildAudioSource(songInfo.youtubeVideoId);
+      final mediaTag = MediaItem(
+        id: songInfo.youtubeVideoId,
+        title: songInfo.title,
+        artist: songInfo.artist,
+        artUri: Uri.parse(songInfo.thumbnailUrl),
+      );
+      final source = await _buildAudioSource(
+        songInfo.youtubeVideoId,
+        tag: mediaTag,
+      );
       // Check if another song was requested during download
       if (token != _loadToken) return;
 
@@ -282,7 +292,10 @@ class AudioPlayerService {
 
   /// Builds an AudioSource by downloading bytes via youtube_explode_dart.
   /// youtube_explode handles YouTube auth internally → no 403 from ExoPlayer.
-  Future<ja.AudioSource?> _buildAudioSource(String videoId) async {
+  Future<ja.AudioSource?> _buildAudioSource(
+    String videoId, {
+    Object? tag,
+  }) async {
     try {
       final manifest = await _yt.videos.streamsClient.getManifest(
         videoId,
@@ -311,7 +324,7 @@ class AudioPlayerService {
       }
       debugPrint('AudioPlayerService: Downloaded ${bytes.length} bytes');
 
-      return _YtStreamAudioSource(bytes, streamInfo.container.name);
+      return _YtStreamAudioSource(bytes, streamInfo.container.name, tag: tag);
     } catch (e) {
       debugPrint('AudioPlayerService: stream extraction failed: $e');
       return null;
@@ -538,7 +551,17 @@ class AudioPlayerService {
     bool shouldPlay = true,
   }) async {
     try {
-      final source = await _buildAudioSource(videoId);
+      // Build a MediaItem tag for notification (use currentSong if available)
+      Object? mediaTag;
+      if (_currentSong != null) {
+        mediaTag = MediaItem(
+          id: _currentSong!.youtubeVideoId,
+          title: _currentSong!.title,
+          artist: _currentSong!.artist,
+          artUri: Uri.parse(_currentSong!.thumbnailUrl),
+        );
+      }
+      final source = await _buildAudioSource(videoId, tag: mediaTag);
       if (source == null) return;
 
       await _player.setAudioSource(source);
@@ -655,7 +678,7 @@ class _YtStreamAudioSource extends ja.StreamAudioSource {
   final List<int> _bytes;
   final String _container;
 
-  _YtStreamAudioSource(this._bytes, this._container);
+  _YtStreamAudioSource(this._bytes, this._container, {super.tag});
 
   @override
   Future<ja.StreamAudioResponse> request([int? start, int? end]) async {

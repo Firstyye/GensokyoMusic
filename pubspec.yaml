@@ -56,6 +56,7 @@ dependencies:
   just_audio: ^0.9.43
   youtube_explode_dart: ^3.0.5
   firebase_database: ^12.1.3
+  just_audio_background: ^0.0.1-beta.17
 
 dev_dependencies:
   flutter_test:
@@ -67,6 +68,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -114,3 +116,11 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/GensokyoMusic.png"
+  adaptive_icon_background: "#1A1A2E"
+  adaptive_icon_foreground: "assets/images/GensokyoMusic_foreground.png"
+  remove_alpha_ios: true

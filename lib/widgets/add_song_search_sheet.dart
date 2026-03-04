@@ -4,6 +4,8 @@ import '../models/song_info.dart';
 import '../constant/my_constant.dart';
 import '../services/firestore_service.dart';
 import '../data/touhoudb_service.dart';
+import '../data/albumsList.dart';
+import '../data/popular_circle.dart';
 
 class AddSongSearchSheet extends StatefulWidget {
   final Function(SongInfo) onSongSelected;
@@ -24,30 +26,146 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
   final TouhouDBService _touhouDB = TouhouDBService();
   final FirestoreService _firestoreService = FirestoreService();
 
-  List<SongInfo> _searchResults = [];
+  // Unified search results
+  List<SongInfo> _songResults = [];
+  List<Albumslist> _albumResults = [];
+  List<PopularCircle> _artistResults = [];
   bool _isLoading = false;
 
   int _selectedTab = 0; // 0=Search, 1=Favorites, 2=Playlists
   String? _selectedPlaylistId;
   String? _selectedPlaylistName;
 
-  void _searchSongs(String query) async {
-    if (query.isEmpty) {
-      if (mounted) setState(() => _searchResults = []);
+  // Inline album expansion
+  int? _expandedAlbumId;
+  List<SongInfo>? _expandedAlbumTracks;
+  bool _loadingAlbumTracks = false;
+
+  // Inline artist expansion
+  int? _expandedArtistId;
+  List<Albumslist>? _expandedArtistAlbums;
+  bool _loadingArtistAlbums = false;
+
+  void _searchAll(String query) async {
+    if (query.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _songResults = [];
+          _albumResults = [];
+          _artistResults = [];
+          _expandedAlbumId = null;
+          _expandedArtistId = null;
+        });
+      }
       return;
     }
     setState(() => _isLoading = true);
     try {
-      final results = await _touhouDB.searchSongs(query);
+      final trimmed = query.trim();
+      final results = await Future.wait([
+        _touhouDB.searchSongs(trimmed),
+        _touhouDB.searchAlbums(trimmed),
+        _touhouDB.searchArtists(trimmed),
+      ]);
       if (mounted) {
         setState(() {
-          _searchResults = results;
+          _songResults = results[0] as List<SongInfo>;
+          _albumResults = results[1] as List<Albumslist>;
+          _artistResults = results[2] as List<PopularCircle>;
           _isLoading = false;
+          _expandedAlbumId = null;
+          _expandedArtistId = null;
         });
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _toggleAlbumExpand(Albumslist album) async {
+    if (_expandedAlbumId == album.id) {
+      setState(() {
+        _expandedAlbumId = null;
+        _expandedAlbumTracks = null;
+      });
+      return;
+    }
+    setState(() {
+      _expandedAlbumId = album.id;
+      _expandedAlbumTracks = null;
+      _loadingAlbumTracks = true;
+    });
+    try {
+      final tracks = await _touhouDB.getAlbumTracks(album.id);
+      if (mounted) {
+        setState(() {
+          _expandedAlbumTracks = tracks
+              .where((t) => t.youtubeVideoId.isNotEmpty)
+              .toList();
+          _loadingAlbumTracks = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingAlbumTracks = false);
+    }
+  }
+
+  void _toggleArtistExpand(PopularCircle artist) async {
+    if (_expandedArtistId == artist.id) {
+      setState(() {
+        _expandedArtistId = null;
+        _expandedArtistAlbums = null;
+      });
+      return;
+    }
+    setState(() {
+      _expandedArtistId = artist.id;
+      _expandedArtistAlbums = null;
+      _loadingArtistAlbums = true;
+    });
+    try {
+      final albums = await _touhouDB.getArtistAlbums(artist.id);
+      if (mounted) {
+        setState(() {
+          _expandedArtistAlbums = albums;
+          _loadingArtistAlbums = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingArtistAlbums = false);
+    }
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon, int count) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+      child: Row(
+        children: [
+          Icon(icon, color: cyanAccent, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: cyanAccent.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$count',
+              style: TextStyle(color: cyanAccent, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildTabButton(String title, int index) {
@@ -98,7 +216,7 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
 
   Widget _buildSelectedTabContent() {
     if (_selectedTab == 0) {
-      // Source 0: Search
+      // ── Search Tab (Unified: Songs + Albums + Artists) ──
       return Container(
         key: const ValueKey('SearchTab'),
         child: Column(
@@ -109,16 +227,31 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
               controller: _searchController,
               style: const TextStyle(color: Colors.white),
               autofocus: true,
-              onChanged: _searchSongs,
+              onChanged: _searchAll,
               decoration: InputDecoration(
-                hintText: 'Search Touhou songs...',
+                hintText: 'Search songs, albums, artists...',
                 hintStyle: const TextStyle(color: Colors.white54),
                 prefixIcon: const Icon(Icons.search, color: Colors.white54),
                 filled: true,
                 fillColor: darkThemeSecondaryColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide(
+                    color: cyanAccent.withValues(alpha: 0.5),
+                    width: 1.5,
+                  ),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -126,71 +259,13 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            if (_isLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: CircularProgressIndicator(color: Colors.cyanAccent),
-                ),
-              )
-            else if (_searchResults.isNotEmpty)
-              Expanded(
-                child: ListView.builder(
-                  controller: widget.scrollController,
-                  shrinkWrap: true,
-                  itemCount: _searchResults.length,
-                  itemBuilder: (context, index) {
-                    final song = _searchResults[index];
-                    return ListTile(
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: song.thumbnailUrl,
-                          width: 50,
-                          height: 50,
-                          memCacheWidth: 100, // 50 * 2
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            width: 50,
-                            height: 50,
-                            color: Colors.white.withValues(alpha: 0.05),
-                          ),
-                          errorWidget: (context, url, error) =>
-                              const Icon(Icons.music_note, color: Colors.white),
-                        ),
-                      ),
-                      title: Text(
-                        song.title,
-                        style: const TextStyle(color: Colors.white),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        song.artist,
-                        style: const TextStyle(color: Colors.white70),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onTap: () => widget.onSongSelected(song),
-                    );
-                  },
-                ),
-              )
-            else if (_searchController.text.isNotEmpty)
-              const Padding(
-                padding: EdgeInsets.all(20.0),
-                child: Text(
-                  "No results found.",
-                  style: TextStyle(color: Colors.white54),
-                  textAlign: TextAlign.center,
-                ),
-              ),
+            const SizedBox(height: 8),
+            _buildSearchResults(),
           ],
         ),
       );
     } else if (_selectedTab == 1) {
-      // Source 1: Favorites
+      // ── Favorites Tab ──
       return Container(
         key: const ValueKey('FavoritesTab'),
         child: StreamBuilder<List<SongInfo>>(
@@ -216,49 +291,17 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
               itemCount: songs.length,
               itemBuilder: (context, index) {
                 final song = songs[index];
-                return ListTile(
-                  leading: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: CachedNetworkImage(
-                      imageUrl: song.thumbnailUrl,
-                      width: 50,
-                      height: 50,
-                      memCacheWidth: 100, // 50 * 2
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        width: 50,
-                        height: 50,
-                        color: Colors.white.withValues(alpha: 0.05),
-                      ),
-                      errorWidget: (context, url, error) =>
-                          const Icon(Icons.music_note, color: Colors.white),
-                    ),
-                  ),
-                  title: Text(
-                    song.title,
-                    style: const TextStyle(color: Colors.white),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    song.artist,
-                    style: const TextStyle(color: Colors.white70),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onTap: () => widget.onSongSelected(song),
-                );
+                return _buildSongTile(song);
               },
             );
           },
         ),
       );
     } else {
-      // Source 2: Playlists
+      // ── Playlists Tab ──
       return Container(
         key: ValueKey('PlaylistsTab_$_selectedPlaylistId'),
         child: _selectedPlaylistId == null
-            // 2A: List all Playlists
             ? StreamBuilder<List<Map<String, dynamic>>>(
                 stream: _firestoreService.getPlaylistsStream(),
                 builder: (context, snapshot) {
@@ -312,7 +355,7 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
                                 imageUrl: songSnap.data!.first.thumbnailUrl,
                                 width: 50,
                                 height: 50,
-                                memCacheWidth: 100, // 50 * 2
+                                memCacheWidth: 100,
                                 fit: BoxFit.cover,
                                 placeholder: (context, url) => placeholder,
                                 errorWidget: (_, __, ___) => placeholder,
@@ -339,7 +382,6 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
                   );
                 },
               )
-            // 2B: Songs inside the selected Playlist
             : Column(
                 mainAxisSize: MainAxisSize.max,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -401,41 +443,7 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
                           itemCount: songs.length,
                           itemBuilder: (context, index) {
                             final song = songs[index];
-                            return ListTile(
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: CachedNetworkImage(
-                                  imageUrl: song.thumbnailUrl,
-                                  width: 50,
-                                  height: 50,
-                                  memCacheWidth: 100, // 50 * 2
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => Container(
-                                    width: 50,
-                                    height: 50,
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                  ),
-                                  errorWidget: (context, error, stackTrace) =>
-                                      const Icon(
-                                        Icons.music_note,
-                                        color: Colors.white,
-                                      ),
-                                ),
-                              ),
-                              title: Text(
-                                song.title,
-                                style: const TextStyle(color: Colors.white),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                song.artist,
-                                style: const TextStyle(color: Colors.white70),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              onTap: () => widget.onSongSelected(song),
-                            );
+                            return _buildSongTile(song);
                           },
                         );
                       },
@@ -447,11 +455,353 @@ class _AddSongSearchSheetState extends State<AddSongSearchSheet> {
     }
   }
 
+  Widget _buildSongTile(SongInfo song) {
+    return ListTile(
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: CachedNetworkImage(
+          imageUrl: song.thumbnailUrl,
+          width: 50,
+          height: 50,
+          memCacheWidth: 100,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(
+            width: 50,
+            height: 50,
+            color: Colors.white.withValues(alpha: 0.05),
+          ),
+          errorWidget: (context, url, error) =>
+              const Icon(Icons.music_note, color: Colors.white),
+        ),
+      ),
+      title: Text(
+        song.title,
+        style: const TextStyle(color: Colors.white),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        song.artist,
+        style: const TextStyle(color: Colors.white70),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: () => widget.onSongSelected(song),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20.0),
+          child: CircularProgressIndicator(color: Colors.cyanAccent),
+        ),
+      );
+    }
+
+    final hasResults =
+        _songResults.isNotEmpty ||
+        _albumResults.isNotEmpty ||
+        _artistResults.isNotEmpty;
+
+    if (!hasResults && _searchController.text.isNotEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(20.0),
+        child: Text(
+          "No results found.",
+          style: TextStyle(color: Colors.white54),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    if (!hasResults) return const SizedBox.shrink();
+
+    return Expanded(
+      child: ListView(
+        controller: widget.scrollController,
+        children: [
+          // ── Songs ──
+          if (_songResults.isNotEmpty) ...[
+            _buildSectionHeader(
+              'Songs',
+              Icons.music_note_rounded,
+              _songResults.length,
+            ),
+            ..._songResults.map((song) => _buildSongTile(song)),
+          ],
+
+          // ── Albums ──
+          if (_albumResults.isNotEmpty) ...[
+            _buildSectionHeader(
+              'Albums',
+              Icons.album_rounded,
+              _albumResults.length,
+            ),
+            ..._albumResults.expand(
+              (album) => [
+                ListTile(
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      imageUrl: album.image,
+                      width: 50,
+                      height: 50,
+                      memCacheWidth: 100,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        width: 50,
+                        height: 50,
+                        color: Colors.white.withValues(alpha: 0.05),
+                      ),
+                      errorWidget: (context, url, error) =>
+                          const Icon(Icons.album, color: Colors.white),
+                    ),
+                  ),
+                  title: Text(
+                    album.name,
+                    style: const TextStyle(color: Colors.white),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    album.artist,
+                    style: const TextStyle(color: Colors.white70),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Icon(
+                    _expandedAlbumId == album.id
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                    color: Colors.white54,
+                  ),
+                  onTap: () => _toggleAlbumExpand(album),
+                ),
+                // Expanded album tracks
+                if (_expandedAlbumId == album.id) ...[
+                  if (_loadingAlbumTracks)
+                    const Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.cyanAccent,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (_expandedAlbumTracks != null &&
+                      _expandedAlbumTracks!.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        'No playable tracks',
+                        style: TextStyle(color: Colors.white38, fontSize: 13),
+                      ),
+                    )
+                  else if (_expandedAlbumTracks != null)
+                    ..._expandedAlbumTracks!.map(
+                      (track) => ListTile(
+                        contentPadding: const EdgeInsets.only(
+                          left: 40,
+                          right: 16,
+                        ),
+                        leading: const Icon(
+                          Icons.subdirectory_arrow_right_rounded,
+                          color: Colors.white24,
+                          size: 18,
+                        ),
+                        title: Text(
+                          track.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          track.artist,
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.cyanAccent,
+                          size: 20,
+                        ),
+                        onTap: () => widget.onSongSelected(track),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ],
+
+          // ── Artists ──
+          if (_artistResults.isNotEmpty) ...[
+            _buildSectionHeader(
+              'Artists',
+              Icons.person_rounded,
+              _artistResults.length,
+            ),
+            ..._artistResults.expand(
+              (artist) => [
+                ListTile(
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: CachedNetworkImage(
+                      imageUrl: artist.imageUrl,
+                      width: 50,
+                      height: 50,
+                      memCacheWidth: 100,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.person, color: Colors.white54),
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    artist.name,
+                    style: const TextStyle(color: Colors.white),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: const Text(
+                    'Artist / Circle',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  trailing: Icon(
+                    _expandedArtistId == artist.id
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                    color: Colors.white54,
+                  ),
+                  onTap: () => _toggleArtistExpand(artist),
+                ),
+                // Expanded artist albums
+                if (_expandedArtistId == artist.id) ...[
+                  if (_loadingArtistAlbums)
+                    const Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.cyanAccent,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (_expandedArtistAlbums != null &&
+                      _expandedArtistAlbums!.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        'No albums found',
+                        style: TextStyle(color: Colors.white38, fontSize: 13),
+                      ),
+                    )
+                  else if (_expandedArtistAlbums != null)
+                    ..._expandedArtistAlbums!.map(
+                      (album) => ListTile(
+                        contentPadding: const EdgeInsets.only(
+                          left: 40,
+                          right: 16,
+                        ),
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: CachedNetworkImage(
+                            imageUrl: album.image,
+                            width: 40,
+                            height: 40,
+                            memCacheWidth: 80,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              width: 40,
+                              height: 40,
+                              color: Colors.white.withValues(alpha: 0.05),
+                            ),
+                            errorWidget: (context, url, error) => const Icon(
+                              Icons.album,
+                              color: Colors.white38,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          album.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          album.artist,
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: const Icon(
+                          Icons.expand_more,
+                          color: Colors.white38,
+                          size: 18,
+                        ),
+                        onTap: () => _toggleAlbumExpand(album),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ],
+
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: darkThemeSecondaryColor,
+        color: darkModeBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(

@@ -27,10 +27,21 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
     _tracksFuture = _touhouDBService.getAlbumTracks(widget.album.id);
   }
 
-  void _playTrack(SongInfo track) async {
-    final result = await _audioService.playFromYoutubeId(
-      track.youtubeVideoId,
-      track,
+  void _playTrack(SongInfo track, List<SongInfo> allTracks) async {
+    // Filter to only playable tracks (ones with a YouTube video ID)
+    final playable = allTracks
+        .where((t) => t.youtubeVideoId.isNotEmpty)
+        .toList();
+
+    final startIndex = playable.indexWhere(
+      (t) => t.youtubeVideoId == track.youtubeVideoId,
+    );
+    if (startIndex == -1) return;
+
+    final result = await _audioService.playQueue(
+      playable,
+      startIndex: startIndex,
+      queueTitle: widget.album.name,
     );
     if (result == PlayResult.blockedAsListener && mounted) {
       showListenerBlockedDialog(context);
@@ -206,10 +217,12 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
                                   Icons.play_arrow_rounded,
                                   color: Colors.white,
                                 ),
-                                onPressed: () => _playTrack(track),
+                                onPressed: () => _playTrack(track, tracks),
                               )
                             : const SizedBox.shrink(),
-                        onTap: hasYoutube ? () => _playTrack(track) : null,
+                        onTap: hasYoutube
+                            ? () => _playTrack(track, tracks)
+                            : null,
                       );
                     }, childCount: tracks.length),
                   );

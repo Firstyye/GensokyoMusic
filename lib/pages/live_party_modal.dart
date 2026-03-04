@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../constant/my_constant.dart';
 import '../models/song_info.dart';
 import '../data/touhoudb_service.dart';
+import '../data/albumsList.dart';
+import '../data/popular_circle.dart';
 import '../services/realtime_database_service.dart';
 import '../services/audio_player_service.dart';
 import '../services/firestore_service.dart';
@@ -31,25 +33,138 @@ class _LivePartyModalState extends State<LivePartyModal> {
   String? _selectedPlaylistId;
   String? _selectedPlaylistName;
 
-  List<SongInfo> _searchResults = [];
+  List<SongInfo> _songResults = [];
+  List<Albumslist> _albumResults = [];
+  List<PopularCircle> _artistResults = [];
 
-  Future<void> _searchSongs(String query) async {
-    if (query.isEmpty) {
-      setState(() => _searchResults = []);
+  // Inline album expansion
+  int? _expandedAlbumId;
+  List<SongInfo>? _expandedAlbumTracks;
+  bool _loadingAlbumTracks = false;
+
+  // Inline artist expansion
+  int? _expandedArtistId;
+  List<Albumslist>? _expandedArtistAlbums;
+  bool _loadingArtistAlbums = false;
+
+  Future<void> _searchAll(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _songResults = [];
+        _albumResults = [];
+        _artistResults = [];
+        _expandedAlbumId = null;
+        _expandedArtistId = null;
+      });
       return;
     }
     setState(() => _isLoading = true);
     try {
-      final results = await _touhouDB.searchSongs(query);
+      final trimmed = query.trim();
+      final results = await Future.wait([
+        _touhouDB.searchSongs(trimmed),
+        _touhouDB.searchAlbums(trimmed),
+        _touhouDB.searchArtists(trimmed),
+      ]);
       if (mounted) {
         setState(() {
-          _searchResults = results;
+          _songResults = results[0] as List<SongInfo>;
+          _albumResults = results[1] as List<Albumslist>;
+          _artistResults = results[2] as List<PopularCircle>;
           _isLoading = false;
+          _expandedAlbumId = null;
+          _expandedArtistId = null;
         });
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _toggleAlbumExpand(Albumslist album) async {
+    if (_expandedAlbumId == album.id) {
+      setState(() {
+        _expandedAlbumId = null;
+        _expandedAlbumTracks = null;
+      });
+      return;
+    }
+    setState(() {
+      _expandedAlbumId = album.id;
+      _expandedAlbumTracks = null;
+      _loadingAlbumTracks = true;
+    });
+    try {
+      final tracks = await _touhouDB.getAlbumTracks(album.id);
+      if (mounted) {
+        setState(() {
+          _expandedAlbumTracks = tracks
+              .where((t) => t.youtubeVideoId.isNotEmpty)
+              .toList();
+          _loadingAlbumTracks = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingAlbumTracks = false);
+    }
+  }
+
+  void _toggleArtistExpand(PopularCircle artist) async {
+    if (_expandedArtistId == artist.id) {
+      setState(() {
+        _expandedArtistId = null;
+        _expandedArtistAlbums = null;
+      });
+      return;
+    }
+    setState(() {
+      _expandedArtistId = artist.id;
+      _expandedArtistAlbums = null;
+      _loadingArtistAlbums = true;
+    });
+    try {
+      final albums = await _touhouDB.getArtistAlbums(artist.id);
+      if (mounted) {
+        setState(() {
+          _expandedArtistAlbums = albums;
+          _loadingArtistAlbums = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingArtistAlbums = false);
+    }
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon, int count) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+      child: Row(
+        children: [
+          Icon(icon, color: cyanAccent, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: cyanAccent.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$count',
+              style: TextStyle(color: cyanAccent, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _createPartyWithSong(SongInfo song) async {
@@ -508,7 +623,7 @@ class _LivePartyModalState extends State<LivePartyModal> {
 
   Widget _buildSelectedTabContent() {
     if (_selectedTab == 0) {
-      // Source 0: Search
+      // Source 0: Unified Search (Songs + Albums + Artists)
       return Container(
         key: const ValueKey('SearchTab'),
         child: Column(
@@ -519,9 +634,9 @@ class _LivePartyModalState extends State<LivePartyModal> {
               controller: _searchController,
               style: const TextStyle(color: Colors.white),
               autofocus: true,
-              onChanged: _searchSongs,
+              onChanged: _searchAll,
               decoration: InputDecoration(
-                hintText: 'Search Touhou songs...',
+                hintText: 'Search songs, albums, artists...',
                 hintStyle: const TextStyle(color: Colors.white54),
                 prefixIcon: const Icon(Icons.search, color: Colors.white54),
                 filled: true,
@@ -536,7 +651,7 @@ class _LivePartyModalState extends State<LivePartyModal> {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             if (_isLoading)
               const Center(
                 child: Padding(
@@ -544,56 +659,338 @@ class _LivePartyModalState extends State<LivePartyModal> {
                   child: CircularProgressIndicator(color: Colors.cyanAccent),
                 ),
               )
-            else if (_searchResults.isNotEmpty)
+            else if (_songResults.isNotEmpty ||
+                _albumResults.isNotEmpty ||
+                _artistResults.isNotEmpty)
               ConstrainedBox(
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.of(context).size.height * 0.4,
                 ),
-                child: ListView.builder(
+                child: ListView(
                   shrinkWrap: true,
-                  itemCount: _searchResults.length,
-                  itemBuilder: (context, index) {
-                    final song = _searchResults[index];
-                    return ListTile(
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: song.thumbnailUrl,
-                          width: 50,
-                          height: 50,
-                          memCacheWidth: 100, // 50 * 2
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            width: 50,
-                            height: 50,
-                            color: Colors.white.withValues(alpha: 0.05),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            width: 50,
-                            height: 50,
-                            color: darkThemeSecondaryColor,
-                            child: const Icon(
-                              Icons.music_note,
-                              color: Colors.white54,
+                  children: [
+                    // ── Songs ──
+                    if (_songResults.isNotEmpty) ...[
+                      _buildSectionHeader(
+                        'Songs',
+                        Icons.music_note_rounded,
+                        _songResults.length,
+                      ),
+                      ..._songResults.map(
+                        (song) => ListTile(
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: CachedNetworkImage(
+                              imageUrl: song.thumbnailUrl,
+                              width: 50,
+                              height: 50,
+                              memCacheWidth: 100,
+                              fit: BoxFit.cover,
+                              placeholder: (c, u) => Container(
+                                width: 50,
+                                height: 50,
+                                color: Colors.white.withValues(alpha: 0.05),
+                              ),
+                              errorWidget: (c, u, e) => Container(
+                                width: 50,
+                                height: 50,
+                                color: darkThemeSecondaryColor,
+                                child: const Icon(
+                                  Icons.music_note,
+                                  color: Colors.white54,
+                                ),
+                              ),
                             ),
                           ),
+                          title: Text(
+                            song.title,
+                            style: const TextStyle(color: Colors.white),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            song.artist,
+                            style: const TextStyle(color: Colors.white70),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onTap: () => _createPartyWithSong(song),
                         ),
                       ),
-                      title: Text(
-                        song.title,
-                        style: const TextStyle(color: Colors.white),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    ],
+                    // ── Albums ──
+                    if (_albumResults.isNotEmpty) ...[
+                      _buildSectionHeader(
+                        'Albums',
+                        Icons.album_rounded,
+                        _albumResults.length,
                       ),
-                      subtitle: Text(
-                        song.artist,
-                        style: const TextStyle(color: Colors.white70),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      ..._albumResults.expand(
+                        (album) => [
+                          ListTile(
+                            leading: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: CachedNetworkImage(
+                                imageUrl: album.image,
+                                width: 50,
+                                height: 50,
+                                memCacheWidth: 100,
+                                fit: BoxFit.cover,
+                                placeholder: (c, u) => Container(
+                                  width: 50,
+                                  height: 50,
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                ),
+                                errorWidget: (c, u, e) => const Icon(
+                                  Icons.album,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              album.name,
+                              style: const TextStyle(color: Colors.white),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              album.artist,
+                              style: const TextStyle(color: Colors.white70),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: Icon(
+                              _expandedAlbumId == album.id
+                                  ? Icons.expand_less
+                                  : Icons.expand_more,
+                              color: Colors.white54,
+                            ),
+                            onTap: () => _toggleAlbumExpand(album),
+                          ),
+                          if (_expandedAlbumId == album.id) ...[
+                            if (_loadingAlbumTracks)
+                              const Padding(
+                                padding: EdgeInsets.all(12.0),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.cyanAccent,
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else if (_expandedAlbumTracks != null &&
+                                _expandedAlbumTracks!.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 8,
+                                ),
+                                child: Text(
+                                  'No playable tracks',
+                                  style: TextStyle(
+                                    color: Colors.white38,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              )
+                            else if (_expandedAlbumTracks != null)
+                              ..._expandedAlbumTracks!.map(
+                                (track) => ListTile(
+                                  contentPadding: const EdgeInsets.only(
+                                    left: 40,
+                                    right: 16,
+                                  ),
+                                  leading: const Icon(
+                                    Icons.subdirectory_arrow_right_rounded,
+                                    color: Colors.white24,
+                                    size: 18,
+                                  ),
+                                  title: Text(
+                                    track.title,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    track.artist,
+                                    style: const TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  trailing: const Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: Colors.cyanAccent,
+                                    size: 20,
+                                  ),
+                                  onTap: () => _createPartyWithSong(track),
+                                ),
+                              ),
+                          ],
+                        ],
                       ),
-                      onTap: () => _createPartyWithSong(song),
-                    );
-                  },
+                    ],
+                    // ── Artists ──
+                    if (_artistResults.isNotEmpty) ...[
+                      _buildSectionHeader(
+                        'Artists',
+                        Icons.person_rounded,
+                        _artistResults.length,
+                      ),
+                      ..._artistResults.expand(
+                        (artist) => [
+                          ListTile(
+                            leading: ClipRRect(
+                              borderRadius: BorderRadius.circular(25),
+                              child: CachedNetworkImage(
+                                imageUrl: artist.imageUrl,
+                                width: 50,
+                                height: 50,
+                                memCacheWidth: 100,
+                                fit: BoxFit.cover,
+                                placeholder: (c, u) => Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                errorWidget: (c, u, e) => Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.person,
+                                    color: Colors.white54,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              artist.name,
+                              style: const TextStyle(color: Colors.white),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: const Text(
+                              'Artist / Circle',
+                              style: TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                            trailing: Icon(
+                              _expandedArtistId == artist.id
+                                  ? Icons.expand_less
+                                  : Icons.expand_more,
+                              color: Colors.white54,
+                            ),
+                            onTap: () => _toggleArtistExpand(artist),
+                          ),
+                          if (_expandedArtistId == artist.id) ...[
+                            if (_loadingArtistAlbums)
+                              const Padding(
+                                padding: EdgeInsets.all(12.0),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.cyanAccent,
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else if (_expandedArtistAlbums != null &&
+                                _expandedArtistAlbums!.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 8,
+                                ),
+                                child: Text(
+                                  'No albums found',
+                                  style: TextStyle(
+                                    color: Colors.white38,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              )
+                            else if (_expandedArtistAlbums != null)
+                              ..._expandedArtistAlbums!.map(
+                                (album) => ListTile(
+                                  contentPadding: const EdgeInsets.only(
+                                    left: 40,
+                                    right: 16,
+                                  ),
+                                  leading: ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: CachedNetworkImage(
+                                      imageUrl: album.image,
+                                      width: 40,
+                                      height: 40,
+                                      memCacheWidth: 80,
+                                      fit: BoxFit.cover,
+                                      placeholder: (c, u) => Container(
+                                        width: 40,
+                                        height: 40,
+                                        color: Colors.white.withValues(
+                                          alpha: 0.05,
+                                        ),
+                                      ),
+                                      errorWidget: (c, u, e) => const Icon(
+                                        Icons.album,
+                                        color: Colors.white38,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    album.name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    album.artist,
+                                    style: const TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  trailing: const Icon(
+                                    Icons.expand_more,
+                                    color: Colors.white38,
+                                    size: 18,
+                                  ),
+                                  onTap: () => _toggleAlbumExpand(album),
+                                ),
+                              ),
+                          ],
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                  ],
                 ),
               )
             else if (_searchController.text.isNotEmpty)
