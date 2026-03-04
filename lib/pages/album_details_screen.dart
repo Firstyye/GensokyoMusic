@@ -5,6 +5,7 @@ import '../models/song_info.dart';
 import '../data/touhoudb_service.dart';
 import '../data/albumsList.dart';
 import '../services/audio_player_service.dart';
+import '../services/firestore_service.dart';
 import '../widgets/_buildMiniPlayer.dart';
 
 class AlbumDetailsScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class AlbumDetailsScreen extends StatefulWidget {
 class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
   final TouhouDBService _touhouDBService = TouhouDBService();
   final AudioPlayerService _audioService = AudioPlayerService();
+  final FirestoreService _firestoreService = FirestoreService();
   late Future<List<SongInfo>> _tracksFuture;
 
   @override
@@ -48,6 +50,147 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
     }
   }
 
+  void _showAddAllToPlaylistSheet(BuildContext context) async {
+    // Wait for tracks to load
+    List<SongInfo> tracks;
+    try {
+      tracks = await _tracksFuture;
+    } catch (e) {
+      return;
+    }
+    final playable = tracks.where((t) => t.youtubeVideoId.isNotEmpty).toList();
+    if (playable.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'No playable tracks in this album',
+              style: bodyTextStyle,
+            ),
+            backgroundColor: Colors.orange.shade700,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.6,
+          decoration: BoxDecoration(
+            color: darkModeBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2.5),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Add ${playable.length} tracks to...',
+                style: headerTextStyle.copyWith(
+                  color: Colors.white,
+                  fontSize: 20,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                widget.album.name,
+                style: bodyTextStyle.copyWith(
+                  color: Colors.white54,
+                  fontSize: 13,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _firestoreService.getPlaylistsStream(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(
+                        child: CircularProgressIndicator(color: cyanAccent),
+                      );
+                    }
+                    final playlists = snapshot.data;
+                    if (playlists == null || playlists.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No playlists found.',
+                          style: bodyTextStyle.copyWith(color: Colors.white54),
+                        ),
+                      );
+                    }
+                    return ListView.builder(
+                      itemCount: playlists.length,
+                      itemBuilder: (context, index) {
+                        final playlist = playlists[index];
+                        final id = playlist['id'] as String;
+                        final name = playlist['name'] as String;
+                        return ListTile(
+                          leading: Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.white10,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.queue_music, color: cyanAccent),
+                          ),
+                          title: Text(
+                            name,
+                            style: bodyTextStyle.copyWith(color: Colors.white),
+                          ),
+                          onTap: () async {
+                            Navigator.pop(context);
+                            int added = 0;
+                            for (final song in playable) {
+                              await _firestoreService.addSongToPlaylist(
+                                id,
+                                song,
+                              );
+                              added++;
+                            }
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Added $added tracks to $name',
+                                    style: bodyTextStyle,
+                                  ),
+                                  backgroundColor: Colors.green.shade700,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -74,6 +217,23 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
                     ),
                   ),
                 ),
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black.withValues(alpha: 0.3),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.playlist_add_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                        tooltip: 'Add all to playlist',
+                        onPressed: () => _showAddAllToPlaylistSheet(context),
+                      ),
+                    ),
+                  ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
                   title: Column(

@@ -341,6 +341,27 @@ class FirestoreService {
         });
   }
 
+  Future<void> removeSongFromPlaylist(String playlistId, SongInfo song) async {
+    await _playlistsRef
+        .doc(playlistId)
+        .collection('songs')
+        .doc(song.youtubeVideoId)
+        .delete();
+  }
+
+  Future<void> deletePlaylist(String playlistId) async {
+    // Delete all songs in the subcollection first
+    final songsSnapshot = await _playlistsRef
+        .doc(playlistId)
+        .collection('songs')
+        .get();
+    for (final doc in songsSnapshot.docs) {
+      await doc.reference.delete();
+    }
+    // Delete the playlist document
+    await _playlistsRef.doc(playlistId).delete();
+  }
+
   /// Returns a stream of songs for a specific playlist.
   Stream<List<SongInfo>> getPlaylistSongsStream(String playlistId) {
     return _playlistsRef

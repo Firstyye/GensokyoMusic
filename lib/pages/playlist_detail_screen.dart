@@ -139,6 +139,80 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                   showListenerBlockedDialog(context);
                                 }
                               },
+                              onMoreTap: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (ctx) {
+                                    return Container(
+                                      decoration: BoxDecoration(
+                                        color: darkModeBackgroundColor,
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                              top: Radius.circular(24),
+                                            ),
+                                      ),
+                                      child: SafeArea(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const SizedBox(height: 12),
+                                            Container(
+                                              width: 40,
+                                              height: 4,
+                                              decoration: BoxDecoration(
+                                                color: Colors.white24,
+                                                borderRadius:
+                                                    BorderRadius.circular(2),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 16),
+                                            ListTile(
+                                              leading: const Icon(
+                                                Icons.delete_outline_rounded,
+                                                color: Colors.redAccent,
+                                              ),
+                                              title: Text(
+                                                'Remove from Playlist',
+                                                style: bodyTextStyle.copyWith(
+                                                  color: Colors.redAccent,
+                                                ),
+                                              ),
+                                              onTap: () async {
+                                                Navigator.pop(ctx);
+                                                await _firestoreService
+                                                    .removeSongFromPlaylist(
+                                                      widget.playlistId,
+                                                      song,
+                                                    );
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        'Removed "${song.title}"',
+                                                        style: bodyTextStyle,
+                                                      ),
+                                                      backgroundColor: Colors
+                                                          .orange
+                                                          .shade700,
+                                                      duration: const Duration(
+                                                        seconds: 2,
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              },
+                                            ),
+                                            const SizedBox(height: 16),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
                             );
                           },
                         ),

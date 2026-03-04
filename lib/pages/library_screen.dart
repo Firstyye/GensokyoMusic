@@ -201,7 +201,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           imageUrl: firstSongUrl,
                           width: 50,
                           height: 50,
-                          memCacheWidth: 100, // 50 * 2
+                          memCacheWidth: 100,
                           fit: BoxFit.cover,
                           placeholder: (context, url) => placeholder,
                           errorWidget: (context, url, error) => placeholder,
@@ -225,6 +225,125 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     pushRoute(
                       context,
                       PlaylistDetailScreen(playlistId: id, playlistName: name),
+                    );
+                  },
+                  onLongPress: () {
+                    showModalBottomSheet(
+                      context: context,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: darkModeBackgroundColor,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(24),
+                            ),
+                          ),
+                          child: SafeArea(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const SizedBox(height: 12),
+                                Container(
+                                  width: 40,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white24,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  name,
+                                  style: bodyTextStyle.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                ListTile(
+                                  leading: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: Colors.redAccent,
+                                  ),
+                                  title: Text(
+                                    'Delete Playlist',
+                                    style: bodyTextStyle.copyWith(
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                  onTap: () {
+                                    Navigator.pop(ctx);
+                                    showDialog(
+                                      context: context,
+                                      builder: (dialogCtx) => AlertDialog(
+                                        backgroundColor:
+                                            darkThemeSecondaryColor,
+                                        title: Text(
+                                          'Delete "$name"?',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        content: const Text(
+                                          'This will permanently delete this playlist and all its songs.',
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(dialogCtx),
+                                            child: const Text(
+                                              'Cancel',
+                                              style: TextStyle(
+                                                color: Colors.white54,
+                                              ),
+                                            ),
+                                          ),
+                                          TextButton(
+                                            onPressed: () async {
+                                              Navigator.pop(dialogCtx);
+                                              await _firestoreService
+                                                  .deletePlaylist(id);
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Deleted "$name"',
+                                                      style: bodyTextStyle,
+                                                    ),
+                                                    backgroundColor:
+                                                        Colors.orange.shade700,
+                                                    duration: const Duration(
+                                                      seconds: 2,
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                            child: const Text(
+                                              'Delete',
+                                              style: TextStyle(
+                                                color: Colors.redAccent,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 );
