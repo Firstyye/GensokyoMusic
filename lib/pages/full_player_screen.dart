@@ -463,7 +463,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                 final queue = _audioService.queue;
                 final currentIndex = _audioService.currentIndex;
 
-                String upNextText = "Up Next: End of queue";
+                String upNextText = _audioService.autoplay
+                    ? "Up Next: Autoplay"
+                    : "Up Next: End of queue";
                 if (queue.isNotEmpty && currentIndex >= 0) {
                   if (currentIndex + 1 < queue.length) {
                     final nextSong = queue[currentIndex + 1];
@@ -592,69 +594,169 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
                     final currentIndex = _audioService.currentIndex;
 
-                    return ListView.builder(
-                      itemCount: queue.length,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemBuilder: (context, index) {
-                        final song = queue[index];
-                        final isPlaying = index == currentIndex;
+                    return StatefulBuilder(
+                      builder: (context, setModalState) {
+                        final autoplayIdx = _audioService.autoplayStartIndex;
+                        // Number of original queue songs
+                        final originalCount = autoplayIdx >= 0
+                            ? autoplayIdx
+                            : queue.length;
+                        // Number of autoplay songs
+                        final autoplayCount = autoplayIdx >= 0
+                            ? queue.length - autoplayIdx
+                            : 0;
+                        // Total: originalSongs + autoplayCard + autoplaySongs
+                        final totalItems = originalCount + 1 + autoplayCount;
 
-                        return ListTile(
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: CachedNetworkImage(
-                              imageUrl: song.thumbnailUrl,
-                              width: 50,
-                              height: 50,
-                              memCacheWidth: 100, // 50 * 2
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                width: 50,
-                                height: 50,
-                                color: Colors.white.withValues(alpha: 0.05),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                width: 50,
-                                height: 50,
-                                color: Colors.white10,
-                                child: const Icon(
-                                  Icons.music_note,
-                                  color: Colors.white54,
+                        return ListView.builder(
+                          itemCount: totalItems,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemBuilder: (context, index) {
+                            // ── Autoplay Toggle Card ──
+                            if (index == originalCount) {
+                              return Container(
+                                margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _audioService.autoplay
+                                        ? cyanAccent.withValues(alpha: 0.3)
+                                        : Colors.white.withValues(alpha: 0.1),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.playlist_play_rounded,
+                                      color: _audioService.autoplay
+                                          ? cyanAccent
+                                          : Colors.white54,
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Autoplay',
+                                            style: bodyTextStyle.copyWith(
+                                              color: _audioService.autoplay
+                                                  ? Colors.white
+                                                  : Colors.white54,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Add similar songs when queue ends',
+                                            style: bodyTextStyle.copyWith(
+                                              color: Colors.white38,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      height: 28,
+                                      child: Switch(
+                                        value: _audioService.autoplay,
+                                        activeColor: cyanAccent,
+                                        onChanged:
+                                            (_audioService.currentPartyId !=
+                                                    null &&
+                                                !_audioService.isHost)
+                                            ? null
+                                            : (val) {
+                                                setModalState(() {
+                                                  _audioService
+                                                      .toggleAutoplay();
+                                                });
+                                                setState(() {});
+                                              },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            // ── Map visual index to queue index ──
+                            final queueIndex = index < originalCount
+                                ? index // original songs
+                                : index - 1; // autoplay songs (skip card)
+                            final song = queue[queueIndex];
+                            final isPlaying = queueIndex == currentIndex;
+
+                            return ListTile(
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: CachedNetworkImage(
+                                  imageUrl: song.thumbnailUrl,
+                                  width: 50,
+                                  height: 50,
+                                  memCacheWidth: 100,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => Container(
+                                    width: 50,
+                                    height: 50,
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      Container(
+                                        width: 50,
+                                        height: 50,
+                                        color: Colors.white10,
+                                        child: const Icon(
+                                          Icons.music_note,
+                                          color: Colors.white54,
+                                        ),
+                                      ),
                                 ),
                               ),
-                            ),
-                          ),
-                          title: Text(
-                            song.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: bodyTextStyle.copyWith(
-                              color: isPlaying ? cyanAccent : Colors.white,
-                              fontWeight: isPlaying
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                          subtitle: Text(
-                            song.artist,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: bodyTextStyle.copyWith(
-                              color: isPlaying
-                                  ? cyanAccent.withValues(alpha: 0.7)
-                                  : Colors.white54,
-                            ),
-                          ),
-                          trailing: isPlaying
-                              ? Icon(Icons.volume_up_rounded, color: cyanAccent)
-                              : null,
-                          onTap:
-                              (_audioService.currentPartyId != null &&
-                                  !_audioService.isHost)
-                              ? null
-                              : () {
-                                  _audioService.skipToQueueItem(index);
-                                },
+                              title: Text(
+                                song.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: bodyTextStyle.copyWith(
+                                  color: isPlaying ? cyanAccent : Colors.white,
+                                  fontWeight: isPlaying
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              subtitle: Text(
+                                song.artist,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: bodyTextStyle.copyWith(
+                                  color: isPlaying
+                                      ? cyanAccent.withValues(alpha: 0.7)
+                                      : Colors.white54,
+                                ),
+                              ),
+                              trailing: isPlaying
+                                  ? Icon(
+                                      Icons.volume_up_rounded,
+                                      color: cyanAccent,
+                                    )
+                                  : null,
+                              onTap:
+                                  (_audioService.currentPartyId != null &&
+                                      !_audioService.isHost)
+                                  ? null
+                                  : () {
+                                      _audioService.skipToQueueItem(queueIndex);
+                                    },
+                            );
+                          },
                         );
                       },
                     );

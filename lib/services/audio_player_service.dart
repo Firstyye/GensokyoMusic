@@ -7,6 +7,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import '../models/song_info.dart';
 import '../services/realtime_database_service.dart';
 import '../services/firestore_service.dart';
+import '../data/touhoudb_service.dart';
 
 enum LoopMode { off, all, one }
 
@@ -43,6 +44,7 @@ class AudioPlayerService {
   final _positionController = StreamController<Duration>.broadcast();
   final _durationController = StreamController<Duration?>.broadcast();
   final _loopModeController = StreamController<LoopMode>.broadcast();
+  final _autoplayController = StreamController<bool>.broadcast();
 
   // ── Queue Management ──
   final List<SongInfo> _queue = [];
@@ -50,6 +52,8 @@ class AudioPlayerService {
   String _queueTitle = 'Queue';
   bool _isShuffle = false;
   LoopMode _loopMode = LoopMode.off;
+  bool _autoplay = true; // ON by default
+  int _autoplayStartIndex = -1; // -1 = no autoplay songs yet
 
   // ── Public getters (same API as before) ──
   Stream<SongInfo?> get currentSongStream => _currentSongController.stream;
@@ -57,6 +61,7 @@ class AudioPlayerService {
   Stream<Duration> get positionStream => _positionController.stream;
   Stream<Duration?> get durationStream => _durationController.stream;
   Stream<LoopMode> get loopModeStream => _loopModeController.stream;
+  Stream<bool> get autoplayStream => _autoplayController.stream;
 
   SongInfo? get currentSong => _currentSong;
   bool get isPlaying => _isPlaying;
@@ -69,6 +74,8 @@ class AudioPlayerService {
   List<SongInfo> get queue => _queue;
   int get currentIndex => _currentIndex;
   String get queueTitle => _queueTitle;
+  bool get autoplay => _autoplay;
+  int get autoplayStartIndex => _autoplayStartIndex;
 
   // ── Party Sync & Firestore ──
   String? _currentPartyId;
@@ -227,6 +234,7 @@ class AudioPlayerService {
     _queue.clear();
     _queue.addAll(songs);
     _prefetchCache.clear();
+    _autoplayStartIndex = -1; // Reset autoplay tracking
     if (_isShuffle) {
       _queue.shuffle();
       _currentIndex = 0;
@@ -247,7 +255,9 @@ class AudioPlayerService {
     // Increment token — any in-flight download with an old token is stale
     final token = ++_loadToken;
 
-    // Reset progress bar + show buffering (don't stop player — keeps audio session alive)
+    // Pause old song immediately (keeps audio session alive, but silences it)
+    await _player.pause();
+    // Reset progress bar + show buffering
     _isLoadingSong = true;
     _positionController.add(Duration.zero);
     _durationController.add(Duration.zero);
@@ -319,6 +329,43 @@ class AudioPlayerService {
     if (nextIndex >= _queue.length) {
       if (_loopMode == LoopMode.all) {
         nextIndex = 0;
+      } else if (_autoplay) {
+        // Near end of queue with autoplay ON → pre-fetch autoplay songs now
+        _appendAutoplaySongs().then((_) {
+          // After appending, try to prefetch the next song audio
+          if (_currentIndex + 1 < _queue.length) {
+            final nextSong = _queue[_currentIndex + 1];
+            if (_prefetchCache.containsKey(nextSong.youtubeVideoId)) return;
+            _isPrefetching = true;
+            final prefetchToken = _loadToken;
+            debugPrint('AudioPlayerService: Pre-buffering ${nextSong.title}');
+            _buildAudioSource(
+                  nextSong.youtubeVideoId,
+                  tag: MediaItem(
+                    id: nextSong.youtubeVideoId,
+                    title: nextSong.title,
+                    artist: nextSong.artist,
+                    artUri: Uri.parse(nextSong.thumbnailUrl),
+                  ),
+                )
+                .then((source) {
+                  _isPrefetching = false;
+                  if (prefetchToken != _loadToken) return;
+                  if (source != null) {
+                    _prefetchCache.clear();
+                    _prefetchCache[nextSong.youtubeVideoId] = source;
+                    debugPrint(
+                      'AudioPlayerService: Pre-buffered ${nextSong.title} \u2713',
+                    );
+                  }
+                })
+                .catchError((e) {
+                  _isPrefetching = false;
+                  debugPrint('AudioPlayerService: Prefetch failed: $e');
+                });
+          }
+        });
+        return; // Don't prefetch audio yet — wait for autoplay songs to arrive
       } else {
         return; // No next song to prefetch
       }
@@ -427,6 +474,15 @@ class AudioPlayerService {
     if (_currentIndex + 1 >= _queue.length) {
       if (_loopMode == LoopMode.all) {
         _currentIndex = 0;
+      } else if (_autoplay) {
+        // Autoplay: fetch and append random songs
+        await _appendAutoplaySongs();
+        if (_currentIndex + 1 < _queue.length) {
+          _currentIndex++;
+        } else {
+          pause();
+          return;
+        }
       } else {
         pause();
         return;
@@ -484,6 +540,44 @@ class AudioPlayerService {
       _loopMode = LoopMode.off;
     }
     _loopModeController.add(_loopMode);
+  }
+
+  void toggleAutoplay() {
+    _autoplay = !_autoplay;
+    _autoplayController.add(_autoplay);
+  }
+
+  /// Fetches random songs and appends them to the queue for autoplay.
+  Future<void> _appendAutoplaySongs() async {
+    try {
+      debugPrint('AudioPlayerService: Autoplay — fetching songs...');
+      final songs = await TouhouDBService().getRecommendedSongs();
+      // Filter out duplicates already in queue
+      final existingIds = _queue.map((s) => s.youtubeVideoId).toSet();
+      final newSongs = songs
+          .where((s) => !existingIds.contains(s.youtubeVideoId))
+          .toList();
+      if (newSongs.isEmpty) {
+        debugPrint('AudioPlayerService: Autoplay — no new songs found');
+        return;
+      }
+      // Track where autoplay songs start (only set once)
+      if (_autoplayStartIndex < 0) {
+        _autoplayStartIndex = _queue.length;
+      }
+      _queue.addAll(newSongs);
+      debugPrint(
+        'AudioPlayerService: Autoplay — added ${newSongs.length} songs to queue',
+      );
+      // If host in party, push to RTDB
+      if (_currentPartyId != null && _isHost) {
+        for (final song in newSongs) {
+          _rtdbService.addSongToQueue(_currentPartyId!, song);
+        }
+      }
+    } catch (e) {
+      debugPrint('AudioPlayerService: Autoplay fetch failed: $e');
+    }
   }
 
   Future<void> stop() async {

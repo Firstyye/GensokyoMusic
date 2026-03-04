@@ -925,7 +925,54 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
   Widget _buildQueueTab() {
     return Stack(
       children: [
-        _buildQueueList(),
+        Column(
+          children: [
+            // Autoplay toggle (host only, synced via stream)
+            if (_isCurrentlyHost)
+              StreamBuilder<bool>(
+                stream: _audioService.autoplayStream,
+                initialData: _audioService.autoplay,
+                builder: (context, snap) {
+                  final isOn = snap.data ?? true;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.playlist_play_rounded,
+                          color: isOn ? cyanAccent : Colors.white54,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Autoplay',
+                          style: bodyTextStyle.copyWith(
+                            color: isOn ? Colors.white : Colors.white54,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const Spacer(),
+                        SizedBox(
+                          height: 28,
+                          child: Switch(
+                            value: isOn,
+                            activeColor: cyanAccent,
+                            onChanged: (val) {
+                              _audioService.toggleAutoplay();
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            Expanded(child: _buildQueueList()),
+          ],
+        ),
         if (_isCurrentlyHost)
           Positioned(
             bottom: 16,
