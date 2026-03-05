@@ -255,14 +255,6 @@ class AudioPlayerService {
     // Increment token — any in-flight download with an old token is stale
     final token = ++_loadToken;
 
-    // Pause old song immediately (keeps audio session alive, but silences it)
-    await _player.pause();
-    // Reset progress bar + show buffering
-    _isLoadingSong = true;
-    _positionController.add(Duration.zero);
-    _durationController.add(Duration.zero);
-    _playerStateController.add(PlayerState.buffering);
-
     try {
       final mediaTag = MediaItem(
         id: songInfo.youtubeVideoId,
@@ -271,44 +263,58 @@ class AudioPlayerService {
         artUri: Uri.parse(songInfo.thumbnailUrl),
       );
 
-      // Check prefetch cache first
+      // Check prefetch cache BEFORE pausing
       ja.AudioSource? source = _prefetchCache.remove(songInfo.youtubeVideoId);
+
       if (source != null) {
+        // ── Cache HIT: seamless swap (NO pause → Android never sees audio stop) ──
         debugPrint('AudioPlayerService: Cache HIT for ${songInfo.title}');
+        _isLoadingSong = true;
+
+        await _player.setAudioSource(source);
+        if (token != _loadToken) return;
+
+        _isLoadingSong = false;
+        _durationController.add(_player.duration ?? Duration.zero);
+        _positionController.add(_player.position);
+        _player.play();
       } else {
+        // ── Cache MISS: pause + download (user must wait anyway) ──
         debugPrint(
           'AudioPlayerService: Cache MISS — downloading ${songInfo.title}',
         );
+        await _player.pause();
+        _isLoadingSong = true;
+        _positionController.add(Duration.zero);
+        _durationController.add(Duration.zero);
+        _playerStateController.add(PlayerState.buffering);
+
         source = await _buildAudioSource(
           songInfo.youtubeVideoId,
           tag: mediaTag,
         );
-      }
+        if (token != _loadToken) return;
 
-      // Check if another song was requested during download
-      if (token != _loadToken) return;
+        if (source == null) {
+          debugPrint(
+            'AudioPlayerService: No playable stream for ${songInfo.youtubeVideoId}',
+          );
+          _isLoadingSong = false;
+          _playerStateController.add(PlayerState.paused);
+          return;
+        }
 
-      if (source == null) {
-        debugPrint(
-          'AudioPlayerService: No playable stream for ${songInfo.youtubeVideoId}',
-        );
+        debugPrint('AudioPlayerService: Playing ${songInfo.title}');
+        await _player.setAudioSource(source);
+        if (token != _loadToken) return;
+
         _isLoadingSong = false;
-        _playerStateController.add(PlayerState.paused);
-        return;
+        _durationController.add(_player.duration ?? Duration.zero);
+        _positionController.add(_player.position);
+        _player.play();
       }
 
-      debugPrint('AudioPlayerService: Playing ${songInfo.title}');
-      await _player.setAudioSource(source);
-      // Check again after setAudioSource
-      if (token != _loadToken) return;
-
-      _isLoadingSong = false;
-      // Manually emit values that were blocked during download
-      _durationController.add(_player.duration ?? Duration.zero);
-      _positionController.add(_player.position);
-      _player.play();
       _firestoreService.addRecentlyPlayedSong(songInfo);
-
       // Pre-buffer the next song in background
       _prefetchNextSong();
     } catch (e) {
@@ -330,42 +336,14 @@ class AudioPlayerService {
       if (_loopMode == LoopMode.all) {
         nextIndex = 0;
       } else if (_autoplay) {
-        // Near end of queue with autoplay ON → pre-fetch autoplay songs now
+        // Last song playing with autoplay ON → fetch songs NOW so prefetch works
         _appendAutoplaySongs().then((_) {
-          // After appending, try to prefetch the next song audio
+          // Songs appended → re-run prefetch to buffer the first autoplay song
           if (_currentIndex + 1 < _queue.length) {
-            final nextSong = _queue[_currentIndex + 1];
-            if (_prefetchCache.containsKey(nextSong.youtubeVideoId)) return;
-            _isPrefetching = true;
-            final prefetchToken = _loadToken;
-            debugPrint('AudioPlayerService: Pre-buffering ${nextSong.title}');
-            _buildAudioSource(
-                  nextSong.youtubeVideoId,
-                  tag: MediaItem(
-                    id: nextSong.youtubeVideoId,
-                    title: nextSong.title,
-                    artist: nextSong.artist,
-                    artUri: Uri.parse(nextSong.thumbnailUrl),
-                  ),
-                )
-                .then((source) {
-                  _isPrefetching = false;
-                  if (prefetchToken != _loadToken) return;
-                  if (source != null) {
-                    _prefetchCache.clear();
-                    _prefetchCache[nextSong.youtubeVideoId] = source;
-                    debugPrint(
-                      'AudioPlayerService: Pre-buffered ${nextSong.title} \u2713',
-                    );
-                  }
-                })
-                .catchError((e) {
-                  _isPrefetching = false;
-                  debugPrint('AudioPlayerService: Prefetch failed: $e');
-                });
+            _prefetchNextSong();
           }
         });
-        return; // Don't prefetch audio yet — wait for autoplay songs to arrive
+        return;
       } else {
         return; // No next song to prefetch
       }
