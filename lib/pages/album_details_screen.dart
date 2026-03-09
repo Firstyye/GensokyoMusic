@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/universal_image.dart';
 import '../constant/my_constant.dart';
 import '../models/song_info.dart';
@@ -48,6 +49,71 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
     if (result == PlayResult.blockedAsListener && mounted) {
       showListenerBlockedDialog(context);
     }
+  }
+
+  void _showCreatePlaylistDialog(BuildContext context) {
+    final TextEditingController controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: darkModeBackgroundColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            'Create Playlist',
+            style: headerTextStyle.copyWith(color: Colors.white),
+          ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            style: bodyTextStyle.copyWith(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Playlist Name',
+              hintStyle: const TextStyle(color: Colors.white54),
+              enabledBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white24),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: cyanAccent),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white54),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cyanAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () async {
+                final text = controller.text.trim();
+                if (text.isNotEmpty) {
+                  await _firestoreService.createPlaylist(text);
+                  if (context.mounted) Navigator.pop(context);
+                }
+              },
+              child: const Text(
+                'Create',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showAddAllToPlaylistSheet(BuildContext context) async {
@@ -128,28 +194,65 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
                     }
                     final playlists = snapshot.data;
                     if (playlists == null || playlists.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'No playlists found.',
-                          style: bodyTextStyle.copyWith(color: Colors.white54),
-                        ),
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildCreatePlaylistTile(context),
+                          const Spacer(),
+                          Text(
+                            'No playlists found.',
+                            style: bodyTextStyle.copyWith(
+                              color: Colors.white54,
+                            ),
+                          ),
+                          const Spacer(),
+                        ],
                       );
                     }
                     return ListView.builder(
-                      itemCount: playlists.length,
+                      itemCount: playlists.length + 1,
                       itemBuilder: (context, index) {
-                        final playlist = playlists[index];
+                        if (index == 0) {
+                          return _buildCreatePlaylistTile(context);
+                        }
+                        final playlist = playlists[index - 1];
                         final id = playlist['id'] as String;
                         final name = playlist['name'] as String;
                         return ListTile(
-                          leading: Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: Colors.white10,
-                              borderRadius: BorderRadius.circular(8),
+                          leading: StreamBuilder<List<SongInfo>>(
+                            stream: _firestoreService.getPlaylistSongsStream(
+                              id,
                             ),
-                            child: Icon(Icons.queue_music, color: cyanAccent),
+                            builder: (context, songSnap) {
+                              Widget placeholder = Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.queue_music,
+                                  color: cyanAccent,
+                                ),
+                              );
+                              if (!songSnap.hasData || songSnap.data!.isEmpty) {
+                                return placeholder;
+                              }
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: CachedNetworkImage(
+                                  imageUrl: songSnap.data!.first.thumbnailUrl,
+                                  width: 50,
+                                  height: 50,
+                                  memCacheWidth: 100,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => placeholder,
+                                  errorWidget: (context, url, error) =>
+                                      placeholder,
+                                ),
+                              );
+                            },
                           ),
                           title: Text(
                             name,
@@ -372,12 +475,25 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
                           ),
                         ),
                         trailing: hasYoutube
-                            ? IconButton(
-                                icon: const Icon(
-                                  Icons.play_arrow_rounded,
-                                  color: Colors.white,
-                                ),
-                                onPressed: () => _playTrack(track, tracks),
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.play_arrow_rounded,
+                                      color: Colors.white,
+                                    ),
+                                    onPressed: () => _playTrack(track, tracks),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.more_vert,
+                                      color: Colors.white54,
+                                    ),
+                                    onPressed: () =>
+                                        _showSongOptions(context, track),
+                                  ),
+                                ],
                               )
                             : const SizedBox.shrink(),
                         onTap: hasYoutube
@@ -394,6 +510,248 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
           const Positioned(bottom: 0, left: 0, right: 0, child: MiniPlayer()),
         ],
       ),
+    );
+  }
+
+  void _showSongOptions(BuildContext context, SongInfo song) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: darkModeBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.playlist_add, color: Colors.white),
+                  title: Text(
+                    'Add to Playlist',
+                    style: bodyTextStyle.copyWith(color: Colors.white),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showAddToSinglePlaylistSheet(context, song);
+                  },
+                ),
+                StreamBuilder<bool>(
+                  stream: _firestoreService.isFavoriteStream(
+                    song.youtubeVideoId,
+                  ),
+                  builder: (context, snapshot) {
+                    final isFav = snapshot.data ?? false;
+                    return ListTile(
+                      leading: Icon(
+                        isFav ? Icons.favorite : Icons.favorite_border,
+                        color: isFav ? Colors.red : Colors.white,
+                      ),
+                      title: Text(
+                        isFav ? 'Remove from Favorites' : 'Add to Favorites',
+                        style: bodyTextStyle.copyWith(color: Colors.white),
+                      ),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        final added = await _firestoreService.toggleFavorite(
+                          song,
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                added
+                                    ? 'Added to Favorites'
+                                    : 'Removed from Favorites',
+                              ),
+                              duration: const Duration(seconds: 1),
+                              backgroundColor: added
+                                  ? Colors.green.shade700
+                                  : Colors.red.shade700,
+                            ),
+                          );
+                        }
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddToSinglePlaylistSheet(BuildContext context, SongInfo song) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.6,
+          decoration: BoxDecoration(
+            color: darkModeBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2.5),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Add to Playlist',
+                style: headerTextStyle.copyWith(
+                  color: Colors.white,
+                  fontSize: 20,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _firestoreService.getPlaylistsStream(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(
+                        child: CircularProgressIndicator(color: cyanAccent),
+                      );
+                    }
+                    final playlists = snapshot.data;
+                    if (playlists == null || playlists.isEmpty) {
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildCreatePlaylistTile(context),
+                          const Spacer(),
+                          Text(
+                            'No playlists found.',
+                            style: bodyTextStyle.copyWith(
+                              color: Colors.white54,
+                            ),
+                          ),
+                          const Spacer(),
+                        ],
+                      );
+                    }
+                    return ListView.builder(
+                      itemCount: playlists.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return _buildCreatePlaylistTile(context);
+                        }
+                        final playlist = playlists[index - 1];
+                        final id = playlist['id'] as String;
+                        final name = playlist['name'] as String;
+                        return ListTile(
+                          leading: StreamBuilder<List<SongInfo>>(
+                            stream: _firestoreService.getPlaylistSongsStream(
+                              id,
+                            ),
+                            builder: (context, songSnap) {
+                              Widget placeholder = Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.queue_music,
+                                  color: cyanAccent,
+                                ),
+                              );
+                              if (!songSnap.hasData || songSnap.data!.isEmpty) {
+                                return placeholder;
+                              }
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: CachedNetworkImage(
+                                  imageUrl: songSnap.data!.first.thumbnailUrl,
+                                  width: 50,
+                                  height: 50,
+                                  memCacheWidth: 100,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => placeholder,
+                                  errorWidget: (_, __, ___) => placeholder,
+                                ),
+                              );
+                            },
+                          ),
+                          title: Text(
+                            name,
+                            style: bodyTextStyle.copyWith(color: Colors.white),
+                          ),
+                          onTap: () async {
+                            Navigator.pop(context);
+                            await _firestoreService.addSongToPlaylist(id, song);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Added to $name',
+                                    style: bodyTextStyle,
+                                  ),
+                                  backgroundColor: Colors.green.shade700,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCreatePlaylistTile(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: cyanAccent.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cyanAccent.withOpacity(0.3)),
+        ),
+        child: Icon(Icons.add_rounded, color: cyanAccent, size: 28),
+      ),
+      title: Text(
+        'Create New Playlist',
+        style: bodyTextStyle.copyWith(
+          color: cyanAccent,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      onTap: () => _showCreatePlaylistDialog(context),
     );
   }
 }
