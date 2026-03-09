@@ -10,6 +10,7 @@ import '../models/song_info.dart';
 import '../constant/my_constant.dart';
 import '../widgets/_buildMiniPlayer.dart';
 import '../widgets/custom_page_route.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
@@ -138,14 +139,24 @@ class _ProfileScreenState extends State<ProfileScreen>
             SliverToBoxAdapter(
               child: Column(
                 children: [
-                  _buildProfileHeader(),
-                  const SizedBox(height: 24),
-                  if (_isOwner || !_isTargetPrivate) ...[
-                    _buildStatsRow(),
-                    const SizedBox(height: 32),
-                  ],
-                  if (_isOwner) _buildActionButtons(),
-                  if (_isOwner) const SizedBox(height: 32),
+                  StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                    stream: _firestoreService.getUserStream(targetUserId),
+                    builder: (context, userSnapshot) {
+                      final userData = userSnapshot.data?.data();
+                      return Column(
+                        children: [
+                          _buildProfileHeader(userData),
+                          const SizedBox(height: 24),
+                          if (_isOwner || !_isTargetPrivate) ...[
+                            _buildStatsRow(),
+                            const SizedBox(height: 32),
+                          ],
+                          if (_isOwner) _buildActionButtons(),
+                          if (_isOwner) const SizedBox(height: 32),
+                        ],
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -228,7 +239,16 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ══════════════════════════════════════════
   //  PROFILE HEADER
   // ══════════════════════════════════════════
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(Map<String, dynamic>? userData) {
+    final bannerUrl = userData?['bannerUrl'] as String?;
+    final photoUrl =
+        userData?['photoUrl'] as String? ??
+        (userData?['photoURL'] as String?) ??
+        _photoUrl; // Fallback to auth photoUrl
+    final displayName =
+        userData?['displayName'] as String? ??
+        (userData?['name'] as String?) ??
+        _displayName;
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.center,
@@ -239,7 +259,12 @@ class _ProfileScreenState extends State<ProfileScreen>
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.asset('lib/pages/images/banner.jpg', fit: BoxFit.cover),
+              bannerUrl != null
+                  ? CachedNetworkImage(imageUrl: bannerUrl, fit: BoxFit.cover)
+                  : Image.asset(
+                      'lib/pages/images/banner.jpg',
+                      fit: BoxFit.cover,
+                    ),
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -283,9 +308,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                       radius: 52,
                       backgroundColor: Colors.transparent,
                       child: ClipOval(
-                        child: (_photoUrl != null)
+                        child: (photoUrl != null)
                             ? CachedNetworkImage(
-                                imageUrl: _photoUrl!,
+                                imageUrl: photoUrl,
                                 memCacheWidth: 160,
                                 width: double.infinity,
                                 height: double.infinity,
@@ -305,15 +330,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  _displayName,
+                  displayName,
                   style: headerTextStyle.copyWith(
-                    color: darkThemeTextColor,
+                    color: Colors.white,
                     fontSize: 28,
-                    letterSpacing: -0.5,
+                    fontWeight: FontWeight.bold,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-                if (_joinDateText != null)
+                const SizedBox(height: 4),
+                if (_targetCreatedAt != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Row(

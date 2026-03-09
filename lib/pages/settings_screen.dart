@@ -14,6 +14,11 @@ import '../widgets/custom_page_route.dart';
 // NEW WIDGET IMPORTS
 import '../widgets/modern_settings_tile.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -26,11 +31,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   User? get user => FirebaseAuth.instance.currentUser;
   final FirestoreService _firestoreService = FirestoreService();
   bool isPrivate = false;
+  bool _isUploading = false;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
+    _initEnv();
     _loadPrivacyStatus();
+  }
+
+  Future<void> _initEnv() async {
+    try {
+      await dotenv.load(fileName: ".env");
+    } catch (e) {
+      print("DotEnv Load Error: $e");
+    }
   }
 
   Future<void> _loadPrivacyStatus() async {
@@ -104,42 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               label: 'Change Avatar',
               onTap: () {
                 Navigator.pop(ctx);
-                showDialog(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    backgroundColor: const Color(0xFF1A1A2E),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    icon: const Icon(
-                      Icons.construction_rounded,
-                      color: Colors.orangeAccent,
-                      size: 48,
-                    ),
-                    title: Text(
-                      'Coming Soon',
-                      style: headerTextStyle.copyWith(color: Colors.white),
-                    ),
-                    content: Text(
-                      'Avatar upload will be available once cloud storage is connected.',
-                      style: bodyTextStyle.copyWith(color: Colors.white70),
-                      textAlign: TextAlign.center,
-                    ),
-                    actionsAlignment: MainAxisAlignment.center,
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(c),
-                        child: Text(
-                          'OK',
-                          style: bodyTextStyle.copyWith(
-                            color: cyanAccent,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+                _pickAndUploadImage(isAvatar: true);
               },
             ),
             const SizedBox(height: 12),
@@ -149,42 +130,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               label: 'Change Banner',
               onTap: () {
                 Navigator.pop(ctx);
-                showDialog(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    backgroundColor: const Color(0xFF1A1A2E),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    icon: const Icon(
-                      Icons.construction_rounded,
-                      color: Colors.orangeAccent,
-                      size: 48,
-                    ),
-                    title: Text(
-                      'Coming Soon',
-                      style: headerTextStyle.copyWith(color: Colors.white),
-                    ),
-                    content: Text(
-                      'Banner upload will be available once cloud storage is connected.',
-                      style: bodyTextStyle.copyWith(color: Colors.white70),
-                      textAlign: TextAlign.center,
-                    ),
-                    actionsAlignment: MainAxisAlignment.center,
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(c),
-                        child: Text(
-                          'OK',
-                          style: bodyTextStyle.copyWith(
-                            color: cyanAccent,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+                _pickAndUploadImage(isAvatar: false);
               },
             ),
           ],
@@ -240,44 +186,130 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.only(top: 16, bottom: 40),
+      body: Stack(
         children: [
-          // ─── PROFILE HEADER WITH GRADIENT ───
-          _buildProfileHeader(),
+          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: _firestoreService.getUserStream(),
+            builder: (context, snapshot) {
+              final userData = snapshot.data?.data();
+              return ListView(
+                padding: const EdgeInsets.only(top: 16, bottom: 40),
+                children: [
+                  // ─── PROFILE HEADER WITH GRADIENT ───
+                  _buildProfileHeader(userData),
 
-          const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-          // ─── STATS ROW ───
-          _buildStatsRow()
-              .animate()
-              .fade(duration: 400.ms, delay: 200.ms)
-              .slideY(begin: 0.08),
+                  // ─── STATS ROW ───
+                  _buildStatsRow()
+                      .animate()
+                      .fade(duration: 400.ms, delay: 200.ms)
+                      .slideY(begin: 0.08),
 
-          const SizedBox(height: 32),
+                  const SizedBox(height: 32),
 
-          // ─── ACTION BUTTONS ───
-          _buildActionButtons()
-              .animate()
-              .fade(duration: 400.ms, delay: 300.ms)
-              .slideY(begin: 0.08),
+                  // ─── ACTION BUTTONS ───
+                  _buildActionButtons()
+                      .animate()
+                      .fade(duration: 400.ms, delay: 300.ms)
+                      .slideY(begin: 0.08),
 
-          const SizedBox(height: 40),
+                  const SizedBox(height: 40),
 
-          // ─── SETTINGS MENU ───
-          _buildSettingsMenu()
-              .animate()
-              .fade(duration: 500.ms, delay: 400.ms)
-              .slideY(begin: 0.1),
+                  // ─── SETTINGS MENU ───
+                  _buildSettingsMenu()
+                      .animate()
+                      .fade(duration: 500.ms, delay: 400.ms)
+                      .slideY(begin: 0.1),
+                ],
+              );
+            },
+          ),
+          if (_isUploading)
+            Container(
+              color: Colors.black54,
+              child: Center(
+                child: CircularProgressIndicator(color: cyanAccent),
+              ),
+            ),
         ],
       ),
     );
   }
 
+  Future<void> _pickAndUploadImage({required bool isAvatar}) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+      );
+
+      if (image == null) return;
+
+      setState(() {
+        _isUploading = true;
+      });
+
+      // Cloudinary Upload
+      final String cloudName = "dvyrdota8";
+      final String uploadPreset = "avatar_banner";
+      final Uri url = Uri.parse(
+        "https://api.cloudinary.com/v1_1/$cloudName/image/upload",
+      );
+
+      final request = http.MultipartRequest("POST", url)
+        ..fields['upload_preset'] = uploadPreset
+        ..files.add(await http.MultipartFile.fromPath('file', image.path));
+
+      final response = await request.send();
+      if (response.statusCode == 200) {
+        final responseData = await response.stream.toBytes();
+        final responseString = utf8.decode(responseData);
+        final jsonResponse = jsonDecode(responseString);
+        final String imageUrl = jsonResponse['secure_url'];
+
+        if (isAvatar) {
+          await _firestoreService.updateUserAvatar(imageUrl);
+        } else {
+          await _firestoreService.updateUserBanner(imageUrl);
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("${isAvatar ? 'Avatar' : 'Banner'} updated!"),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception("Upload failed with status: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Upload Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error: ${e.toString()}"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
+    }
+  }
+
   // ══════════════════════════════════════════
   //  PROFILE HEADER
   // ══════════════════════════════════════════
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(Map<String, dynamic>? userData) {
+    final bannerUrl = userData?['bannerUrl'] as String?;
+    final photoUrl = userData?['photoUrl'] as String? ?? user?.photoURL;
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.center,
@@ -289,7 +321,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.asset('lib/pages/images/banner.jpg', fit: BoxFit.cover),
+              bannerUrl != null
+                  ? CachedNetworkImage(imageUrl: bannerUrl, fit: BoxFit.cover)
+                  : Image.asset(
+                      'lib/pages/images/banner.jpg',
+                      fit: BoxFit.cover,
+                    ),
               // Gradient overlay matching Deep Midnight theme
               Container(
                 decoration: BoxDecoration(
@@ -340,9 +377,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           radius: 52,
                           backgroundColor: Colors.transparent,
                           child: ClipOval(
-                            child: (user?.photoURL != null)
+                            child: (photoUrl != null)
                                 ? CachedNetworkImage(
-                                    imageUrl: user!.photoURL!,
+                                    imageUrl: photoUrl,
                                     memCacheWidth: 160,
                                     width: double.infinity,
                                     height: double.infinity,
@@ -372,7 +409,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 // Name
                 Text(
-                  user?.displayName ?? 'Cirno, The Fairy',
+                  userData?['displayName'] ??
+                      user?.displayName ??
+                      'Cirno, The Fairy',
                   style: headerTextStyle.copyWith(
                     color: darkThemeTextColor,
                     fontSize: 28,

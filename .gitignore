@@ -48,3 +48,6 @@ app.*.map.json
 app_spec.md
 
 /lib/app_spec.md
+
+# Environment Variables
+.env

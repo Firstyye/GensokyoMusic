@@ -32,6 +32,40 @@ class FirestoreService {
     }
   }
 
+  /// Updates the user's avatar URL in both Firestore and Firebase Auth.
+  Future<void> updateUserAvatar(String url) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    try {
+      await user.updatePhotoURL(url);
+      await _db.collection('users').doc(user.uid).set({
+        'photoUrl': url,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('FirestoreService ERROR: Failed to update avatar: $e');
+    }
+  }
+
+  /// Updates the user's banner URL in Firestore.
+  Future<void> updateUserBanner(String url) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    try {
+      await _db.collection('users').doc(user.uid).set({
+        'bannerUrl': url,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('FirestoreService ERROR: Failed to update banner: $e');
+    }
+  }
+
+  /// Returns a stream of the user's data from Firestore.
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getUserStream([String? uid]) {
+    final targetUid = uid ?? _auth.currentUser?.uid;
+    if (targetUid == null) return const Stream.empty();
+    return _db.collection('users').doc(targetUid).snapshots();
+  }
+
   /// Fetches the createdAt date for a given user from Firestore.
   Future<DateTime?> getUserCreatedAt(String uid) async {
     try {
