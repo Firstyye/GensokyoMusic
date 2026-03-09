@@ -537,29 +537,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildActionButtons() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildActionBtn(
-              icon: Icons.image_rounded,
-              label: 'Edit Avatar / Banner',
-              color: cyanAccent,
-              textColor: Colors.black,
-              onTap: _showEditAvatarBannerDialog,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildActionBtn(
-              icon: Icons.share_rounded,
-              label: 'Share',
-              color: Colors.transparent,
-              textColor: darkThemeTextColor,
-              outlined: true,
-              onTap: () {},
-            ),
-          ),
-        ],
+      child: _buildActionBtn(
+        icon: Icons.image_rounded,
+        label: 'Edit Avatar / Banner',
+        color: cyanAccent,
+        textColor: Colors.black,
+        onTap: _showEditAvatarBannerDialog,
       ),
     );
   }
@@ -575,6 +558,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
         decoration: BoxDecoration(
           color: color,
