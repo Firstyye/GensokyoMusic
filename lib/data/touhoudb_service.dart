@@ -121,18 +121,26 @@ class TouhouDBService {
   }
 
   Future<List<SongInfo>> getRecommendedSongs({String genre = 'All'}) async {
-    if (genre == 'All') {
-      final sortOptions = ['RatingScore', 'AdditionDate', 'PublishDate'];
-      final randomSort = sortOptions[Random().nextInt(sortOptions.length)];
+    final rng = Random();
+    final cacheBuster = DateTime.now().millisecondsSinceEpoch;
 
-      // Try up to 3 times with decreasing offsets.
-      // High offset = more variety, but may overshoot available songs.
-      // Each retry halves the offset; final attempt uses 0 (guaranteed results).
-      int offset = Random().nextInt(100);
+    if (genre == 'All') {
+      final sortOptions = [
+        'RatingScore',
+        'AdditionDate',
+        'PublishDate',
+        'FavoritedTimes',
+        'Name',
+      ];
+      final randomSort = sortOptions[rng.nextInt(sortOptions.length)];
+
+      // VocaDB has tens of thousands of songs — use a large offset range
+      // for genuine variety. Retry with smaller offset if overshoot.
+      int offset = rng.nextInt(2000);
       for (int attempt = 0; attempt < 3; attempt++) {
         final response = await http.get(
           Uri.parse(
-            "$baseUrl/songs?sort=$randomSort&start=$offset&maxResults=10&fields=MainPicture,PVs",
+            "$baseUrl/songs?sort=$randomSort&start=$offset&maxResults=10&fields=MainPicture,PVs&_cb=$cacheBuster",
           ),
         );
         if (response.statusCode == 200) {
@@ -155,15 +163,17 @@ class TouhouDBService {
               );
             }
           }
-          if (results.isNotEmpty) return results;
+          if (results.isNotEmpty) {
+            results.shuffle(rng); // Shuffle for extra randomness
+            return results;
+          }
         }
-        // Retry with a lower offset
+        // Overshoot → halve offset and retry
         offset = (offset ~/ 2);
       }
       return []; // All retries exhausted
     } else {
-      // Fetch by Tag for better accuracy in Genre
-      // The API ignores tagName, so we must map exactly to tagId[]
+      // ── Genre-specific fetch ──
       final Map<String, int> genreTags = {
         'chiptune': 27,
         'drum and bass': 20,
@@ -183,43 +193,47 @@ class TouhouDBService {
       };
 
       final tagId = genreTags[genre];
-      if (tagId == null) return []; // Fallback if genre not mapped
+      if (tagId == null) return [];
 
-      // Niche genres (like eurobeat) might have very few entries.
-      // Sorting by AdditionDate with a large offset often results in 0 items.
-      // To ensure we get results and they are varied:
-      // 1. Force RatingScore (which usually has the most robust data).
-      // 2. Use a very small random offset.
-      // 3. Add a random dummy parameter to bypass aggressive API caching.
-      final randomOffset = Random().nextInt(5); // Safe small offset
-      final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+      // Randomize sort to avoid always getting the same top-rated songs
+      final genreSorts = ['RatingScore', 'AdditionDate', 'FavoritedTimes'];
+      final randomSort = genreSorts[rng.nextInt(genreSorts.length)];
 
-      final response = await http.get(
-        Uri.parse(
-          "$baseUrl/songs?tagId[]=$tagId&sort=RatingScore&start=$randomOffset&maxResults=10&fields=MainPicture,PVs&_cb=$cacheBuster",
-        ),
-      );
-      if (response.statusCode == 200) {
-        var data = json.decode(response.body);
-        List<dynamic> items = data['items'] ?? [];
-        List<SongInfo> results = [];
-        for (var song in items) {
-          final pvId = _extractYoutubePvId(song['pvs']);
-          if (pvId.isNotEmpty) {
-            results.add(
-              SongInfo(
-                youtubeVideoId: pvId,
-                title: song['defaultName'] ?? song['name'] ?? 'Unknown',
-                artist: song['artistString'] ?? 'Unknown Artist',
-                thumbnailUrl:
-                    song['mainPicture']?['urlOriginal'] ??
-                    song['mainPicture']?['urlThumb'] ??
-                    'https://i.ytimg.com/vi/$pvId/hqdefault.jpg',
-              ),
-            );
+      // Use larger offset (retry with smaller if empty)
+      int offset = rng.nextInt(50);
+      for (int attempt = 0; attempt < 3; attempt++) {
+        final response = await http.get(
+          Uri.parse(
+            "$baseUrl/songs?tagId[]=$tagId&sort=$randomSort&start=$offset&maxResults=10&fields=MainPicture,PVs&_cb=$cacheBuster",
+          ),
+        );
+        if (response.statusCode == 200) {
+          var data = json.decode(response.body);
+          List<dynamic> items = data['items'] ?? [];
+          List<SongInfo> results = [];
+          for (var song in items) {
+            final pvId = _extractYoutubePvId(song['pvs']);
+            if (pvId.isNotEmpty) {
+              results.add(
+                SongInfo(
+                  youtubeVideoId: pvId,
+                  title: song['defaultName'] ?? song['name'] ?? 'Unknown',
+                  artist: song['artistString'] ?? 'Unknown Artist',
+                  thumbnailUrl:
+                      song['mainPicture']?['urlOriginal'] ??
+                      song['mainPicture']?['urlThumb'] ??
+                      'https://i.ytimg.com/vi/$pvId/hqdefault.jpg',
+                ),
+              );
+            }
+          }
+          if (results.isNotEmpty) {
+            results.shuffle(rng);
+            return results;
           }
         }
-        return results;
+        // Overshoot → halve offset and retry
+        offset = (offset ~/ 2);
       }
       return [];
     }
@@ -385,37 +399,83 @@ class TouhouDBService {
   }
 
   Future<List<Albumslist>> getTopRatedAlbums() async {
-    // Variety: use a random start offset for "Daily Discovery" effect
-    final randomOffset = Random().nextInt(50);
-    final response = await http.get(
-      Uri.parse(
-        "$baseUrl/albums?sort=RatingTotal&start=$randomOffset&maxResults=10&fields=MainPicture",
-      ),
-    );
-    if (response.statusCode == 200) {
-      var data = json.decode(response.body);
-      List<dynamic> items = data['items'] ?? [];
+    final rng = Random();
+    final cacheBuster = DateTime.now().millisecondsSinceEpoch;
 
-      return items.map((albumUrlData) {
-        String imageUrl = "";
-        if (albumUrlData['mainPicture'] != null) {
-          imageUrl =
-              albumUrlData['mainPicture']['urlOriginal'] ??
-              albumUrlData['mainPicture']['urlThumb'];
+    final sortOptions = ['RatingTotal', 'AdditionDate', 'Name'];
+    final randomSort = sortOptions[rng.nextInt(sortOptions.length)];
+
+    // Fetch 20 albums to have a pool; filter to those with playable tracks
+    int offset = rng.nextInt(500);
+    for (int attempt = 0; attempt < 3; attempt++) {
+      final response = await http.get(
+        Uri.parse(
+          "$baseUrl/albums?sort=$randomSort&start=$offset&maxResults=20&fields=MainPicture&_cb=$cacheBuster",
+        ),
+      );
+      if (response.statusCode == 200) {
+        var data = json.decode(response.body);
+        List<dynamic> items = data['items'] ?? [];
+        if (items.isNotEmpty) {
+          List<Albumslist> validAlbums = [];
+
+          // Check all albums concurrently for playable tracks
+          await Future.wait(
+            items.map((albumUrlData) async {
+              final int albumId = albumUrlData['id'] ?? 0;
+              if (albumId == 0) return;
+              try {
+                final trackRes = await http.get(
+                  Uri.parse("$baseUrl/albums/$albumId/tracks?fields=PVs"),
+                );
+                if (trackRes.statusCode == 200) {
+                  var tData = json.decode(trackRes.body);
+                  List<dynamic> tItems = tData is List
+                      ? tData
+                      : (tData['items'] ?? []);
+                  for (var track in tItems) {
+                    final songData = track['song'];
+                    if (songData != null &&
+                        _extractYoutubePvId(songData['pvs']).isNotEmpty) {
+                      // Has at least 1 playable track → keep this album
+                      String imageUrl = "";
+                      if (albumUrlData['mainPicture'] != null) {
+                        imageUrl =
+                            albumUrlData['mainPicture']['urlOriginal'] ??
+                            albumUrlData['mainPicture']['urlThumb'];
+                      }
+                      validAlbums.add(
+                        Albumslist(
+                          id: albumId,
+                          name:
+                              albumUrlData['defaultName'] ??
+                              albumUrlData['name'] ??
+                              'Unknown Album',
+                          artist:
+                              albumUrlData['artistString'] ?? 'Unknown Artist',
+                          image: imageUrl,
+                        ),
+                      );
+                      break; // Found one playable track, no need to check more
+                    }
+                  }
+                }
+              } catch (e) {
+                debugPrint("Error checking tracks for album $albumId: $e");
+              }
+            }),
+          );
+
+          if (validAlbums.isNotEmpty) {
+            validAlbums.shuffle(rng);
+            return validAlbums.take(10).toList();
+          }
         }
-        return Albumslist(
-          id: albumUrlData['id'] ?? 0,
-          name:
-              albumUrlData['defaultName'] ??
-              albumUrlData['name'] ??
-              'Unknown Album',
-          artist: albumUrlData['artistString'] ?? 'Unknown Artist',
-          image: imageUrl,
-        );
-      }).toList();
-    } else {
-      throw Exception("Failed to load top rated albums");
+      }
+      // Overshoot -> halve the offset and retry
+      offset = (offset ~/ 2);
     }
+    return [];
   }
 
   Future<List<PopularCircle>> getPopularCircles() async {

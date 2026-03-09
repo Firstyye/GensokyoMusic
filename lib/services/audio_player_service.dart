@@ -283,6 +283,9 @@ class AudioPlayerService {
         debugPrint(
           'AudioPlayerService: Cache MISS — downloading ${songInfo.title}',
         );
+        // OOM Fix: Wipe stale cache to free RAM before a new heavy download
+        _prefetchCache.clear();
+
         await _player.pause();
         _isLoadingSong = true;
         _positionController.add(Duration.zero);
@@ -725,6 +728,9 @@ class AudioPlayerService {
         debugPrint(
           'AudioPlayerService: Listener cache MISS — downloading $videoId',
         );
+        // OOM Fix: Wipe stale cache to free RAM for the new download
+        _prefetchCache.clear();
+
         source = await _buildAudioSource(videoId, tag: mediaTag);
       }
       if (source == null) return;
