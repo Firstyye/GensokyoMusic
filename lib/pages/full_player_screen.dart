@@ -770,6 +770,71 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
     );
   }
 
+  void _showCreatePlaylistDialog(BuildContext context) {
+    final TextEditingController controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: darkModeBackgroundColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            'Create Playlist',
+            style: headerTextStyle.copyWith(color: Colors.white),
+          ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            style: bodyTextStyle.copyWith(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Playlist Name',
+              hintStyle: const TextStyle(color: Colors.white54),
+              enabledBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white24),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: cyanAccent),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white54),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cyanAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () async {
+                final text = controller.text.trim();
+                if (text.isNotEmpty) {
+                  await _firestoreService.createPlaylist(text);
+                  if (context.mounted) Navigator.pop(context);
+                }
+              },
+              child: const Text(
+                'Create',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showAddToPlaylistBottomSheet(BuildContext context, SongInfo song) {
     showModalBottomSheet(
       context: context,
@@ -814,17 +879,28 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                     }
                     final playlists = snapshot.data;
                     if (playlists == null || playlists.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'No playlists found.',
-                          style: bodyTextStyle.copyWith(color: Colors.white54),
-                        ),
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildCreatePlaylistTile(context),
+                          const Spacer(),
+                          Text(
+                            'No playlists found.',
+                            style: bodyTextStyle.copyWith(
+                              color: Colors.white54,
+                            ),
+                          ),
+                          const Spacer(),
+                        ],
                       );
                     }
                     return ListView.builder(
-                      itemCount: playlists.length,
+                      itemCount: playlists.length + 1,
                       itemBuilder: (context, index) {
-                        final playlist = playlists[index];
+                        if (index == 0) {
+                          return _buildCreatePlaylistTile(context);
+                        }
+                        final playlist = playlists[index - 1];
                         final id = playlist['id'] as String;
                         final name = playlist['name'] as String;
                         return ListTile(
@@ -892,6 +968,29 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCreatePlaylistTile(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: cyanAccent.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cyanAccent.withOpacity(0.3)),
+        ),
+        child: Icon(Icons.add_rounded, color: cyanAccent, size: 28),
+      ),
+      title: Text(
+        'Create New Playlist',
+        style: bodyTextStyle.copyWith(
+          color: cyanAccent,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      onTap: () => _showCreatePlaylistDialog(context),
     );
   }
 }
