@@ -10,10 +10,54 @@ together in synchronized Live Parties.
 > community-maintained music metadata, while audio is streamed from YouTube.
 > This repository does not host or redistribute the audio.
 
-<p align="center">
-  <img src="flutter_02.png" alt="GensokyoMusic login screen" width="280">
-  <img src="flutter_03.png" alt="GensokyoMusic library screen" width="280">
-</p>
+## App tour
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="screenshot/13333_0.jpg" alt="GensokyoMusic login screen" width="220"><br>
+      <sub><b>Welcome back</b></sub>
+    </td>
+    <td align="center">
+      <img src="screenshot/13329_0.jpg" alt="Home screen with Live Parties and Daily Discovery" width="220"><br>
+      <sub><b>Home & discovery</b></sub>
+    </td>
+    <td align="center">
+      <img src="screenshot/13325_0.jpg" alt="Explore screen showing artist search results" width="220"><br>
+      <sub><b>Explore the catalog</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshot/13334_0.jpg" alt="Full-screen music player" width="220"><br>
+      <sub><b>Now playing</b></sub>
+    </td>
+    <td align="center">
+      <img src="flutter_03.png" alt="Library screen showing favorite songs" width="220"><br>
+      <sub><b>Your library</b></sub>
+    </td>
+    <td align="center">
+      <img src="screenshot/13326_0.jpg" alt="Friends and chat screen" width="220"><br>
+      <sub><b>Find friends</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshot/13327_0.jpg" alt="Private chat with shared song cards" width="220"><br>
+      <sub><b>Share songs in chat</b></sub>
+    </td>
+    <td align="center">
+      <img src="screenshot/13349_0.jpg" alt="Live Party room with a shared song" width="220"><br>
+      <sub><b>Listen together</b></sub>
+    </td>
+    <td align="center">
+      <img src="screenshot/13328_0.jpg" alt="Custom user profile with library statistics" width="220"><br>
+      <sub><b>Make it yours</b></sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center"><sub>Captured from the Android app.</sub></p>
 
 ## Features
 
