@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "382928908528",
+    "firebase_url": "https://flutterauth-d67b9-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "flutterauth-d67b9",
     "storage_bucket": "flutterauth-d67b9.firebasestorage.app"
   },
@@ -14,11 +15,63 @@
       },
       "oauth_client": [
         {
+          "client_id": "382928908528-dkne7kjpbf5kmqnpaq3ffef200a5i5r2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.yo",
+            "certificate_hash": "7e5ad3a337c1c18217fb7742d0338ba7a1ad3449"
+          }
+        },
+        {
           "client_id": "382928908528-qni7lh494vcqkrj70o014df7u10tp4j8.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.yo",
             "certificate_hash": "726b9cb3e706158926b9314cebe8a166c53ea1a7"
+          }
+        },
+        {
+          "client_id": "382928908528-3jrfrvbnh1ecv4283n0tdk2vk50gdu8b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC4_Kh9hm6Fg5sbZahX92bEKQ-cNT3J57s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "382928908528-3jrfrvbnh1ecv4283n0tdk2vk50gdu8b.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "382928908528-uocion3b6ehk25onvs1q5b7dv8fo7ui5.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.yo"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:382928908528:android:4f17575c1bd8c8f0c8d235",
+        "android_client_info": {
+          "package_name": "com.firstyye.gensokyomusic"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "382928908528-61fd6gpdmush22859dp3sb6ah3a30gjp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.firstyye.gensokyomusic",
+            "certificate_hash": "b74fd9a26784de271ffd214d515446768f255eb6"
           }
         },
         {

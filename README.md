@@ -59,6 +59,15 @@ together in synchronized Live Parties.
 
 <p align="center"><sub>Captured from the Android app.</sub></p>
 
+## Download for Android
+
+Download the latest signed APK from
+[GitHub Releases](https://github.com/Firstyye/GensokyoMusic/releases/latest).
+
+Android might ask you to allow installs from your browser or file manager
+because this APK is distributed directly rather than through Google Play.
+Future updates must be signed by the same GensokyoMusic release key.
+
 ## Features
 
 ### Discover Touhou music
@@ -223,6 +232,20 @@ flutter run -d chrome
 
 Provider sign-in and background audio behavior can vary by platform and require
 the corresponding native/provider configuration.
+
+### Build a signed Android release
+
+Release builds require the ignored `android/key.properties` file and the
+private keystore it references:
+
+```powershell
+flutter pub get
+flutter build apk --release
+```
+
+The APK is written to
+`build/app/outputs/flutter-apk/app-release.apk`. Never commit the keystore,
+`android/key.properties`, `.env`, or generated APKs.
 
 ## Project structure
 
