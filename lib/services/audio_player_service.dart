@@ -7,6 +7,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import '../models/song_info.dart';
 import '../services/realtime_database_service.dart';
 import '../services/firestore_service.dart';
+import '../services/youtube_api_clients.dart';
 import '../data/touhoudb_service.dart';
 
 enum LoopMode { off, all, one }
@@ -399,7 +400,7 @@ class AudioPlayerService {
     try {
       final manifest = await _yt.videos.streamsClient.getManifest(
         videoId,
-        ytClients: [yt.YoutubeApiClient.safari, yt.YoutubeApiClient.androidVr],
+        ytClients: [youtubeVisionOsClient],
       );
 
       // Prefer audio-only
