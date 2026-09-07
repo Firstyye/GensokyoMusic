@@ -33,6 +33,7 @@ class PartySessionService {
   StreamSubscription<PartyPlaybackSnapshot?>? _playbackSub;
   StreamSubscription<List<PartyQueueEntry>>? _queueSub;
   String? _sessionUid;
+  _Membership? _membership;
   bool _operationInFlight = false;
   bool _disposed = false;
   Future<void>? _disposeFuture;
@@ -50,7 +51,8 @@ class PartySessionService {
   List<PartyQueueEntry> get queue => _queue;
 
   Future<PartyActionResult> createParty(SongInfo song) => _operate(() async {
-    if (_state.isActive) return _failure(PartyFailureCode.alreadyBusy);
+    if (_state.isActive || _hasPendingMembership)
+      return _failure(PartyFailureCode.alreadyBusy);
     final token = _capture();
     final id = _repository.reservePartyId();
     return _enter(
@@ -62,23 +64,29 @@ class PartySessionService {
   });
 
   Future<PartyActionResult> validateParty(String id) => _operate(() async {
+    _requirePartyId(id);
     final token = _capture();
     await _validate(id, token);
     return const PartyActionResult.success();
   });
 
   Future<PartyActionResult> joinParty(String id) => _operate(() async {
+    _requirePartyId(id);
     final token = _capture();
     if (_state.isActive) {
       return _state.partyId == id
           ? const PartyActionResult.success()
           : _failure(PartyFailureCode.alreadyBusy);
     }
+    if (_hasPendingMembership) return _failure(PartyFailureCode.alreadyBusy);
     return _joinInternal(id, token);
   });
 
   Future<PartyActionResult> switchParty(String id) => _operate(() async {
+    _requirePartyId(id);
     final token = _capture();
+    if (!_state.isActive && _hasPendingMembership)
+      return _failure(PartyFailureCode.alreadyBusy);
     if (_state.isActive && _state.partyId == id)
       return const PartyActionResult.success();
     await _validate(id, token);
@@ -95,7 +103,8 @@ class PartySessionService {
   });
 
   Future<PartyActionResult> leaveParty() => _operate(() async {
-    if (!_state.isActive) return const PartyActionResult.success();
+    if (!_state.isActive && !_hasPendingMembership)
+      return const PartyActionResult.success();
     return _leaveInternal(_capture());
   });
 
@@ -107,7 +116,8 @@ class PartySessionService {
     try {
       // Keep the active session if root deletion fails. A successful deletion
       // can reach the metadata stream before this future completes.
-      await _repository.endParty(id);
+      await _guardRejected(token, () => _repository.endParty(id));
+      _clearMembership(id, token.uid);
       final observedGeneration = _endDeletionGeneration;
       final _SessionToken endedToken;
       if (observedGeneration != null) {
@@ -119,7 +129,7 @@ class PartySessionService {
         await _teardownLocal();
         _check(endedToken);
       }
-      await _repository.disarmDisconnect(id);
+      await _guardRejected(endedToken, () => _repository.disarmDisconnect(id));
       _check(endedToken);
       _publish(PartySessionState.ended(generation: _state.generation));
       return const PartyActionResult.success();
@@ -143,13 +153,16 @@ class PartySessionService {
   ) => _operate(() async {
     final token = _capture();
     _checkHost(token);
-    await write(_state.partyId!);
+    await _guardRejected(token, () => write(_state.partyId!));
     _checkHost(token);
     return const PartyActionResult.success();
   });
 
   Future<void> _validate(String id, _SessionToken token) async {
-    final joinable = await _repository.isJoinable(id);
+    final joinable = await _guardRejected(
+      token,
+      () => _repository.isJoinable(id),
+    );
     _check(token);
     if (!joinable)
       throw const PartyRepositoryException(PartyFailureCode.roomClosed);
@@ -181,12 +194,15 @@ class PartySessionService {
       PartySessionState.joining(partyId: id, generation: token.generation),
     );
     var armed = false;
+    var membershipWritten = false;
     try {
       _check(token);
       await _repository.armDisconnect(id);
       armed = true;
       _check(token);
       await write();
+      membershipWritten = true;
+      _membership = _Membership(id, token.uid, role);
       _check(token);
       _publish(
         PartySessionState.active(
@@ -200,6 +216,12 @@ class PartySessionService {
       return const PartyActionResult.success();
     } catch (error) {
       _check(token);
+      if (membershipWritten) {
+        // The remote write succeeded. Subscription setup is a separate stage:
+        // rollback membership before cancelling its server cleanup fallback.
+        final cleanup = await _leaveInternal(token);
+        return cleanup.isSuccess ? _failure(_code(error)) : cleanup;
+      }
       // A new auth identity must never cancel the previous user's fallback.
       if (armed && _isCurrent(token)) {
         try {
@@ -216,8 +238,9 @@ class PartySessionService {
 
   Future<PartyActionResult> _leaveInternal(_SessionToken token) async {
     _check(token);
-    final id = _state.partyId!;
-    final role = _state.role!;
+    final membership = _membership!;
+    final id = membership.partyId;
+    final role = _state.role ?? membership.role;
     final leavingToken = _SessionToken(token.uid, token.generation + 1);
     await _teardownLocal();
     // Teardown invalidates all room callbacks before any remote removal.
@@ -234,6 +257,7 @@ class PartySessionService {
         _check(leavingToken);
         try {
           await _repository.removeCurrentParticipant(id);
+          _clearMembership(id, token.uid);
           _check(leavingToken);
           break;
         } on PartyRepositoryException catch (error) {
@@ -252,6 +276,7 @@ class PartySessionService {
       _publish(PartySessionState.idle(generation: _state.generation));
       return const PartyActionResult.success();
     } catch (error) {
+      _check(leavingToken);
       if (_isCurrent(leavingToken)) {
         _publish(
           PartySessionState.failed(
@@ -268,6 +293,7 @@ class PartySessionService {
     _metadataSub = _repository.watchMetadata(id).listen((metadata) {
       if (!_isCurrent(token) || !_state.isActive) return;
       if (metadata == null) {
+        _clearMembership(id, token.uid);
         if (_endingToken?.generation == token.generation &&
             _endingToken?.uid == token.uid) {
           _endDeletionGeneration = token.generation + 1;
@@ -343,6 +369,20 @@ class PartySessionService {
     }
   }
 
+  /// Rejected futures need the same identity/generation guard as successful
+  /// completions; a stale failure must not strand or overwrite local state.
+  Future<T> _guardRejected<T>(
+    _SessionToken token,
+    Future<T> Function() operation,
+  ) async {
+    try {
+      return await operation();
+    } catch (_) {
+      _check(token);
+      rethrow;
+    }
+  }
+
   _SessionToken _capture() {
     final uid = _repository.currentUserUid;
     if (_sessionUid != null && uid != _sessionUid) {
@@ -399,7 +439,30 @@ class PartySessionService {
   static PartyActionResult _failure(PartyFailureCode code) =>
       PartyActionResult.failure(code);
 
-  Future<void> dispose() => _disposeFuture ??= _dispose();
+  static void _requirePartyId(String id) {
+    if (id.trim().isEmpty) {
+      throw const PartyRepositoryException(PartyFailureCode.roomClosed);
+    }
+  }
+
+  bool get _hasPendingMembership =>
+      _membership != null && _membership!.uid == _repository.currentUserUid;
+
+  void _clearMembership(String id, String uid) {
+    if (_membership?.partyId == id && _membership?.uid == uid) {
+      _membership = null;
+    }
+  }
+
+  Future<void> dispose() {
+    if (_disposeFuture != null) return _disposeFuture!;
+    final completion = Completer<void>();
+    _disposeFuture = completion.future;
+    // Install the shared completion before teardown synchronously notifies UI.
+    completion.complete(_dispose());
+    return completion.future;
+  }
+
   Future<void> _dispose() async {
     _disposed = true;
     final teardown = _teardownLocal();
@@ -418,4 +481,11 @@ class _SessionToken {
   const _SessionToken(this.uid, this.generation);
   final String uid;
   final int generation;
+}
+
+class _Membership {
+  const _Membership(this.partyId, this.uid, this.role);
+  final String partyId;
+  final String uid;
+  final PartyRole role;
 }

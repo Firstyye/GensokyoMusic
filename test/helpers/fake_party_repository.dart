@@ -24,6 +24,23 @@ class FakePartyRepository implements PartyRepository {
   final Map<String, SongInfo> createdSongs = {};
   final Map<String, SongInfo> addedSongs = {};
   final Map<String, List<SongInfo>> overwrittenSongs = {};
+  final Set<String> memberships = {};
+  final Map<String, Future<void>> cancellationDelays = {};
+
+  Stream<T> _withCancellationDelay<T>(Stream<T> source, String key) {
+    if (!cancellationDelays.containsKey(key)) return source;
+    return Stream<T>.multi((controller) {
+      final subscription = source.listen(
+        controller.addSync,
+        onError: controller.addErrorSync,
+        onDone: controller.closeSync,
+      );
+      controller.onCancel = () async {
+        await subscription.cancel();
+        await cancellationDelays[key];
+      };
+    }, isBroadcast: true);
+  }
 
   void _cancelled(String key) {
     cancellations.update(key, (count) => count + 1, ifAbsent: () => 1);
@@ -127,6 +144,7 @@ class FakePartyRepository implements PartyRepository {
       'createReservedParty',
     );
     createdSongs[partyId] = initialSong;
+    memberships.add(partyId);
   }
 
   @override
@@ -138,6 +156,7 @@ class FakePartyRepository implements PartyRepository {
   @override
   Future<void> joinParty(String partyId) async {
     await _recordAndAwait('joinParty:$partyId', 'joinParty');
+    memberships.add(partyId);
   }
 
   @override
@@ -146,17 +165,22 @@ class FakePartyRepository implements PartyRepository {
       'removeCurrentParticipant:$partyId',
       'removeCurrentParticipant',
     );
+    memberships.remove(partyId);
   }
 
   @override
   Future<void> endParty(String partyId) async {
     await _recordAndAwait('endParty:$partyId', 'endParty');
+    memberships.remove(partyId);
   }
 
   @override
   Stream<PartyMetadata?> watchMetadata(String partyId) {
     _record('watchMetadata:$partyId', 'watchMetadata');
-    return metadataControllerFor(partyId).stream;
+    return _withCancellationDelay(
+      metadataControllerFor(partyId).stream,
+      'metadata:$partyId',
+    );
   }
 
   @override

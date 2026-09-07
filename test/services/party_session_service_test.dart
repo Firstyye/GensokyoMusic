@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yo/models/party_session.dart';
 import 'package:yo/models/song_info.dart';
+import 'package:yo/services/party_repository.dart';
 import 'package:yo/services/party_session_service.dart';
 
 import '../helpers/fake_party_repository.dart';
@@ -45,6 +46,75 @@ void main() {
     await repository.dispose();
   });
 
+  group('review rejected awaits', () {
+    for (final operation in [
+      'removeCurrentParticipant',
+      'disarmDisconnect',
+      'validate',
+      'updatePlayback',
+      'addQueueSong',
+      'removeQueueSong',
+      'overwriteQueue',
+      'endParty',
+    ]) {
+      for (final typed in [true, false]) {
+        for (final invalidation in ['uid', 'generation']) {
+          test(
+            '$operation ${typed ? 'typed' : 'unexpected'} rejection after $invalidation invalidation clears stale membership',
+            () async {
+              expect((await service.joinParty('old')).isSuccess, isTrue);
+              repository.metadataControllerFor('old').add(hostMetadata);
+              await pumpEventQueue();
+              repository.callLog.clear();
+              final repositoryOperation = operation == 'validate'
+                  ? 'isJoinable'
+                  : operation;
+              final gate = Completer<void>();
+              repository.operationCallbacks[repositoryOperation] = () async {
+                await gate.future;
+                if (typed)
+                  throw const PartyRepositoryException(
+                    PartyFailureCode.network,
+                  );
+                throw StateError('rejected after await');
+              };
+              final pending = switch (operation) {
+                'removeCurrentParticipant' ||
+                'disarmDisconnect' => service.leaveParty(),
+                'validate' => service.validateParty('new'),
+                'updatePlayback' => service.updatePlayback(playback),
+                'addQueueSong' => service.addQueueSong(song),
+                'removeQueueSong' => service.removeQueueSong('entry'),
+                'overwriteQueue' => service.overwriteQueue([song]),
+                _ => service.endParty(),
+              };
+              await pumpEventQueue();
+              if (invalidation == 'uid') {
+                repository.currentUserUid = 'replacement';
+              } else {
+                await service.dispose();
+              }
+              final terminal = service.state;
+              gate.complete();
+              final result = await pending;
+              expect(
+                result.failure,
+                invalidation == 'uid'
+                    ? PartyFailureCode.unauthenticated
+                    : PartyFailureCode.roomClosed,
+              );
+              expect(service.state.partyId, isNull);
+              expect(service.state.phase, isNot(PartySessionPhase.joining));
+              expect(service.state.phase, isNot(PartySessionPhase.leaving));
+              if (invalidation == 'generation')
+                expect(service.state, same(terminal));
+            },
+          );
+        }
+      }
+    }
+  });
+
   Future<void> join() async {
     expect((await service.joinParty('old')).isSuccess, isTrue);
     repository.callLog.clear();
@@ -61,6 +131,135 @@ void main() {
       repository.callLog.where((call) => !call.startsWith('watch')).toList();
   void cancelledOld() =>
       expect(repository.cancellations, containsPair('metadata:old', 1));
+
+  group('review invalid room IDs', () {
+    for (final id in ['', '   ', '\t\n']) {
+      for (final operation in ['validate', 'join', 'switch']) {
+        test(
+          '$operation rejects ${id.codeUnits} before repository access',
+          () async {
+            if (operation == 'switch') await join();
+            repository.callLog.clear();
+            final before = service.state;
+            final result = await switch (operation) {
+              'validate' => service.validateParty(id),
+              'join' => service.joinParty(id),
+              _ => service.switchParty(id),
+            };
+            expect(result.failure, PartyFailureCode.roomClosed);
+            expect(service.state, same(before));
+            expect(repository.callLog, isEmpty);
+            expect(repository.cancellations, isEmpty);
+          },
+        );
+      }
+    }
+  });
+
+  group('review subscription setup', () {
+    for (final creation in [true, false]) {
+      for (final stream in ['watchMetadata', 'watchPlayback', 'watchQueue']) {
+        for (final removalFails in [false, true]) {
+          test(
+            '${creation ? 'create' : 'join'} $stream failure ${removalFails ? 'retains fallback on failed removal' : 'removes acknowledged membership before disarm'}',
+            () async {
+              final id = creation ? 'party-1' : 'old';
+              repository.failNext(stream, PartyFailureCode.permissionDenied);
+              if (removalFails) {
+                for (var i = 0; i < 3; i++) {
+                  repository.failNext(
+                    'removeCurrentParticipant',
+                    PartyFailureCode.network,
+                  );
+                }
+              }
+              final result = await (creation
+                  ? service.createParty(song)
+                  : service.joinParty(id));
+              expect(result.isSuccess, isFalse);
+              expect(service.state.partyId, isNull);
+              final cleanup = calls()
+                  .where(
+                    (call) =>
+                        call.startsWith('removeCurrentParticipant') ||
+                        call.startsWith('disarmDisconnect'),
+                  )
+                  .toList();
+              expect(
+                cleanup,
+                removalFails
+                    ? [
+                        'removeCurrentParticipant:$id',
+                        'removeCurrentParticipant:$id',
+                        'removeCurrentParticipant:$id',
+                      ]
+                    : ['removeCurrentParticipant:$id', 'disarmDisconnect:$id'],
+              );
+              expect(repository.cancellations, {
+                if (stream != 'watchMetadata') 'metadata:$id': 1,
+                if (stream == 'watchQueue') 'playback:$id': 1,
+              });
+              repository.callLog.clear();
+              final next = await service.joinParty('new');
+              if (removalFails) {
+                expect(next.failure, PartyFailureCode.alreadyBusy);
+                expect(calls(), isEmpty);
+                expect(repository.memberships, {id});
+                expect((await service.leaveParty()).isSuccess, isTrue);
+                expect(repository.memberships, isEmpty);
+                expect((await service.joinParty('new')).isSuccess, isTrue);
+              } else {
+                expect(next.isSuccess, isTrue);
+              }
+              expect(repository.memberships, {'new'});
+            },
+          );
+        }
+      }
+    }
+  });
+
+  test(
+    'review dispose shares completion with reentrant idle callback until cancellation finishes',
+    () async {
+      final gate = Completer<void>();
+      repository.cancellationDelays['metadata:old'] = gate.future;
+      await join();
+      final generation = service.state.generation;
+      Future<void>? reentrant;
+      service.stateStream.listen((state) {
+        if (state.phase == PartySessionPhase.idle && reentrant == null)
+          reentrant = service.dispose();
+      });
+      final outer = service.dispose();
+      var outerDone = false;
+      var innerDone = false;
+      unawaited(
+        outer.then((_) {
+          outerDone = true;
+        }),
+      );
+      unawaited(
+        reentrant!.then((_) {
+          innerDone = true;
+        }),
+      );
+      await pumpEventQueue();
+      final prematurelyDone = outerDone || innerDone;
+      final invalidations = service.state.generation - generation;
+      gate.complete();
+      await Future.wait([outer, reentrant!]);
+      expect(reentrant, same(outer));
+      expect(prematurelyDone, isFalse);
+      expect(invalidations, 1);
+      expect(repository.cancellations, {
+        'auth': 1,
+        'metadata:old': 1,
+        'playback:old': 1,
+        'queue:old': 1,
+      });
+    },
+  );
 
   test(
     'switch leaves old membership before target join and reads preflight once',
