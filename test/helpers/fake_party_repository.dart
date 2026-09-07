@@ -18,8 +18,13 @@ class FakePartyRepository implements PartyRepository {
       {};
   final Map<String, bool> joinableByPartyId = {};
 
+  /// Async callbacks invoked after an operation is recorded and before it
+  /// completes. Tests can use these to apply a precise state change mid-call.
+  final Map<String, FutureOr<void> Function()> operationCallbacks = {};
+
   final Map<String, Queue<PartyRepositoryException>> _failures = {};
   final Map<String, PartyPlaybackSnapshot?> _playbackByPartyId = {};
+  final Map<String, Completer<void>> _operationGates = {};
   String? _currentUserUid;
   int _nextPartyId = 1;
   int _nextQueueEntryId = 1;
@@ -33,6 +38,19 @@ class FakePartyRepository implements PartyRepository {
     _failures
         .putIfAbsent(operation, Queue<PartyRepositoryException>.new)
         .add(PartyRepositoryException(code, cause: cause));
+  }
+
+  /// Pauses a future repository operation until [releaseOperation] is called.
+  ///
+  /// This test-only control lets lifecycle tests change auth or generation
+  /// while an awaited repository operation is in flight.
+  void pauseOperation(String operation) {
+    _operationGates.putIfAbsent(operation, Completer<void>.new);
+  }
+
+  /// Releases the gate installed by [pauseOperation], if one exists.
+  void releaseOperation(String operation) {
+    _operationGates.remove(operation)?.complete();
   }
 
   StreamController<PartyMetadata?> metadataControllerFor(String partyId) {
@@ -70,38 +88,41 @@ class FakePartyRepository implements PartyRepository {
 
   @override
   Future<void> armDisconnect(String partyId) async {
-    _record('armDisconnect:$partyId', 'armDisconnect');
+    await _recordAndAwait('armDisconnect:$partyId', 'armDisconnect');
   }
 
   @override
   Future<void> disarmDisconnect(String partyId) async {
-    _record('disarmDisconnect:$partyId', 'disarmDisconnect');
+    await _recordAndAwait('disarmDisconnect:$partyId', 'disarmDisconnect');
   }
 
   @override
   Future<void> createReservedParty(String partyId, SongInfo initialSong) async {
-    _record('createReservedParty:$partyId', 'createReservedParty');
+    await _recordAndAwait('createReservedParty:$partyId', 'createReservedParty');
   }
 
   @override
   Future<bool> isJoinable(String partyId) async {
-    _record('isJoinable:$partyId', 'isJoinable');
+    await _recordAndAwait('isJoinable:$partyId', 'isJoinable');
     return joinableByPartyId[partyId] ?? true;
   }
 
   @override
   Future<void> joinParty(String partyId) async {
-    _record('joinParty:$partyId', 'joinParty');
+    await _recordAndAwait('joinParty:$partyId', 'joinParty');
   }
 
   @override
   Future<void> removeCurrentParticipant(String partyId) async {
-    _record('removeCurrentParticipant:$partyId', 'removeCurrentParticipant');
+    await _recordAndAwait(
+      'removeCurrentParticipant:$partyId',
+      'removeCurrentParticipant',
+    );
   }
 
   @override
   Future<void> endParty(String partyId) async {
-    _record('endParty:$partyId', 'endParty');
+    await _recordAndAwait('endParty:$partyId', 'endParty');
   }
 
   @override
@@ -124,7 +145,7 @@ class FakePartyRepository implements PartyRepository {
 
   @override
   Future<PartyPlaybackSnapshot?> readPlayback(String partyId) async {
-    _record('readPlayback:$partyId', 'readPlayback');
+    await _recordAndAwait('readPlayback:$partyId', 'readPlayback');
     return _playbackByPartyId[partyId];
   }
 
@@ -133,31 +154,32 @@ class FakePartyRepository implements PartyRepository {
     String partyId,
     PartyPlaybackSnapshot state,
   ) async {
-    _record('updatePlayback:$partyId', 'updatePlayback');
+    await _recordAndAwait('updatePlayback:$partyId', 'updatePlayback');
     _playbackByPartyId[partyId] = state;
     playbackControllerFor(partyId).add(state);
   }
 
   @override
   Future<void> addQueueSong(String partyId, SongInfo song) async {
-    _record('addQueueSong:$partyId', 'addQueueSong');
+    await _recordAndAwait('addQueueSong:$partyId', 'addQueueSong');
   }
 
   @override
   Future<void> removeQueueSong(String partyId, String entryId) async {
-    _record('removeQueueSong:$partyId:$entryId', 'removeQueueSong');
+    await _recordAndAwait(
+      'removeQueueSong:$partyId:$entryId',
+      'removeQueueSong',
+    );
   }
 
   @override
   Future<void> overwriteQueue(String partyId, List<SongInfo> songs) async {
-    _record('overwriteQueue:$partyId', 'overwriteQueue');
+    await _recordAndAwait('overwriteQueue:$partyId', 'overwriteQueue');
     final entries = List<PartyQueueEntry>.unmodifiable([
       for (final song in songs)
         PartyQueueEntry(
           entryId: 'queue-${_nextQueueEntryId++}',
           song: song,
-          addedByUid: _currentUserUid ?? '',
-          addedAt: 0,
         ),
     ]);
     queueControllerFor(partyId).add(entries);
@@ -183,5 +205,14 @@ class FakePartyRepository implements PartyRepository {
       _failures.remove(operation);
     }
     throw failure;
+  }
+
+  Future<void> _recordAndAwait(String call, String operation) async {
+    _record(call, operation);
+    final callback = operationCallbacks[operation];
+    if (callback != null) {
+      await callback();
+    }
+    await _operationGates[operation]?.future;
   }
 }

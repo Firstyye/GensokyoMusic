@@ -5,12 +5,11 @@ enum PartySessionPhase { idle, joining, active, leaving, ended, failed }
 enum PartyRole { host, listener }
 
 enum PartyFailureCode {
-  roomClosed,
-  notFound,
-  notJoinable,
   unauthenticated,
+  roomClosed,
   permissionDenied,
   network,
+  alreadyBusy,
   unknown,
 }
 
@@ -111,37 +110,42 @@ class PartyActionResult {
 }
 
 class PartyMetadata {
-  final String partyId;
   final String hostUid;
-  final bool isJoinable;
-  final int generation;
+  final String hostName;
   final int createdAt;
 
   const PartyMetadata({
-    required this.partyId,
     required this.hostUid,
-    required this.isJoinable,
-    required this.generation,
-    this.createdAt = 0,
+    required this.hostName,
+    required this.createdAt,
   });
 
-  factory PartyMetadata.fromMap(String partyId, Map<String, dynamic> map) {
+  /// Decodes only party roots that can still accept a participant join.
+  ///
+  /// The party ID is intentionally supplied by the repository path rather than
+  /// duplicated in the Realtime Database payload.
+  static PartyMetadata? tryFromMap(Map<String, dynamic> map) {
+    final hostUid = map['hostUid'];
+    final hostName = map['hostName'];
+    final createdAt = map['createdAt'];
+    final participants = map['participants'];
+    final hostParticipant = participants is Map ? participants[hostUid] : null;
+    if (map['status'] != 'active' ||
+        hostUid is! String ||
+        hostUid.isEmpty ||
+        hostName is! String ||
+        createdAt is! num ||
+        map['state'] is! Map ||
+        participants is! Map ||
+        hostParticipant is! Map ||
+        hostParticipant['isHost'] != true) {
+      return null;
+    }
     return PartyMetadata(
-      partyId: partyId,
-      hostUid: _stringValue(map['hostUid']),
-      isJoinable: map['isJoinable'] is bool ? map['isJoinable'] as bool : false,
-      generation: _intValue(map['generation']),
-      createdAt: _intValue(map['createdAt']),
+      hostUid: hostUid,
+      hostName: hostName,
+      createdAt: createdAt.toInt(),
     );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'hostUid': hostUid,
-      'isJoinable': isJoinable,
-      'generation': generation,
-      'createdAt': createdAt,
-    };
   }
 }
 
@@ -183,37 +187,20 @@ class PartyPlaybackSnapshot {
 class PartyQueueEntry {
   final String entryId;
   final SongInfo song;
-  final String addedByUid;
-  final int addedAt;
 
   const PartyQueueEntry({
     required this.entryId,
     required this.song,
-    required this.addedByUid,
-    required this.addedAt,
   });
 
   factory PartyQueueEntry.fromMap(String entryId, Map<String, dynamic> map) {
-    final rawSong = map['song'];
     return PartyQueueEntry(
       entryId: entryId,
-      song: SongInfo.fromMap(
-        rawSong is Map ? Map<String, dynamic>.from(rawSong) : const {},
-      ),
-      addedByUid: _stringValue(map['addedByUid']),
-      addedAt: _intValue(map['addedAt']),
+      song: SongInfo.fromMap(map),
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'song': song.toMap(),
-      'addedByUid': addedByUid,
-      'addedAt': addedAt,
-    };
-  }
+  Map<String, dynamic> toMap() => song.toMap();
 }
 
 int _intValue(Object? value) => value is num ? value.toInt() : 0;
-
-String _stringValue(Object? value) => value is String ? value : '';
