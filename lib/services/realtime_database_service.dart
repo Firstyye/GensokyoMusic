@@ -135,7 +135,25 @@ class RealtimeDatabaseService implements PartyRepository {
       throw const PartyRepositoryException(PartyFailureCode.permissionDenied);
     }
     // The server rechecks ownership if an election races this read.
-    await ref.remove();
+    try {
+      await ref.remove();
+    } on FirebaseException {
+      // A failed optimistic removal normally rolls back to the active room.
+      // If the room really disappeared remotely, rollback may stay null and
+      // produce no second event. Confirm that case before reporting closure.
+      if (currentUserUid == user.uid) {
+        DataSnapshot? current;
+        try {
+          current = await ref.get();
+        } catch (_) {
+          // An unavailable confirmation must not replace the original error.
+        }
+        if (current != null && !current.exists) {
+          throw const PartyRepositoryException(PartyFailureCode.roomClosed);
+        }
+      }
+      rethrow;
+    }
   });
 
   @override

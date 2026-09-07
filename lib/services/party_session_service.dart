@@ -44,7 +44,6 @@ class PartySessionService {
   bool _disposed = false;
   Future<void>? _disposeFuture;
   _SessionToken? _endingToken;
-  int? _endDeletionGeneration;
   bool _publishingState = false;
   final _pendingStates = Queue<PartySessionState>();
 
@@ -120,28 +119,31 @@ class PartySessionService {
     final id = _state.partyId!;
     _endingToken = token;
     try {
-      // Keep the active session if root deletion fails. A successful deletion
-      // can reach the metadata stream before this future completes.
-      await _guardRejected(token, () => _repository.endParty(id));
-      _clearMembership(id, token.uid);
-      final observedGeneration = _endDeletionGeneration;
-      final _SessionToken endedToken;
-      if (observedGeneration != null) {
-        endedToken = _SessionToken(token.uid, observedGeneration);
-        _check(endedToken);
-      } else {
-        _check(token);
-        endedToken = _SessionToken(token.uid, token.generation + 1);
-        await _teardownLocal();
-        _check(endedToken);
+      // Firebase emits an optimistic null before the server acknowledges a
+      // root removal. Keep membership and subscriptions until this succeeds,
+      // so rejection/rollback cannot strand a still-live remote membership.
+      try {
+        await _guardRejected(token, () => _repository.endParty(id));
+      } on PartyRepositoryException catch (error) {
+        // A missing-room read is authoritative even when the matching null
+        // event was deferred during this operation's optimistic removal.
+        if (error.code == PartyFailureCode.roomClosed && _isCurrent(token)) {
+          _clearMembership(id, token.uid);
+          await _teardownLocal();
+        }
+        rethrow;
       }
+      _check(token);
+      _clearMembership(id, token.uid);
+      final endedToken = _SessionToken(token.uid, token.generation + 1);
+      await _teardownLocal();
+      _check(endedToken);
       await _guardRejected(endedToken, () => _repository.disarmDisconnect(id));
       _check(endedToken);
       _publish(PartySessionState.ended(generation: _state.generation));
       return const PartyActionResult.success();
     } finally {
       _endingToken = null;
-      _endDeletionGeneration = null;
     }
   });
 
@@ -299,11 +301,13 @@ class PartySessionService {
     _metadataSub = _repository.watchMetadata(id).listen((metadata) {
       if (!_isCurrent(token) || !_state.isActive) return;
       if (metadata == null) {
-        _clearMembership(id, token.uid);
         if (_endingToken?.generation == token.generation &&
             _endingToken?.uid == token.uid) {
-          _endDeletionGeneration = token.generation + 1;
+          // End owns the acknowledgment decision. A rollback snapshot still
+          // flows through the live subscriptions without changing generation.
+          return;
         }
+        _clearMembership(id, token.uid);
         unawaited(_teardownLocal());
       } else {
         _publish(

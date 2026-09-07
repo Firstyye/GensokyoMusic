@@ -82,6 +82,206 @@ void main() {
       }
     });
 
+    Future<PartySessionService> startHost() async {
+      final service = PartySessionService.withRepository(repository);
+      addTearDown(service.dispose);
+      expect((await service.createParty(song)).isSuccess, true);
+      final root = _room()
+        ..['hostUid'] = 'u1'
+        ..['participants'] = {
+          'u1': {'name': 'Host', 'photoUrl': '', 'joinedAt': 1, 'isHost': true},
+        };
+      database.values['parties/push-1/hostUid'] = 'u1';
+      database.emit('parties/push-1', root);
+      await Future<void>.delayed(Duration.zero);
+      database.writes.clear();
+      return service;
+    }
+
+    for (final code in ['permission-denied', 'network-error']) {
+      test(
+        'optimistic End Party rollback preserves active membership after $code',
+        () async {
+          final service = await startHost();
+          final generation = service.state.generation;
+          final restored = database.values['parties/push-1'];
+          final gate = Completer<void>();
+          database.optimisticRemovals['parties/push-1'] = gate;
+          final pending = service.endParty();
+          await Future<void>.delayed(Duration.zero);
+          // The boundary emits Firebase's speculative root null while remove
+          // remains unacknowledged. Firebase later rolls it back before rejection.
+          expect(service.state.isHost, true);
+          expect(service.state.generation, generation);
+          expect(database.cancellations, isEmpty);
+          database.emit('parties/push-1', restored);
+          gate.completeError(
+            FirebaseException(plugin: 'firebase_database', code: code),
+          );
+          final result = await pending;
+          expect(
+            result.failure,
+            code == 'permission-denied'
+                ? PartyFailureCode.permissionDenied
+                : PartyFailureCode.network,
+          );
+          expect(service.state.partyId, 'push-1');
+          expect(service.state.isHost, true);
+          expect(service.state.generation, generation);
+          expect(database.cancellations, isEmpty);
+          expect(database.armed, {'parties/push-1/participants/u1'});
+          expect(
+            (await service.joinParty('another')).failure,
+            PartyFailureCode.alreadyBusy,
+          );
+          expect(database.writes.map((write) => write.$1), [
+            'remove:parties/push-1',
+          ]);
+          database.emit('parties/push-1/state', {
+            'isPlaying': true,
+            'positionSeconds': 7,
+            'updatedAt': 3,
+            'song': song.toMap(),
+          });
+          database.emit('parties/push-1/queue', {'q': song.toMap()});
+          await Future<void>.delayed(Duration.zero);
+          expect(service.playback?.positionSeconds, 7);
+          expect(service.queue.single.entryId, 'q');
+          // A genuine external deletion after rollback still tears down once.
+          database.emit('parties/push-1', null);
+          await Future<void>.delayed(Duration.zero);
+          expect(service.state.isActive, false);
+          expect(service.state.generation, generation + 1);
+          expect(database.cancellations.values, everyElement(1));
+        },
+      );
+    }
+
+    test(
+      'optimistic End Party success waits for acknowledgment before one teardown and disarm',
+      () async {
+        final service = await startHost();
+        final generation = service.state.generation;
+        final gate = Completer<void>();
+        database.optimisticRemovals['parties/push-1'] = gate;
+        final pending = service.endParty();
+        await Future<void>.delayed(Duration.zero);
+        expect(service.state.isHost, true);
+        expect(database.cancellations, isEmpty);
+        expect(database.armed, {'parties/push-1/participants/u1'});
+        gate.complete();
+        expect((await pending).isSuccess, true);
+        expect(service.state.phase, PartySessionPhase.ended);
+        expect(service.state.generation, generation + 1);
+        expect(database.cancellations, {
+          'parties/push-1': 1,
+          'parties/push-1/state': 1,
+          'parties/push-1/queue': 1,
+        });
+        expect(database.armed, isEmpty);
+        expect(database.writes.map((write) => write.$1), [
+          'remove:parties/push-1',
+          'disarm:parties/push-1/participants/u1',
+        ]);
+      },
+    );
+
+    test(
+      'external deletion during End Party host verification tears down the actual closed room',
+      () async {
+        final service = await startHost();
+        final generation = service.state.generation;
+        database.afterRead = () {
+          database.values['parties/push-1/hostUid'] = null;
+          database.emit('parties/push-1', null);
+        };
+        expect((await service.endParty()).failure, PartyFailureCode.roomClosed);
+        expect(service.state.isActive, false);
+        expect(service.state.generation, generation + 1);
+        expect(database.cancellations.values, everyElement(1));
+      },
+    );
+
+    test(
+      'external deletion during a rejected optimistic End Party is confirmed before teardown',
+      () async {
+        final service = await startHost();
+        final generation = service.state.generation;
+        final gate = Completer<void>();
+        database.optimisticRemovals['parties/push-1'] = gate;
+        final pending = service.endParty();
+        await Future<void>.delayed(Duration.zero);
+        // The server has actually removed the room, so rejection rolls back to
+        // another null and may not generate an additional onValue event.
+        gate.completeError(
+          FirebaseException(
+            plugin: 'firebase_database',
+            code: 'permission-denied',
+          ),
+        );
+        expect((await pending).failure, PartyFailureCode.roomClosed);
+        expect(service.state.isActive, false);
+        expect(service.state.generation, generation + 1);
+        expect(database.cancellations.values, everyElement(1));
+      },
+    );
+
+    for (final confirmationError in <Object>[
+      FirebaseException(plugin: 'firebase_database', code: 'network-error'),
+      StateError('confirmation failed'),
+    ]) {
+      test(
+        'optimistic End Party keeps original rejection when confirmation fails with ${confirmationError.runtimeType}',
+        () async {
+          final service = await startHost();
+          final restored = database.values['parties/push-1'];
+          final gate = Completer<void>();
+          database.optimisticRemovals['parties/push-1'] = gate;
+          final pending = service.endParty();
+          await Future<void>.delayed(Duration.zero);
+          database.emit('parties/push-1', restored);
+          database.readFailures['parties/push-1'] = confirmationError;
+          gate.completeError(
+            FirebaseException(
+              plugin: 'firebase_database',
+              code: 'permission-denied',
+            ),
+          );
+          expect((await pending).failure, PartyFailureCode.permissionDenied);
+          expect(service.state.isHost, true);
+          expect(database.cancellations, isEmpty);
+          expect(database.armed, {'parties/push-1/participants/u1'});
+        },
+      );
+    }
+
+    test(
+      'optimistic End Party cannot revive membership after auth loss and rollback',
+      () async {
+        final service = await startHost();
+        final restored = database.values['parties/push-1'];
+        final gate = Completer<void>();
+        database.optimisticRemovals['parties/push-1'] = gate;
+        final pending = service.endParty();
+        await Future<void>.delayed(Duration.zero);
+        auth.user = null;
+        auth.events.add(null);
+        await Future<void>.delayed(Duration.zero);
+        final terminal = service.state;
+        database.emit('parties/push-1', restored);
+        gate.completeError(
+          FirebaseException(
+            plugin: 'firebase_database',
+            code: 'permission-denied',
+          ),
+        );
+        expect((await pending).failure, PartyFailureCode.unauthenticated);
+        expect(service.state, same(terminal));
+        expect(service.state.isActive, false);
+        expect(database.armed, {'parties/push-1/participants/u1'});
+      },
+    );
+
     test(
       'reserves without writing and creates with one root set and server times',
       () async {
@@ -692,7 +892,11 @@ class _Database implements FirebaseDatabase {
   final values = <String, Object?>{};
   final writes = <(String, Object?)>[];
   final reads = <String>[];
+  final readFailures = <String, Object>{};
   final events = <String, StreamController<DatabaseEvent>>{};
+  final cancellations = <String, int>{};
+  final armed = <String>{};
+  final optimisticRemovals = <String, Completer<void>>{};
   FirebaseException? failure;
   void Function()? afterRead;
   int nextKey = 0;
@@ -705,9 +909,18 @@ class _Database implements FirebaseDatabase {
 
   Future<void> write(String operation, String path, Object? value) async {
     writes.add(('$operation:$path', value));
+    final pendingRemoval = operation == 'remove'
+        ? optimisticRemovals.remove(path)
+        : null;
+    if (pendingRemoval != null) {
+      emit(path, null);
+      await pendingRemoval.future;
+    }
     final error = failure;
     failure = null;
     if (error != null) throw error;
+    if (operation == 'arm') armed.add(path);
+    if (operation == 'disarm') armed.remove(path);
     values[path] = value;
   }
 
@@ -737,6 +950,8 @@ class _Reference implements DatabaseReference {
   @override
   Future<DataSnapshot> get() async {
     database.reads.add(path);
+    final failure = database.readFailures.remove(path);
+    if (failure != null) throw failure;
     database.afterRead?.call();
     return _Snapshot(database.values[path]);
   }
@@ -745,7 +960,16 @@ class _Reference implements DatabaseReference {
   OnDisconnect onDisconnect() => _Disconnect(database, path);
   @override
   Stream<DatabaseEvent> get onValue => database.events
-      .putIfAbsent(path, () => StreamController<DatabaseEvent>.broadcast())
+      .putIfAbsent(
+        path,
+        () => StreamController<DatabaseEvent>.broadcast(
+          onCancel: () => database.cancellations.update(
+            path,
+            (value) => value + 1,
+            ifAbsent: () => 1,
+          ),
+        ),
+      )
       .stream;
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
