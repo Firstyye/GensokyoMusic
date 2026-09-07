@@ -6,17 +6,33 @@ import 'package:yo/models/song_info.dart';
 import 'package:yo/services/party_repository.dart';
 
 class FakePartyRepository implements PartyRepository {
-  FakePartyRepository({String? currentUserUid}) : _currentUserUid = currentUserUid;
+  FakePartyRepository({String? currentUserUid})
+    : _currentUserUid = currentUserUid {
+    authUidController.onCancel = () => _cancelled('auth');
+  }
 
   final List<String> callLog = [];
   final StreamController<String?> authUidController =
       StreamController<String?>.broadcast();
   final Map<String, StreamController<PartyMetadata?>> metadataControllers = {};
   final Map<String, StreamController<PartyPlaybackSnapshot?>>
-      playbackControllers = {};
+  playbackControllers = {};
   final Map<String, StreamController<List<PartyQueueEntry>>> queueControllers =
       {};
   final Map<String, bool> joinableByPartyId = {};
+  final Map<String, int> cancellations = {};
+  final Map<String, SongInfo> createdSongs = {};
+  final Map<String, SongInfo> addedSongs = {};
+  final Map<String, List<SongInfo>> overwrittenSongs = {};
+
+  void _cancelled(String key) {
+    cancellations.update(key, (count) => count + 1, ifAbsent: () => 1);
+  }
+
+  void emitAuth(String? uid) {
+    _currentUserUid = uid;
+    authUidController.add(uid);
+  }
 
   /// Async callbacks invoked after an operation is recorded and before it
   /// completes. Tests can use these to apply a precise state change mid-call.
@@ -56,21 +72,29 @@ class FakePartyRepository implements PartyRepository {
   StreamController<PartyMetadata?> metadataControllerFor(String partyId) {
     return metadataControllers.putIfAbsent(
       partyId,
-      () => StreamController<PartyMetadata?>.broadcast(),
+      () => StreamController<PartyMetadata?>.broadcast(
+        onCancel: () => _cancelled('metadata:$partyId'),
+      ),
     );
   }
 
-  StreamController<PartyPlaybackSnapshot?> playbackControllerFor(String partyId) {
+  StreamController<PartyPlaybackSnapshot?> playbackControllerFor(
+    String partyId,
+  ) {
     return playbackControllers.putIfAbsent(
       partyId,
-      () => StreamController<PartyPlaybackSnapshot?>.broadcast(),
+      () => StreamController<PartyPlaybackSnapshot?>.broadcast(
+        onCancel: () => _cancelled('playback:$partyId'),
+      ),
     );
   }
 
   StreamController<List<PartyQueueEntry>> queueControllerFor(String partyId) {
     return queueControllers.putIfAbsent(
       partyId,
-      () => StreamController<List<PartyQueueEntry>>.broadcast(),
+      () => StreamController<List<PartyQueueEntry>>.broadcast(
+        onCancel: () => _cancelled('queue:$partyId'),
+      ),
     );
   }
 
@@ -98,7 +122,11 @@ class FakePartyRepository implements PartyRepository {
 
   @override
   Future<void> createReservedParty(String partyId, SongInfo initialSong) async {
-    await _recordAndAwait('createReservedParty:$partyId', 'createReservedParty');
+    await _recordAndAwait(
+      'createReservedParty:$partyId',
+      'createReservedParty',
+    );
+    createdSongs[partyId] = initialSong;
   }
 
   @override
@@ -162,6 +190,7 @@ class FakePartyRepository implements PartyRepository {
   @override
   Future<void> addQueueSong(String partyId, SongInfo song) async {
     await _recordAndAwait('addQueueSong:$partyId', 'addQueueSong');
+    addedSongs[partyId] = song;
   }
 
   @override
@@ -175,12 +204,10 @@ class FakePartyRepository implements PartyRepository {
   @override
   Future<void> overwriteQueue(String partyId, List<SongInfo> songs) async {
     await _recordAndAwait('overwriteQueue:$partyId', 'overwriteQueue');
+    overwrittenSongs[partyId] = List.of(songs);
     final entries = List<PartyQueueEntry>.unmodifiable([
       for (final song in songs)
-        PartyQueueEntry(
-          entryId: 'queue-${_nextQueueEntryId++}',
-          song: song,
-        ),
+        PartyQueueEntry(entryId: 'queue-${_nextQueueEntryId++}', song: song),
     ]);
     queueControllerFor(partyId).add(entries);
   }
