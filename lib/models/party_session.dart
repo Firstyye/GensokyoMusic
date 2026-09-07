@@ -29,68 +29,66 @@ class PartySessionState {
   });
 
   const PartySessionState.idle({int generation = 0})
-      : this._(
-          phase: PartySessionPhase.idle,
-          partyId: null,
-          role: null,
-          generation: generation,
-          failure: null,
-        );
+    : this._(
+        phase: PartySessionPhase.idle,
+        partyId: null,
+        role: null,
+        generation: generation,
+        failure: null,
+      );
 
-  const PartySessionState.joining({
-    required String partyId,
-    int generation = 0,
-  }) : this._(
-          phase: PartySessionPhase.joining,
-          partyId: partyId,
-          role: null,
-          generation: generation,
-          failure: null,
-        );
+  const PartySessionState.joining({required String partyId, int generation = 0})
+    : this._(
+        phase: PartySessionPhase.joining,
+        partyId: partyId,
+        role: null,
+        generation: generation,
+        failure: null,
+      );
 
   const PartySessionState.active({
     required String partyId,
     required PartyRole role,
     required int generation,
   }) : this._(
-          phase: PartySessionPhase.active,
-          partyId: partyId,
-          role: role,
-          generation: generation,
-          failure: null,
-        );
+         phase: PartySessionPhase.active,
+         partyId: partyId,
+         role: role,
+         generation: generation,
+         failure: null,
+       );
 
   const PartySessionState.leaving({
     required String partyId,
     required PartyRole role,
     required int generation,
   }) : this._(
-          phase: PartySessionPhase.leaving,
-          partyId: partyId,
-          role: role,
-          generation: generation,
-          failure: null,
-        );
+         phase: PartySessionPhase.leaving,
+         partyId: partyId,
+         role: role,
+         generation: generation,
+         failure: null,
+       );
 
   const PartySessionState.ended({int generation = 0})
-      : this._(
-          phase: PartySessionPhase.ended,
-          partyId: null,
-          role: null,
-          generation: generation,
-          failure: null,
-        );
+    : this._(
+        phase: PartySessionPhase.ended,
+        partyId: null,
+        role: null,
+        generation: generation,
+        failure: null,
+      );
 
   const PartySessionState.failed({
     required PartyFailureCode failure,
     int generation = 0,
   }) : this._(
-          phase: PartySessionPhase.failed,
-          partyId: null,
-          role: null,
-          generation: generation,
-          failure: failure,
-        );
+         phase: PartySessionPhase.failed,
+         partyId: null,
+         role: null,
+         generation: generation,
+         failure: failure,
+       );
 
   bool get isActive => phase == PartySessionPhase.active;
 
@@ -124,7 +122,20 @@ class PartyMetadata {
   ///
   /// The party ID is intentionally supplied by the repository path rather than
   /// duplicated in the Realtime Database payload.
-  static PartyMetadata? tryFromMap(Map<String, dynamic> map) {
+  static PartyMetadata? tryFromMap(Map<String, dynamic> map) =>
+      _decode(map, allowDepartedHost: false);
+
+  /// An existing session must survive the short interval between host removal
+  /// and the server's election/deletion transaction. Missing membership alone
+  /// is not a room-deletion signal; invalid metadata or an invalid *present*
+  /// host still is. Join preflights must continue using [tryFromMap].
+  static PartyMetadata? tryFromObservedMap(Map<String, dynamic> map) =>
+      _decode(map, allowDepartedHost: true);
+
+  static PartyMetadata? _decode(
+    Map<String, dynamic> map, {
+    required bool allowDepartedHost,
+  }) {
     final hostUid = map['hostUid'];
     final hostName = map['hostName'];
     final createdAt = map['createdAt'];
@@ -136,9 +147,14 @@ class PartyMetadata {
         hostName is! String ||
         createdAt is! num ||
         map['state'] is! Map ||
-        participants is! Map ||
-        hostParticipant is! Map ||
-        hostParticipant['isHost'] != true) {
+        (participants != null && participants is! Map)) {
+      return null;
+    }
+    final hostAbsent =
+        participants == null ||
+        (participants is Map && !participants.containsKey(hostUid));
+    if (!(allowDepartedHost && hostAbsent) &&
+        (hostParticipant is! Map || hostParticipant['isHost'] != true)) {
       return null;
     }
     return PartyMetadata(
@@ -188,19 +204,45 @@ class PartyQueueEntry {
   final String entryId;
   final SongInfo song;
 
-  const PartyQueueEntry({
-    required this.entryId,
-    required this.song,
-  });
+  const PartyQueueEntry({required this.entryId, required this.song});
 
   factory PartyQueueEntry.fromMap(String entryId, Map<String, dynamic> map) {
-    return PartyQueueEntry(
-      entryId: entryId,
-      song: SongInfo.fromMap(map),
-    );
+    return PartyQueueEntry(entryId: entryId, song: SongInfo.fromMap(map));
   }
 
   Map<String, dynamic> toMap() => song.toMap();
+}
+
+/// Firebase payload construction without depending on the Firebase SDK.
+class PartyDatabaseCodec {
+  static Map<String, dynamic> createPayload({
+    required String uid,
+    required String name,
+    required String photoUrl,
+    required SongInfo song,
+    required String queueEntryId,
+    required Object timestamp,
+  }) => {
+    'status': 'active',
+    'hostUid': uid,
+    'hostName': name,
+    'createdAt': timestamp,
+    'state': {
+      'isPlaying': false,
+      'positionSeconds': 0,
+      'updatedAt': timestamp,
+      'song': song.toMap(),
+    },
+    'participants': {
+      uid: {
+        'name': name,
+        'photoUrl': photoUrl,
+        'joinedAt': timestamp,
+        'isHost': true,
+      },
+    },
+    'queue': {queueEntryId: song.toMap()},
+  };
 }
 
 int _intValue(Object? value) => value is num ? value.toInt() : 0;

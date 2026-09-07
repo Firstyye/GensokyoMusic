@@ -3,9 +3,15 @@ import 'dart:collection';
 import '../models/party_session.dart';
 import '../models/song_info.dart';
 import 'party_repository.dart';
+import 'realtime_database_service.dart';
 
 /// Owns the app's one party membership and its subscriptions independently of UI.
 class PartySessionService {
+  static final PartySessionService _instance =
+      PartySessionService.withRepository(RealtimeDatabaseService());
+
+  factory PartySessionService() => _instance;
+
   PartySessionService.withRepository(
     this._repository, {
     Future<void> Function(Duration)? delay,

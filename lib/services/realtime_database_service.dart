@@ -1,76 +1,284 @@
+import 'dart:async';
+
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import '../models/party_session.dart';
 import '../models/song_info.dart';
+import 'party_repository.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 
-class RealtimeDatabaseService {
-  final FirebaseDatabase _db = FirebaseDatabase.instanceFor(
-    app: Firebase.app(),
-    databaseURL:
-        'https://flutterauth-d67b9-default-rtdb.asia-southeast1.firebasedatabase.app',
+class RealtimeDatabaseService implements PartyRepository {
+  RealtimeDatabaseService({FirebaseDatabase? database, FirebaseAuth? auth})
+    : _db =
+          database ??
+          FirebaseDatabase.instanceFor(
+            app: Firebase.app(),
+            databaseURL:
+                'https://flutterauth-d67b9-default-rtdb.asia-southeast1.firebasedatabase.app',
+          ),
+      _auth = auth ?? FirebaseAuth.instance;
+
+  final FirebaseDatabase _db;
+  final FirebaseAuth _auth;
+
+  @override
+  String? get currentUserUid => _auth.currentUser?.uid;
+
+  @override
+  Stream<String?> watchAuthUid() =>
+      _typedStream(() => _auth.authStateChanges().map((user) => user?.uid));
+
+  User _requireUser() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw const PartyRepositoryException(PartyFailureCode.unauthenticated);
+    }
+    return user;
+  }
+
+  @override
+  String reservePartyId() {
+    _requireUser();
+    try {
+      return _pushKey(_db.ref('parties'));
+    } on FirebaseException catch (error) {
+      throw _mapFirebaseFailure(error);
+    }
+  }
+
+  String _pushKey(DatabaseReference ref) {
+    final key = ref.push().key;
+    if (key == null) {
+      throw const PartyRepositoryException(PartyFailureCode.unknown);
+    }
+    return key;
+  }
+
+  @override
+  Future<void> armDisconnect(String partyId) => _authenticated(
+    (user) => _db
+        .ref('parties/$partyId/participants/${user.uid}')
+        .onDisconnect()
+        .remove(),
   );
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  @override
+  Future<void> disarmDisconnect(String partyId) => _authenticated(
+    (user) => _db
+        .ref('parties/$partyId/participants/${user.uid}')
+        .onDisconnect()
+        .cancel(),
+  );
+
+  @override
+  Future<void> createReservedParty(String partyId, SongInfo initialSong) =>
+      _authenticated((user) async {
+        final ref = _db.ref('parties/$partyId');
+        final queueEntryId = _pushKey(ref.child('queue'));
+        await ref.set(
+          PartyDatabaseCodec.createPayload(
+            uid: user.uid,
+            name: user.displayName ?? 'Host',
+            photoUrl: user.photoURL ?? '',
+            song: initialSong,
+            queueEntryId: queueEntryId,
+            timestamp: ServerValue.timestamp,
+          ),
+        );
+      });
+
+  @override
+  Future<bool> isJoinable(String partyId) => _authenticated((_) async {
+    final snapshot = await _db.ref('parties/$partyId').get();
+    final map = _map(snapshot.value);
+    return map != null && PartyMetadata.tryFromMap(map) != null;
+  });
+
+  @override
+  Future<void> joinParty(String partyId) => _authenticated((user) async {
+    // Rules evaluate the current parent atomically with this participant write.
+    // Never transact on the root: listeners cannot rewrite it.
+    try {
+      await _db.ref('parties/$partyId/participants/${user.uid}').set({
+        'name': user.displayName ?? user.email?.split('@').first ?? 'Guest',
+        'photoUrl': user.photoURL ?? '',
+        'isHost': false,
+        'joinedAt': ServerValue.timestamp,
+      });
+    } on FirebaseException catch (error) {
+      if (_firebaseCode(error) == 'permission-denied' &&
+          !await isJoinable(partyId)) {
+        throw const PartyRepositoryException(PartyFailureCode.roomClosed);
+      }
+      rethrow;
+    }
+  });
+
+  @override
+  Future<void> removeCurrentParticipant(String partyId) => _authenticated(
+    (user) => _db.ref('parties/$partyId/participants/${user.uid}').remove(),
+  );
+
+  @override
+  Future<void> endParty(String partyId) => _authenticated((user) async {
+    final ref = _db.ref('parties/$partyId');
+    final host = await ref.child('hostUid').get();
+    if (currentUserUid != user.uid) {
+      throw const PartyRepositoryException(PartyFailureCode.unauthenticated);
+    }
+    if (!host.exists) {
+      throw const PartyRepositoryException(PartyFailureCode.roomClosed);
+    }
+    if (host.value != user.uid) {
+      throw const PartyRepositoryException(PartyFailureCode.permissionDenied);
+    }
+    // The server rechecks ownership if an election races this read.
+    await ref.remove();
+  });
+
+  @override
+  Stream<PartyMetadata?> watchMetadata(String partyId) => _typedStream(() {
+    _requireUser();
+    return _db.ref('parties/$partyId').onValue.map((event) {
+      final map = _map(event.snapshot.value);
+      return map == null ? null : PartyMetadata.tryFromObservedMap(map);
+    });
+  });
+
+  @override
+  Stream<PartyPlaybackSnapshot?> watchPlayback(String partyId) =>
+      _typedStream(() {
+        _requireUser();
+        return _db
+            .ref('parties/$partyId/state')
+            .onValue
+            .map((event) => _playback(event.snapshot.value));
+      });
+
+  @override
+  Stream<List<PartyQueueEntry>> watchQueue(String partyId) => _typedStream(() {
+    _requireUser();
+    return _db.ref('parties/$partyId/queue').onValue.map((event) {
+      final map = _map(event.snapshot.value);
+      if (map == null) return <PartyQueueEntry>[];
+      final keys = map.keys.toList()..sort();
+      return [
+        for (final key in keys)
+          if (_map(map[key]) case final song?)
+            PartyQueueEntry.fromMap(key, song),
+      ];
+    });
+  });
+
+  @override
+  Future<PartyPlaybackSnapshot?> readPlayback(String partyId) => _authenticated(
+    (_) async =>
+        _playback((await _db.ref('parties/$partyId/state').get()).value),
+  );
+
+  @override
+  Future<void> updatePlayback(String partyId, PartyPlaybackSnapshot state) =>
+      _authenticated(
+        (_) => _db.ref('parties/$partyId/state').update({
+          ...state.toMap(),
+          'song': state.song?.toMap(),
+          'updatedAt': ServerValue.timestamp,
+        }),
+      );
+
+  @override
+  Future<void> addQueueSong(String partyId, SongInfo song) => _authenticated(
+    (_) => _db.ref('parties/$partyId/queue').push().set(song.toMap()),
+  );
+
+  @override
+  Future<void> removeQueueSong(String partyId, String entryId) =>
+      _authenticated(
+        (_) => _db.ref('parties/$partyId/queue/$entryId').remove(),
+      );
+
+  Future<T> _authenticated<T>(Future<T> Function(User) operation) async {
+    final user = _requireUser();
+    try {
+      return await operation(user);
+    } on FirebaseException catch (error) {
+      throw _mapFirebaseFailure(error);
+    }
+  }
+
+  Stream<T> _typedStream<T>(Stream<T> Function() source) {
+    try {
+      return source().transform(
+        StreamTransformer<T, T>.fromHandlers(
+          handleError: (Object error, StackTrace stack, EventSink<T> sink) =>
+              sink.addError(
+                error is FirebaseException ? _mapFirebaseFailure(error) : error,
+                stack,
+              ),
+        ),
+      );
+    } on FirebaseException catch (error, stack) {
+      return Stream<T>.error(_mapFirebaseFailure(error), stack);
+    }
+  }
+
+  static String _firebaseCode(FirebaseException error) =>
+      error.code.toLowerCase().replaceAll('_', '-').split('/').last;
+
+  static PartyRepositoryException _mapFirebaseFailure(FirebaseException error) {
+    final code = switch (_firebaseCode(error)) {
+      'permission-denied' => PartyFailureCode.permissionDenied,
+      'network-error' ||
+      'network-request-failed' ||
+      'disconnected' ||
+      'unavailable' => PartyFailureCode.network,
+      'unauthenticated' ||
+      'expired-token' ||
+      'invalid-token' => PartyFailureCode.unauthenticated,
+      'aborted' => PartyFailureCode.roomClosed,
+      _ => PartyFailureCode.unknown,
+    };
+    return PartyRepositoryException(code, cause: error);
+  }
+
+  static Map<String, dynamic>? _map(Object? value) =>
+      value is Map && value.keys.every((key) => key is String)
+      ? Map<String, dynamic>.from(value)
+      : null;
+
+  static PartyPlaybackSnapshot? _playback(Object? value) {
+    final map = _map(value);
+    return map == null ? null : PartyPlaybackSnapshot.fromMap(map);
+  }
 
   // ═══════════════════════════════════════════
   //  PARTY MANAGEMENT
   // ═══════════════════════════════════════════
 
   /// Creates a new party room and returns the room code.
+  @Deprecated('Use PartySessionService.createParty with an initial song')
   Future<String?> createParty({SongInfo? initialSong}) async {
-    final user = _auth.currentUser;
-    if (user == null) return null;
-
-    final partyRef = _db.ref('parties').push(); // Generate unique key
-    final roomId = partyRef.key;
-    if (roomId == null) return null;
-
-    final initialData = {
-      'hostUid': user.uid,
-      'hostName': user.displayName ?? 'Host',
-      'createdAt': ServerValue.timestamp,
-      'state': {
-        'isPlaying': false,
-        'positionSeconds': 0,
-        'song': initialSong?.toMap(),
-      },
-      'participants': {
-        user.uid: {
-          'name': user.displayName ?? 'Host',
-          'photoUrl': user.photoURL ?? '',
-          'isHost': true,
-          'joinedAt': ServerValue.timestamp,
-        },
-      },
-    };
-
-    await partyRef.set(initialData);
-
-    // If an initial song is provided, add it to the queue
-    if (initialSong != null) {
-      await partyRef.child('queue').push().set(initialSong.toMap());
-    }
-
+    _requireUser();
+    if (initialSong == null) return null;
+    final roomId = reservePartyId();
+    await createReservedParty(roomId, initialSong);
     return roomId;
   }
 
   /// Closes the party room and deletes all data/chat
-  Future<void> closeParty(String partyId) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-    await _db.ref('parties/$partyId').remove();
-  }
+  Future<void> closeParty(String partyId) => endParty(partyId);
 
   /// Check if party exists before joining
-  Future<bool> checkPartyExists(String partyId) async {
-    final snapshot = await _db.ref('parties/$partyId').get();
-    return snapshot.exists;
-  }
+  @Deprecated('Use PartySessionService.validateParty')
+  Future<bool> checkPartyExists(String partyId) => isJoinable(partyId);
 
   // ═══════════════════════════════════════════
   //  PARTICIPANTS MANAGEMENT
   // ═══════════════════════════════════════════
 
+  @Deprecated('Use PartySessionService.joinParty')
   Future<void> joinPartyUser(String partyId, {bool isHost = false}) async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -84,6 +292,7 @@ class RealtimeDatabaseService {
   }
 
   /// Removes user from party. If user is host, transfers host status or closes party.
+  @Deprecated('Use PartySessionService.leaveParty; server owns host election')
   Future<void> leavePartyUser(String partyId, bool wasHost) async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -145,22 +354,23 @@ class RealtimeDatabaseService {
   // ═══════════════════════════════════════════
 
   Future<void> addSongToQueue(String partyId, SongInfo song) async {
-    await _db.ref('parties/$partyId/queue').push().set(song.toMap());
+    await addQueueSong(partyId, song);
   }
 
   Future<void> removeSongFromQueue(String partyId, String pushId) async {
-    await _db.ref('parties/$partyId/queue/$pushId').remove();
+    await removeQueueSong(partyId, pushId);
   }
 
   /// For reordering, we rewrite the entire queue list to maintain strict order effortlessly
-  Future<void> overwriteQueue(String partyId, List<SongInfo> newQueue) async {
-    final ref = _db.ref('parties/$partyId/queue');
-    await ref.remove(); // Clear old queue
-
-    for (final song in newQueue) {
-      await ref.push().set(song.toMap());
-    }
-  }
+  @override
+  Future<void> overwriteQueue(String partyId, List<SongInfo> newQueue) =>
+      _authenticated((_) async {
+        final ref = _db.ref('parties/$partyId/queue');
+        final payload = {
+          for (final song in newQueue) _pushKey(ref): song.toMap(),
+        };
+        await ref.set(payload.isEmpty ? null : payload);
+      });
 
   Stream<DatabaseEvent> getPartyQueueStream(String partyId) {
     return _db.ref('parties/$partyId/queue').onValue;
@@ -283,9 +493,7 @@ class RealtimeDatabaseService {
         'lastMessageAt': ServerValue.timestamp,
       });
     } catch (e) {
-      print(
-        'RealtimeDatabaseService ERROR: Failed to send private message: $e',
-      );
+      debugPrint('RealtimeDatabaseService: private message send failed');
     }
   }
 
