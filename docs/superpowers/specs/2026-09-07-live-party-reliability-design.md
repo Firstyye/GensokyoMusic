@@ -81,6 +81,7 @@ Public lifecycle interface:
 
 ```dart
 Future<PartyActionResult> createParty(SongInfo initialSong);
+Future<PartyActionResult> validateParty(String partyId);
 Future<PartyActionResult> joinParty(String partyId);
 Future<PartyActionResult> switchParty(String targetPartyId);
 Future<PartyActionResult> leaveParty();
@@ -125,6 +126,10 @@ Party-specific changes:
 
 `LivePartyScreen` will render its role and lifecycle from the session state stream rather than copying `widget.isHost` into long-lived local state. It will own only screen-specific chat and presentation subscriptions and cancel them in `dispose()`.
 
+### Debug-only Firebase Emulator bootstrap
+
+Manual multi-client acceptance uses a compile-time `USE_FIREBASE_EMULATORS` flag. The bootstrap connects Firebase Auth and the exact regional Realtime Database instance to the local emulators before any service singleton is created. Android emulators default to `10.0.2.2`; desktop tests default to `127.0.0.1`; an explicit host override supports a USB-connected device. The bootstrap is a no-op unless both the compile-time flag and `kDebugMode` are true, so profile and release builds cannot be redirected accidentally.
+
 ## Realtime Database Model
 
 The existing shape is retained with two required fields added:
@@ -159,9 +164,9 @@ The first song is written into `state.song` and `queue` during party creation, r
 
 1. Reject an empty ID and an already-running lifecycle operation.
 2. Register `onDisconnect().remove()` on the prospective participant path.
-3. Run a transaction at the party root. Abort unless the party satisfies all joinability invariants; otherwise add the participant without changing host, state, or queue.
-4. Only after transaction commit, invalidate outstanding independent loads, stop independent playback, clear its queue, subscribe to the room, and publish active listener state.
-5. If the transaction aborts or fails, cancel the disconnect registration and do not change the current session.
+3. Write only the authenticated participant node. Security Rules evaluate the current parent atomically and reject the write unless the party satisfies all joinability invariants, so a deleted room cannot be recreated and a listener never receives permission to rewrite the complete root.
+4. Only after the participant write is acknowledged, invalidate outstanding independent loads, stop independent playback, clear its queue, subscribe to the room, and publish active listener state.
+5. If validation or the participant write fails, cancel the disconnect registration and do not change the current session.
 
 ### Switch
 
@@ -174,8 +179,8 @@ The first song is written into `state.song` and `queue` during party creation, r
 
 1. Capture the current party ID, role, and generation.
 2. Immediately increment the generation, invalidate party playback loads, cancel party subscriptions, and publish leaving state.
-3. Cancel the participant's registered `onDisconnect` handler.
-4. Remove the participant node and await server acknowledgement.
+3. Remove the participant node and await server acknowledgement while keeping `onDisconnect` armed as a fallback.
+4. After removal succeeds, cancel the now-redundant `onDisconnect` handler.
 5. The participant-deletion Firebase Function performs host succession or room deletion.
 6. Publish idle state. On a transient cleanup failure, report the failure and retry the idempotent participant removal without restoring stale subscriptions.
 
@@ -191,16 +196,16 @@ The first song is written into `state.song` and `queue` during party creation, r
 ### End Party
 
 1. Confirm locally that the session role is host.
-2. Cancel the host's `onDisconnect` registration.
-3. Delete the party root using an operation authorized only when the existing `hostUid` equals `auth.uid`.
-4. Invalidate local generation and subscriptions, then publish idle state.
+2. Delete the party root using an operation authorized only when the existing `hostUid` equals `auth.uid`.
+3. After deletion succeeds, cancel the now-redundant host `onDisconnect` registration.
+4. Invalidate local generation and subscriptions, then publish idle state. If deletion fails, preserve the active session and armed disconnect cleanup.
 5. Listener metadata streams observe the missing root and perform the same local teardown.
 
 ## Playback Synchronization Rules
 
 Each listener load captures `(generation, partyId, videoId, loadToken)`. Completion is accepted only if all four values still match. A newer song increments the token before starting its download. Leaving or switching increments both the party generation and load token.
 
-After a valid download completes, read fresh party state once, verify the tuple again, then seek and play/pause. A stale download may finish at the network layer but must never call `setAudioSource`, `seek`, `play`, update the current song, or emit player UI state.
+After a valid download completes, verify the tuple before entering a serialized player-mutation queue. A ticket that is already stale must never call `setAudioSource`, `seek`, `play`, update the current song, or emit player UI state. If a newer request arrives while an earlier valid `setAudioSource` call is already in progress, the earlier commit performs no subsequent mutation or emission and the newer serialized commit is guaranteed to install the final source. After installation, read fresh party state once, verify the tuple again, then seek and play/pause.
 
 Host writes include `updatedAt`. Listener state handling ignores snapshots older than the last accepted timestamp, preventing delayed events from moving playback backward after a newer state was applied.
 
@@ -219,7 +224,6 @@ Typed failures:
 ```dart
 enum PartyFailureCode {
   unauthenticated,
-  roomNotFound,
   roomClosed,
   permissionDenied,
   network,
@@ -240,13 +244,13 @@ The Home card and modal share the same confirmation and action helper so they ca
 - Only `data.child('hostUid').val() == auth.uid` may update playback state or queue, or delete the complete party.
 - Chat writes require the authenticated UID to exist in the party's participants.
 - Host identity changes performed by the Firebase Function use Admin credentials and bypass client rules.
-- Rules validate required field types and reject writes that remove the last valid host through ordinary client updates.
+- Rules validate required field types and reject ordinary client updates that remove the last valid host. The sole controlled exception is deletion of the authenticated current host's own participant node, which intentionally enters the short transition resolved by the server trigger.
 
 ## Testing Strategy
 
 ### Dart unit tests
 
-- Join succeeds only after the repository transaction commits.
+- Join succeeds only after the guarded participant write is acknowledged.
 - Failed join preserves the previous session or returns idle according to operation stage.
 - Switch awaits old-room leave before target join.
 - Every teardown cancels all subscriptions once and increments generation.
@@ -280,6 +284,9 @@ The Home card and modal share the same confirmation and action helper so they ca
 
 Use two Android emulator instances or one emulator plus a physical Android device with distinct accounts:
 
+- Start each debug client with `--dart-define=USE_FIREBASE_EMULATORS=true`; use the documented host override and `adb reverse` for a USB-connected physical device.
+- Create or sign in to two email/password accounts in the Auth Emulator so production authentication data is not used.
+
 1. Create a party and verify the initial song and queue appear atomically.
 2. Join from the second account and compare play, pause, seek, and skip behavior.
 3. Skip rapidly across multiple songs and confirm only the final selection plays for the listener.
@@ -294,6 +301,7 @@ Use two Android emulator instances or one emulator plus a physical Android devic
 - No destructive database migration is required; existing rooms lacking `status` are treated as non-joinable and may be removed before rollout.
 - Deploy the Firebase Function and RTDB rules before publishing the client that depends on them.
 - Validate function behavior and rules against the Firebase Emulator before production deployment.
+- Verify a release-mode resolver test and a release APK launch without the emulator flag before production smoke testing.
 - After backend deployment, run a short production smoke test with two test accounts, then build the next signed Android release.
 - Function logs should include party ID, departed UID, action (`noop`, `promote`, or `delete`), and promoted UID, without chat content or personal profile data.
 
