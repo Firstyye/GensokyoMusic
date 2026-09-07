@@ -14,9 +14,9 @@ import {
   serverTimestamp,
   set,
 } from "firebase/database";
-import {afterAll, beforeAll, beforeEach, describe, it} from "vitest";
+import {afterAll, beforeAll, beforeEach, describe, expect, it} from "vitest";
 
-const projectId = "demo-gensokyo-music";
+const projectId = "demo-gensokyo-music-rules";
 
 function participant(name: string, isHost: boolean) {
   return {
@@ -73,6 +73,15 @@ describe("Realtime Database security rules", () => {
 
   afterAll(async () => {
     await testEnv.cleanup();
+  });
+
+  it("uses a database namespace isolated from function integration tests", () => {
+    const database = testEnv.authenticatedContext("namespace-check").database();
+    const namespace = (database as unknown as {
+      _delegate: {_repoInternal: {repoInfo_: {namespace: string}}};
+    })._delegate._repoInternal.repoInfo_.namespace;
+
+    expect(namespace).toBe("demo-gensokyo-music-rules");
   });
 
   it("rejects unauthenticated party-list reads", async () => {
