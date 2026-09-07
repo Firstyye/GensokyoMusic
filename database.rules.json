@@ -1,6 +1,40 @@
 {
   "rules": {
-    ".read": false,
-    ".write": false
+    "parties": {
+      ".read": "auth != null",
+      "$partyId": {
+        ".write": "auth != null && ((!data.exists() && newData.exists() && newData.child('hostUid').val() === auth.uid) || (data.exists() && !newData.exists() && data.child('hostUid').val() === auth.uid))",
+        ".validate": "!newData.exists() || (newData.child('status').val() === 'active' && newData.child('hostUid').isString() && newData.child('hostName').isString() && newData.child('createdAt').isNumber() && newData.child('state').exists() && (newData.child('participants').child(newData.child('hostUid').val()).child('isHost').val() === true || (auth != null && data.child('hostUid').val() === auth.uid && !newData.child('participants').child(auth.uid).exists())))",
+        "hostUid": {".write": false},
+        "hostName": {".write": false},
+        "status": {".write": false},
+        "state": {
+          ".write": "auth != null && root.child('parties').child($partyId).child('hostUid').val() === auth.uid"
+        },
+        "queue": {
+          ".write": "auth != null && root.child('parties').child($partyId).child('hostUid').val() === auth.uid"
+        },
+        "participants": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && (root.child('parties').child($partyId).child('status').val() === 'active' || (!data.exists() && !newData.exists()))",
+            ".validate": "!newData.exists() || ((root.child('parties').child($partyId).exists() || $uid === auth.uid) && newData.child('name').isString() && newData.child('photoUrl').isString() && newData.child('joinedAt').isNumber() && ((!data.exists() && newData.child('joinedAt').val() === now) || (data.exists() && newData.child('joinedAt').val() === data.child('joinedAt').val())) && newData.child('isHost').val() === (newData.parent().parent().child('hostUid').val() === $uid))"
+          }
+        },
+        "chat": {
+          "$messageId": {
+            ".write": "auth != null && root.child('parties').child($partyId).child('participants').child(auth.uid).exists() && newData.child('uid').val() === auth.uid",
+            ".validate": "!newData.exists() || (newData.child('uid').isString() && newData.child('name').isString() && newData.child('photoUrl').isString() && newData.child('message').isString() && newData.child('timestamp').isNumber())"
+          }
+        }
+      }
+    },
+    "private_chats": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "status": {
+      ".read": "auth != null",
+      "$uid": {".write": "auth != null && auth.uid === $uid"}
+    }
   }
 }
