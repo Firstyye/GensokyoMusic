@@ -6,6 +6,7 @@ import 'pages/loginscreen.dart';
 import 'pages/main_layout.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'services/firebase_emulator_config.dart';
 
 bool seen = false;
 
@@ -20,6 +21,7 @@ void main() async {
   );
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await configureFirebaseEmulators();
 
   final prefs = await SharedPreferences.getInstance();
   seen = prefs.getBool('seen') ?? false;

@@ -1,3 +1,4 @@
+import 'firebase_emulator_config.dart';
 import 'dart:async';
 
 import 'package:firebase_database/firebase_database.dart';
@@ -15,8 +16,7 @@ class RealtimeDatabaseService implements PartyRepository {
           database ??
           FirebaseDatabase.instanceFor(
             app: Firebase.app(),
-            databaseURL:
-                'https://flutterauth-d67b9-default-rtdb.asia-southeast1.firebasedatabase.app',
+            databaseURL: gensokyoRealtimeDatabaseUrl,
           ),
       _auth = auth ?? FirebaseAuth.instance;
 
