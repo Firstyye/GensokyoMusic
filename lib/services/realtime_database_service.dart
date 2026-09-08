@@ -124,23 +124,23 @@ class RealtimeDatabaseService implements PartyRepository {
   @override
   Future<void> endParty(String partyId) => _authenticated((user) async {
     final ref = _db.ref('parties/$partyId');
-    final host = await ref.child('hostUid').get();
-    if (currentUserUid != user.uid) {
-      throw const PartyRepositoryException(PartyFailureCode.unauthenticated);
-    }
-    if (!host.exists) {
-      throw const PartyRepositoryException(PartyFailureCode.roomClosed);
-    }
-    if (host.value != user.uid) {
-      throw const PartyRepositoryException(PartyFailureCode.permissionDenied);
-    }
-    // The server rechecks ownership if an election races this read.
     try {
+      final host = await ref.child('hostUid').get();
+      if (currentUserUid != user.uid) {
+        throw const PartyRepositoryException(PartyFailureCode.unauthenticated);
+      }
+      if (!host.exists) {
+        throw const PartyRepositoryException(PartyFailureCode.roomClosed);
+      }
+      if (host.value != user.uid) {
+        throw const PartyRepositoryException(PartyFailureCode.permissionDenied);
+      }
+      // The server rechecks ownership if an election races this read.
       await ref.remove();
-    } on FirebaseException {
-      // A failed optimistic removal normally rolls back to the active room.
-      // If the room really disappeared remotely, rollback may stay null and
-      // produce no second event. Confirm that case before reporting closure.
+    } catch (_) {
+      // The session defers null metadata throughout End, including host
+      // verification. Reconcile every rejection: a genuine deletion during
+      // that read (or removal) may produce no second event afterward.
       if (currentUserUid == user.uid) {
         DataSnapshot? current;
         try {

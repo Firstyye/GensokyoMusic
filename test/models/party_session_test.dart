@@ -186,6 +186,42 @@ void main() {
       },
     );
 
+    for (final rejectedRead in [false, true]) {
+      test(
+        'deferred external deletion survives ${rejectedRead ? 'failed' : 'stale non-host'} host read',
+        () async {
+          final service = await startHost();
+          final generation = service.state.generation;
+          final gate = Completer<Object?>();
+          database.readGates['parties/push-1/hostUid'] = gate;
+          final pending = service.endParty();
+          await Future<void>.delayed(Duration.zero);
+          database.emit('parties/push-1', null);
+          await Future<void>.delayed(Duration.zero);
+          if (rejectedRead) {
+            gate.completeError(
+              FirebaseException(
+                plugin: 'firebase_database',
+                code: 'network-error',
+              ),
+            );
+          } else {
+            gate.complete('different-host');
+          }
+          expect((await pending).failure, PartyFailureCode.roomClosed);
+          expect(service.state.isActive, false);
+          expect(service.state.generation, generation + 1);
+          expect(database.cancellations, {
+            'parties/push-1': 1,
+            'parties/push-1/state': 1,
+            'parties/push-1/queue': 1,
+          });
+          expect(database.writes, isEmpty);
+          expect(database.armed, {'parties/push-1/participants/u1'});
+        },
+      );
+    }
+
     test(
       'external deletion during End Party host verification tears down the actual closed room',
       () async {
@@ -412,13 +448,14 @@ void main() {
     test(
       'end rejects a listener locally and removes a host room once',
       () async {
-        database.values['parties/room/hostUid'] = 'someone-else';
+        database.values['parties/room'] = _room();
+        database.values['parties/room/hostUid'] = 'old-host';
         await expectLater(
           repository.endParty('room'),
           throwsA(_failure(PartyFailureCode.permissionDenied)),
         );
         expect(database.writes, isEmpty);
-        database.values['parties/room/hostUid'] = 'u1';
+        auth.user = _User('old-host');
         await repository.endParty('room');
         expect(database.writes, [('remove:parties/room', null)]);
       },
@@ -893,6 +930,7 @@ class _Database implements FirebaseDatabase {
   final writes = <(String, Object?)>[];
   final reads = <String>[];
   final readFailures = <String, Object>{};
+  final readGates = <String, Completer<Object?>>{};
   final events = <String, StreamController<DatabaseEvent>>{};
   final cancellations = <String, int>{};
   final armed = <String>{};
@@ -950,6 +988,8 @@ class _Reference implements DatabaseReference {
   @override
   Future<DataSnapshot> get() async {
     database.reads.add(path);
+    final gate = database.readGates.remove(path);
+    if (gate != null) return _Snapshot(await gate.future);
     final failure = database.readFailures.remove(path);
     if (failure != null) throw failure;
     database.afterRead?.call();
