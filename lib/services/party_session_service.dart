@@ -53,6 +53,20 @@ class PartySessionService {
       _playbackController.stream;
   Stream<List<PartyQueueEntry>> get queueStream => _queueController.stream;
   PartyPlaybackSnapshot? get playback => _playback;
+
+  /// Refresh listener state without allowing a late read to cross sessions.
+  Future<PartyPlaybackSnapshot?> readPlayback() async {
+    if (!_state.isActive) return null;
+    final token = _capture();
+    final id = _state.partyId!;
+    final value = await _guardRejected(
+      token,
+      () => _repository.readPlayback(id),
+    );
+    _check(token);
+    return value;
+  }
+
   List<PartyQueueEntry> get queue => _queue;
 
   Future<PartyActionResult> createParty(SongInfo song) => _operate(() async {

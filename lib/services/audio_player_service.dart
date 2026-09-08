@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../models/party_session.dart';
+import 'party_session_service.dart';
+import 'party_playback_guard.dart';
 import 'package:just_audio/just_audio.dart' as ja;
 import 'package:audio_service/audio_service.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import '../models/song_info.dart';
-import '../services/realtime_database_service.dart';
+
 import '../services/firestore_service.dart';
 import '../services/youtube_api_clients.dart';
 import '../data/touhoudb_service.dart';
@@ -24,11 +26,29 @@ class AudioPlayerService {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
   factory AudioPlayerService() => _instance;
 
-  AudioPlayerService._internal() {
+  AudioPlayerService._internal() : _partySession = PartySessionService() {
     _player = ja.AudioPlayer();
     _yt = yt.YoutubeExplode();
     _setupPlayerListeners();
+    _sessionSub = _partySession.stateStream.listen(_onPartySession);
+    _onPartySession(_partySession.state);
   }
+
+  @visibleForTesting
+  AudioPlayerService.withDependencies({
+    required PartySessionService session,
+    required ja.AudioPlayer player,
+    required Future<ja.AudioSource?> Function(String, Object?) sourceBuilder,
+  }) : _partySession = session,
+       _sourceBuilder = sourceBuilder {
+    _player = player;
+    _yt = yt.YoutubeExplode();
+    _setupPlayerListeners();
+    _sessionSub = session.stateStream.listen(_onPartySession);
+    _onPartySession(session.state);
+  }
+
+  Future<ja.AudioSource?> Function(String, Object?)? _sourceBuilder;
 
   late final ja.AudioPlayer _player;
   late yt.YoutubeExplode _yt;
@@ -79,13 +99,20 @@ class AudioPlayerService {
   int get autoplayStartIndex => _autoplayStartIndex;
 
   // ── Party Sync & Firestore ──
-  String? _currentPartyId;
-  bool _isHost = false;
+  String? get _currentPartyId => _partySession.state.partyId;
+  bool get _isHost => _partySession.state.isHost;
   StreamSubscription? _partyStateSub;
   StreamSubscription? _partyQueueSub;
   Timer? _syncDebounce;
-  final RealtimeDatabaseService _rtdbService = RealtimeDatabaseService();
-  final FirestoreService _firestoreService = FirestoreService();
+  final PartySessionService _partySession;
+  final _partyGuard = PartyPlaybackGuard();
+  final _partyCommits = PartyPlaybackCommitQueue();
+  StreamSubscription<PartySessionState>? _sessionSub;
+  int? _mirroredGeneration;
+  PartyRole? _mirroredRole;
+  String? _requestedVideo;
+  PartyPlaybackTicket? _listenerTicket;
+  late final FirestoreService _firestoreService = FirestoreService();
 
   String? get currentPartyId => _currentPartyId;
   bool get isHost => _isHost;
@@ -143,6 +170,7 @@ class AudioPlayerService {
       }
 
       if (mapped != _lastEmittedState) {
+        if (_isLoadingSong) return;
         _lastEmittedState = mapped;
         _playerStateController.add(mapped);
       }
@@ -152,6 +180,7 @@ class AudioPlayerService {
 
       // Auto-advance on end
       if (state.processingState == ja.ProcessingState.completed) {
+        if (_currentPartyId != null && !_isHost) return;
         if (_isHandlingEnd) return;
         _isHandlingEnd = true;
 
@@ -196,11 +225,7 @@ class AudioPlayerService {
       return PlayResult.blockedAsListener;
 
     if (_currentPartyId != null && _isHost) {
-      _queue.add(songInfo);
-      _currentIndex = _queue.length - 1;
-      await _playQueueItem();
-      _rtdbService.addSongToQueue(_currentPartyId!, songInfo);
-      return PlayResult.ok;
+      return playPartySong(songInfo, enqueue: true);
     }
 
     _queue.clear();
@@ -222,8 +247,9 @@ class AudioPlayerService {
 
     if (_currentPartyId != null && _isHost) {
       for (final song in songs) {
+        final result = await _partySession.addQueueSong(song);
+        if (!result.isSuccess || !_isHost) return PlayResult.blockedAsListener;
         _queue.add(song);
-        _rtdbService.addSongToQueue(_currentPartyId!, song);
       }
       _currentIndex =
           _queue.length - songs.length + startIndex.clamp(0, songs.length - 1);
@@ -248,84 +274,45 @@ class AudioPlayerService {
 
   Future<void> _playQueueItem() async {
     if (_currentIndex < 0 || _currentIndex >= _queue.length) return;
-
-    final songInfo = _queue[_currentIndex];
-    _currentSong = songInfo;
-    _currentSongController.add(songInfo);
-
-    // Increment token — any in-flight download with an old token is stale
+    final song = _queue[_currentIndex];
     final token = ++_loadToken;
-
+    bool current() =>
+        token == _loadToken && !(_partySession.state.isActive && !_isHost);
+    _isLoadingSong = true;
     try {
-      final mediaTag = MediaItem(
-        id: songInfo.youtubeVideoId,
-        title: songInfo.title,
-        artist: songInfo.artist,
-        artUri: Uri.parse(songInfo.thumbnailUrl),
-      );
-
-      // Check prefetch cache BEFORE pausing
-      ja.AudioSource? source = _prefetchCache.remove(songInfo.youtubeVideoId);
-
-      if (source != null) {
-        // ── Cache HIT: seamless swap (NO pause → Android never sees audio stop) ──
-        debugPrint('AudioPlayerService: Cache HIT for ${songInfo.title}');
-        _isLoadingSong = true;
-
-        await _player.setAudioSource(source);
-        if (token != _loadToken) return;
-
-        _isLoadingSong = false;
-        _durationController.add(_player.duration ?? Duration.zero);
-        _positionController.add(_player.position);
-        _player.play();
-      } else {
-        // ── Cache MISS: pause + download (user must wait anyway) ──
-        debugPrint(
-          'AudioPlayerService: Cache MISS — downloading ${songInfo.title}',
-        );
-        // OOM Fix: Wipe stale cache to free RAM before a new heavy download
-        _prefetchCache.clear();
-
-        await _player.pause();
-        _isLoadingSong = true;
-        _positionController.add(Duration.zero);
-        _durationController.add(Duration.zero);
-        _playerStateController.add(PlayerState.buffering);
-
-        source = await _buildAudioSource(
-          songInfo.youtubeVideoId,
-          tag: mediaTag,
-        );
-        if (token != _loadToken) return;
-
-        if (source == null) {
-          debugPrint(
-            'AudioPlayerService: No playable stream for ${songInfo.youtubeVideoId}',
+      final source =
+          _prefetchCache.remove(song.youtubeVideoId) ??
+          await _buildAudioSource(
+            song.youtubeVideoId,
+            tag: MediaItem(
+              id: song.youtubeVideoId,
+              title: song.title,
+              artist: song.artist,
+              artUri: Uri.tryParse(song.thumbnailUrl),
+            ),
           );
-          _isLoadingSong = false;
-          _playerStateController.add(PlayerState.paused);
-          return;
-        }
-
-        debugPrint('AudioPlayerService: Playing ${songInfo.title}');
+      if (!current() || source == null) return;
+      await _partyCommits.run(() async {
+        if (!current()) return;
         await _player.setAudioSource(source);
-        if (token != _loadToken) return;
-
+        if (!current()) return;
+        _currentSong = song;
         _isLoadingSong = false;
-        _durationController.add(_player.duration ?? Duration.zero);
+        _currentSongController.add(song);
+        _durationController.add(_player.duration);
         _positionController.add(_player.position);
-        _player.play();
-      }
-
-      _firestoreService.addRecentlyPlayedSong(songInfo);
-      // Pre-buffer the next song in background
-      _prefetchNextSong();
-    } catch (e) {
-      if (token != _loadToken) return;
-      debugPrint('AudioPlayerService error: $e');
-      _isLoadingSong = false;
-      _playerStateController.add(PlayerState.paused);
+        unawaited(_player.play());
+        if (!current()) return;
+        _syncStateToParty();
+        if (_sourceBuilder == null) {
+          unawaited(_firestoreService.addRecentlyPlayedSong(song));
+          _prefetchNextSong();
+        }
+      });
+    } catch (_) {
+      if (current()) _playerStateController.add(PlayerState.paused);
+    } finally {
+      if (current()) _isLoadingSong = false;
     }
   }
 
@@ -397,6 +384,7 @@ class AudioPlayerService {
     String videoId, {
     Object? tag,
   }) async {
+    if (_sourceBuilder != null) return _sourceBuilder!(videoId, tag);
     try {
       final manifest = await _yt.videos.streamsClient.getManifest(
         videoId,
@@ -436,9 +424,15 @@ class AudioPlayerService {
   //  PLAYBACK CONTROLS
   // ═══════════════════════════════════════════
 
-  Future<void> play() async => _player.play();
+  Future<void> play() async {
+    if (_currentPartyId != null && !_isHost) return;
+    unawaited(_player.play());
+  }
 
-  Future<void> pause() async => _player.pause();
+  Future<void> pause() async {
+    if (_currentPartyId != null && !_isHost) return;
+    await _player.pause();
+  }
 
   Future<void> togglePlayPause() async {
     if (_currentPartyId != null && !_isHost) return;
@@ -554,7 +548,7 @@ class AudioPlayerService {
       // If host in party, push to RTDB
       if (_currentPartyId != null && _isHost) {
         for (final song in newSongs) {
-          _rtdbService.addSongToQueue(_currentPartyId!, song);
+          _partySession.addQueueSong(song);
         }
       }
     } catch (e) {
@@ -576,254 +570,246 @@ class AudioPlayerService {
   // ═══════════════════════════════════════════
 
   void _syncStateToParty() {
-    if (_currentPartyId == null || !_isHost) {
+    if (!_isHost || !_partySession.state.isActive) {
       _syncDebounce?.cancel();
       _syncDebounce = null;
       return;
     }
+    void publish() {
+      if (!_isHost) return;
+      unawaited(
+        _partySession.updatePlayback(
+          PartyPlaybackSnapshot(
+            song: _currentSong,
+            isPlaying: _isPlaying,
+            positionSeconds: _player.position.inSeconds,
+            updatedAt: 0,
+          ),
+        ),
+      );
+    }
 
-    // Immediately sync current state
-    _rtdbService.updatePartyState(
-      partyId: _currentPartyId!,
-      song: _currentSong,
-      isPlaying: _isPlaying,
-      positionSeconds: _player.position.inSeconds,
-    );
-
-    // Start/stop periodic position sync based on playing state
+    publish();
     if (_isPlaying) {
-      // Sync position every 1 second while playing
-      _syncDebounce ??= Timer.periodic(const Duration(seconds: 1), (_) {
-        if (_currentPartyId == null || !_isHost || !_isPlaying) {
-          _syncDebounce?.cancel();
-          _syncDebounce = null;
-          return;
-        }
-        _rtdbService.updatePartyState(
-          partyId: _currentPartyId!,
-          song: _currentSong,
-          isPlaying: _isPlaying,
-          positionSeconds: _player.position.inSeconds,
-        );
-      });
+      _syncDebounce ??= Timer.periodic(
+        const Duration(seconds: 1),
+        (_) => publish(),
+      );
     } else {
       _syncDebounce?.cancel();
       _syncDebounce = null;
     }
   }
 
-  void setHostParty(String partyId) {
-    _currentPartyId = partyId;
-    _isHost = true;
-    _syncStateToParty();
-    _rtdbService.joinPartyUser(partyId, isHost: true);
-    _listenToPartyQueue();
-    _loopMode = LoopMode.all; // Party queue defaults to loop all
-  }
-
-  Future<void> joinPartyAsListener(String partyId) async {
-    _currentPartyId = partyId;
-    _isHost = false;
-    _queue.clear();
-
-    // Cancel any in-flight _playQueueItem download
+  void _onPartySession(PartySessionState state) {
+    final generation = state.isActive ? state.generation : null;
+    if (generation == _mirroredGeneration && state.role == _mirroredRole)
+      return;
+    _mirroredGeneration = generation;
+    _mirroredRole = state.role;
+    _partyGuard.invalidate();
     ++_loadToken;
-
-    // Stop whatever is currently playing immediately
-    await _player.stop();
-    _currentSong = null;
-    _isLoadingSong = true;
-    _loopMode = LoopMode.all; // Party queue defaults to loop all
-
-    _rtdbService.joinPartyUser(partyId, isHost: false);
-    _listenToPartyQueue();
-
-    _partyStateSub?.cancel();
-    _partyStateSub = _rtdbService.getPartyStream(partyId).listen((event) async {
-      if (event.snapshot.value == null) return;
-
-      final data = Map<String, dynamic>.from(event.snapshot.value as Map);
-      final bool hostIsPlaying = data['isPlaying'] ?? false;
-      final int hostPosSecs = data['positionSeconds'] ?? 0;
-
-      SongInfo? hostSong;
-      if (data['song'] != null) {
-        hostSong = SongInfo.fromMap(Map<String, dynamic>.from(data['song']));
-      }
-
-      if (hostSong != null &&
-          hostSong.youtubeVideoId != _currentSong?.youtubeVideoId) {
-        _currentSong = hostSong;
-        _currentSongController.add(hostSong);
-        await _player.stop();
-        _isLoadingSong = true;
-        try {
-          await _loadAndPlayVideoId(
-            hostSong.youtubeVideoId,
-            shouldPlay: hostIsPlaying,
-          );
-        } finally {
-          _isLoadingSong = false;
-        }
-        return;
-      }
-
-      // Skip play/pause/seek while still downloading
-      if (_isLoadingSong) return;
-
-      if (hostIsPlaying && !_isPlaying) {
-        play();
-      } else if (!hostIsPlaying && _isPlaying) {
-        pause();
-      }
-
-      final int myPosSecs = _player.position.inSeconds;
-      if ((hostPosSecs - myPosSecs).abs() > 3) {
-        _player.seek(Duration(seconds: hostPosSecs));
-      }
-    });
-
-    _rtdbService.getPartyMetadataStream(partyId).listen((event) {
-      if (!event.snapshot.exists) return;
-      final meta = Map<String, dynamic>.from(event.snapshot.value as Map);
-      if (meta['hostUid'] == FirebaseAuth.instance.currentUser?.uid &&
-          !_isHost) {
-        _isHost = true;
-        _partyStateSub?.cancel();
-        _partyStateSub = null;
-        _syncStateToParty();
-      }
-    });
-  }
-
-  /// Ensures _currentIndex matches _currentSong's position in _queue.
-  void _syncCurrentIndex() {
-    if (_currentSong == null || _queue.isEmpty) return;
-    final idx = _queue.indexWhere(
-      (s) => s.youtubeVideoId == _currentSong!.youtubeVideoId,
-    );
-    if (idx != -1) _currentIndex = idx;
-  }
-
-  /// Helper to load a video by ID for party sync (listener side)
-  Future<void> _loadAndPlayVideoId(
-    String videoId, {
-    bool shouldPlay = true,
-  }) async {
-    try {
-      // Build a MediaItem tag for notification (use currentSong if available)
-      Object? mediaTag;
-      if (_currentSong != null) {
-        mediaTag = MediaItem(
-          id: _currentSong!.youtubeVideoId,
-          title: _currentSong!.title,
-          artist: _currentSong!.artist,
-          artUri: Uri.parse(_currentSong!.thumbnailUrl),
-        );
-      }
-      // Check prefetch cache first
-      ja.AudioSource? source = _prefetchCache.remove(videoId);
-      if (source != null) {
-        debugPrint('AudioPlayerService: Listener cache HIT for $videoId');
-      } else {
-        debugPrint(
-          'AudioPlayerService: Listener cache MISS — downloading $videoId',
-        );
-        // OOM Fix: Wipe stale cache to free RAM for the new download
-        _prefetchCache.clear();
-
-        source = await _buildAudioSource(videoId, tag: mediaTag);
-      }
-      if (source == null) return;
-
-      await _player.setAudioSource(source);
-      await _player.seek(Duration.zero);
-      await _player.pause();
-
-      // Small delay to let native streams propagate the new duration
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      // Manually emit duration/position since native events were blocked
-      _isLoadingSong = false;
-      _durationController.add(_player.duration ?? Duration.zero);
-      _positionController.add(_player.position);
-
-      // Read FRESH host state after download
-      if (_currentPartyId != null) {
-        final freshData = await _rtdbService.getPartyState(_currentPartyId!);
-        if (freshData != null) {
-          final freshPosSecs = (freshData['positionSeconds'] ?? 0) as int;
-          final freshIsPlaying = (freshData['isPlaying'] ?? true) as bool;
-          if (freshPosSecs > 0) {
-            await _player.seek(Duration(seconds: freshPosSecs));
-          }
-          if (freshIsPlaying) {
-            _player.play();
-          }
-          // Sync index before prefetching
-          _syncCurrentIndex();
-          _prefetchNextSong();
-          return;
-        }
-      }
-
-      // Fallback: use the initial shouldPlay flag
-      if (shouldPlay) {
-        _player.play();
-      }
-      // Sync index before prefetching
-      _syncCurrentIndex();
-      _prefetchNextSong();
-    } catch (e) {
-      debugPrint('AudioPlayerService: Failed to load video $videoId: $e');
-    }
-  }
-
-  void _listenToPartyQueue() {
-    _partyQueueSub?.cancel();
-    if (_currentPartyId == null) return;
-
-    _partyQueueSub = _rtdbService.getPartyQueueStream(_currentPartyId!).listen((
-      event,
-    ) {
-      _queue.clear();
-      if (event.snapshot.value != null) {
-        final Map<dynamic, dynamic> qMap =
-            event.snapshot.value as Map<dynamic, dynamic>;
-        final sortedKeys = qMap.keys.toList()..sort();
-        for (var key in sortedKeys) {
-          _queue.add(SongInfo.fromMap(Map<String, dynamic>.from(qMap[key])));
-        }
-      }
-      if (_currentSong != null) {
-        final idx = _queue.indexWhere(
-          (s) => s.youtubeVideoId == _currentSong!.youtubeVideoId,
-        );
-        if (idx != -1) _currentIndex = idx;
-      }
-      // Pre-buffer next song when party queue updates
-      _prefetchNextSong();
-    });
-  }
-
-  void leaveParty({bool isEndParty = false}) {
-    if (_currentPartyId != null) {
-      if (!isEndParty) {
-        _rtdbService.leavePartyUser(_currentPartyId!, _isHost);
-      } else if (_isHost) {
-        _rtdbService.closeParty(_currentPartyId!);
-      }
-    }
-
+    _listenerTicket = null;
+    _requestedVideo = null;
+    _isLoadingSong = false;
     _partyStateSub?.cancel();
     _partyQueueSub?.cancel();
     _partyStateSub = null;
     _partyQueueSub = null;
-    _currentPartyId = null;
-    _isHost = false;
+    _syncDebounce?.cancel();
+    _syncDebounce = null;
+    _queue.clear();
+    _prefetchCache.clear();
+    _currentIndex = -1;
+    if (!state.isActive) return;
+    _loopMode = LoopMode.all;
+    final id = state.partyId;
+    bool current() =>
+        _partySession.state.isActive &&
+        _partySession.state.generation == generation &&
+        _partySession.state.partyId == id;
+    void mirrorQueue() {
+      if (!current()) return;
+      _queue
+        ..clear()
+        ..addAll(_partySession.queue.map((entry) => entry.song));
+      _syncCurrentIndex();
+    }
 
-    // Force re-emit so MiniPlayer's StreamBuilder refreshes
-    _playerStateController.add(_mapPlayerState(_player.processingState));
+    // Read current session values on delivery: an async buffered event from
+    // a previous room must never become data for this generation.
+    _partyQueueSub = _partySession.queueStream.listen((_) => mirrorQueue());
+    mirrorQueue();
+    if (state.isHost) {
+      _syncStateToParty();
+      return;
+    }
+    unawaited(
+      _partyCommits.run(() async {
+        if (!current() || _isHost) return;
+        await _player.stop();
+        if (!current() || _isHost) return;
+        _currentSong = null;
+      }),
+    );
+    void mirrorPlayback() {
+      if (!current() || _isHost) return;
+      final snapshot = _partySession.playback;
+      if (snapshot != null) unawaited(_applyPartyPlayback(snapshot));
+    }
+
+    _partyStateSub = _partySession.playbackStream.listen(
+      (_) => mirrorPlayback(),
+    );
+    mirrorPlayback();
+  }
+
+  bool _acceptsParty(PartyPlaybackTicket ticket) =>
+      !_isHost &&
+      _partySession.state.isActive &&
+      _partyGuard.accepts(
+        ticket,
+        generation: _partySession.state.generation,
+        partyId: _currentPartyId,
+        videoId: _requestedVideo,
+      );
+
+  Future<void> _applyPartyPlayback(PartyPlaybackSnapshot snapshot) async {
+    final song = snapshot.song;
+    if (song == null || !_partyGuard.acceptTimestamp(snapshot.updatedAt))
+      return;
+    if (_requestedVideo == song.youtubeVideoId && _listenerTicket != null) {
+      if (_isLoadingSong) return;
+      final ticket = _listenerTicket!;
+      try {
+        await _partyCommits.run(() => _commitPartyPosition(ticket));
+      } catch (_) {
+        /* Next snapshot can retry a transient player failure. */
+      }
+      return;
+    }
+    _requestedVideo = song.youtubeVideoId;
+    ++_loadToken;
+    final ticket = _partyGuard.beginLoad(
+      generation: _partySession.state.generation,
+      partyId: _currentPartyId!,
+      videoId: song.youtubeVideoId,
+    );
+    _listenerTicket = ticket;
+    _isLoadingSong = true;
+    try {
+      final source = await _buildAudioSource(
+        song.youtubeVideoId,
+        tag: MediaItem(
+          id: song.youtubeVideoId,
+          title: song.title,
+          artist: song.artist,
+          artUri: Uri.tryParse(song.thumbnailUrl),
+        ),
+      );
+      if (!_acceptsParty(ticket)) return;
+      if (source == null) {
+        _isLoadingSong = false;
+        _requestedVideo = null;
+        return;
+      }
+      await _partyCommits.run(() async {
+        if (!_acceptsParty(ticket)) return;
+        await _player.setAudioSource(source);
+        if (!_acceptsParty(ticket)) return;
+        await _commitPartyPosition(ticket, refresh: true);
+        if (!_acceptsParty(ticket)) return;
+        if (_partySession.playback?.song?.youtubeVideoId != ticket.videoId)
+          return;
+        _currentSong = song;
+        _isLoadingSong = false;
+        _currentSongController.add(song);
+        _durationController.add(_player.duration);
+        _positionController.add(_player.position);
+        _syncCurrentIndex();
+        if (_sourceBuilder == null && _acceptsParty(ticket))
+          _prefetchNextSong();
+      });
+    } catch (_) {
+      if (_acceptsParty(ticket)) {
+        _isLoadingSong = false;
+        _requestedVideo = null;
+        _playerStateController.add(PlayerState.paused);
+      }
+    } finally {
+      if (_acceptsParty(ticket)) _isLoadingSong = false;
+    }
+  }
+
+  Future<void> _commitPartyPosition(
+    PartyPlaybackTicket ticket, {
+    bool refresh = false,
+  }) async {
+    if (!_acceptsParty(ticket)) return;
+    final fresh = refresh
+        ? await _partySession.readPlayback()
+        : _partySession.playback;
+    if (!_acceptsParty(ticket)) return;
+    if (fresh == null ||
+        fresh.song?.youtubeVideoId != ticket.videoId ||
+        !_partyGuard.acceptTimestamp(fresh.updatedAt))
+      return;
+    await _player.seek(Duration(seconds: fresh.positionSeconds));
+    if (!_acceptsParty(ticket)) return;
+    if (fresh.isPlaying) {
+      // just_audio play completes only when playback stops; don't block FIFO.
+      unawaited(_player.play());
+    } else {
+      await _player.pause();
+    }
+  }
+
+  void _syncCurrentIndex() {
+    _currentIndex = _queue.indexWhere(
+      (song) => song.youtubeVideoId == _currentSong?.youtubeVideoId,
+    );
+  }
+
+  Future<PlayResult> playPartySong(
+    SongInfo song, {
+    required bool enqueue,
+  }) async {
+    if (!_isHost) return PlayResult.blockedAsListener;
+    if (enqueue) {
+      final result = await _partySession.addQueueSong(song);
+      if (!result.isSuccess || !_isHost) return PlayResult.blockedAsListener;
+    }
+    _queue
+      ..clear()
+      ..addAll(_partySession.queue.map((entry) => entry.song));
+    var index = _queue.indexWhere(
+      (entry) => entry.youtubeVideoId == song.youtubeVideoId,
+    );
+    if (index < 0) {
+      _queue.add(song);
+      index = _queue.length - 1;
+    }
+    _currentIndex = index;
+    await _playQueueItem();
+    return PlayResult.ok;
+  }
+
+  @Deprecated('Use PartySessionService lifecycle methods')
+  void setHostParty(String partyId) => _onPartySession(_partySession.state);
+
+  @Deprecated('Use PartySessionService.joinParty')
+  Future<void> joinPartyAsListener(String partyId) async {
+    await _partySession.joinParty(partyId);
+  }
+
+  Future<void> leaveParty({bool isEndParty = false}) async {
+    _partyGuard.invalidate();
+    ++_loadToken;
+    if (isEndParty) {
+      await _partySession.endParty();
+    } else {
+      await _partySession.leaveParty();
+    }
   }
 
   Future<void> seek(Duration position) async {
@@ -837,6 +823,12 @@ class AudioPlayerService {
   // ═══════════════════════════════════════════
 
   void dispose() {
+    _partyGuard.invalidate();
+    ++_loadToken;
+    _sessionSub?.cancel();
+    _partyStateSub?.cancel();
+    _partyQueueSub?.cancel();
+    _syncDebounce?.cancel();
     _playerStateSub?.cancel();
     _positionSub?.cancel();
     _durationSub?.cancel();
@@ -846,6 +838,7 @@ class AudioPlayerService {
     _positionController.close();
     _durationController.close();
     _loopModeController.close();
+    _autoplayController.close();
     _player.dispose();
     _yt.close();
   }
