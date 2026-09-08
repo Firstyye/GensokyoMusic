@@ -6,11 +6,14 @@ import '../models/song_info.dart';
 import '../data/touhoudb_service.dart';
 import '../data/albumsList.dart';
 import '../data/popular_circle.dart';
-import '../services/realtime_database_service.dart';
 import '../services/audio_player_service.dart';
+import '../services/party_session_service.dart';
 import '../services/firestore_service.dart';
+import '../models/party_session.dart';
 import 'live_party_screen.dart';
+import 'loginscreen.dart';
 import '../widgets/custom_page_route.dart';
+import '../widgets/party_switch_confirmation.dart';
 
 class LivePartyModal extends StatefulWidget {
   const LivePartyModal({super.key});
@@ -22,8 +25,8 @@ class LivePartyModal extends StatefulWidget {
 class _LivePartyModalState extends State<LivePartyModal> {
   final TextEditingController _joinController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
-  final RealtimeDatabaseService _dbService = RealtimeDatabaseService();
   final AudioPlayerService _audioService = AudioPlayerService();
+  final PartySessionService _partySession = PartySessionService();
   final TouhouDBService _touhouDB = TouhouDBService();
   final FirestoreService _firestoreService = FirestoreService();
 
@@ -46,6 +49,43 @@ class _LivePartyModalState extends State<LivePartyModal> {
   int? _expandedArtistId;
   List<Albumslist>? _expandedArtistAlbums;
   bool _loadingArtistAlbums = false;
+
+  @override
+  void dispose() {
+    _joinController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _showPartyFailure(PartyActionResult result) {
+    if (!mounted || result.isSuccess) return;
+    if (result.failure == PartyFailureCode.unknown) {
+      debugPrint('Live Party action failed with an unknown error.');
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(partyFailureMessage(result.failure))),
+    );
+    if (result.failure == PartyFailureCode.unauthenticated) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => LoginScreen()),
+        (_) => false,
+      );
+    }
+  }
+
+  Future<PartyActionResult> _withPendingCleanupRetry(
+    Future<PartyActionResult> Function() action,
+  ) async {
+    var result = await action();
+    if (result.failure == PartyFailureCode.alreadyBusy &&
+        !_partySession.state.isActive &&
+        _partySession.state.partyId == null) {
+      final cleanup = await _partySession.leaveParty();
+      if (!cleanup.isSuccess) return cleanup;
+      result = await action();
+    }
+    return result;
+  }
 
   Future<void> _searchAll(String query) async {
     if (query.trim().isEmpty) {
@@ -168,281 +208,89 @@ class _LivePartyModalState extends State<LivePartyModal> {
   }
 
   Future<void> _createPartyWithSong(SongInfo song) async {
-    // Block if already hosting a party
-    if (_audioService.currentPartyId != null && _audioService.isHost) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1A1A2E),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            icon: const Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.redAccent,
-              size: 48,
-            ),
-            title: Text(
-              'Already Hosting',
-              style: headerTextStyle.copyWith(color: Colors.white),
-            ),
-            content: Text(
-              'You are already hosting Room ${_audioService.currentPartyId}. Leave that party first before creating a new one.',
-              style: bodyTextStyle.copyWith(color: Colors.white70),
-              textAlign: TextAlign.center,
-            ),
-            actionsAlignment: MainAxisAlignment.center,
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(
-                  'Got it',
-                  style: bodyTextStyle.copyWith(
-                    color: cyanAccent,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-      return;
-    }
-
-    // If listener in another party, ask to switch
-    if (_audioService.currentPartyId != null && !_audioService.isHost) {
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: Colors.grey[900],
-          title: Text(
-            'Leave Current Party?',
-            style: headerTextStyle.copyWith(color: Colors.white),
-          ),
-          content: Text(
-            'You are currently in Room ${_audioService.currentPartyId}. Do you want to leave and create a new party?',
-            style: bodyTextStyle.copyWith(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(
-                'Cancel',
-                style: bodyTextStyle.copyWith(color: Colors.white54),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(
-                'Leave & Create',
-                style: bodyTextStyle.copyWith(
-                  color: cyanAccent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-      if (confirm != true) return;
-      _audioService.leaveParty();
-    }
-
+    if (_isLoading) return;
+    final confirmed = await showPartySwitchConfirmation(
+      context,
+      _partySession.state,
+      '__new_party__',
+    );
+    if (!mounted || !confirmed) return;
     setState(() => _isLoading = true);
-    final partyId = await _dbService.createParty();
-    setState(() => _isLoading = false);
-
-    if (partyId != null && mounted) {
-      _audioService.setHostParty(partyId);
-      // Start download in background — navigate immediately
-      _audioService.playFromYoutubeId(song.youtubeVideoId, song);
-
-      Navigator.pop(context); // Close modal
-      Navigator.push(
-        context,
-        SlideFadeRoute(page: LivePartyScreen(partyId: partyId, isHost: true)),
-      );
-    } else {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1A1A2E),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            icon: const Icon(
-              Icons.error_outline_rounded,
-              color: Colors.redAccent,
-              size: 48,
-            ),
-            title: Text(
-              'Party Creation Failed',
-              style: headerTextStyle.copyWith(color: Colors.white),
-            ),
-            content: Text(
-              'Could not create the party. Please try again.',
-              style: bodyTextStyle.copyWith(color: Colors.white70),
-              textAlign: TextAlign.center,
-            ),
-            actionsAlignment: MainAxisAlignment.center,
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(
-                  'OK',
-                  style: bodyTextStyle.copyWith(
-                    color: cyanAccent,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
+    try {
+      if (_partySession.state.isActive) {
+        final leave = await _partySession.leaveParty();
+        if (!mounted) return;
+        if (!leave.isSuccess) {
+          _showPartyFailure(leave);
+          return;
+        }
       }
+      final result = await _withPendingCleanupRetry(
+        () => _partySession.createParty(song),
+      );
+      if (!mounted) return;
+      if (!result.isSuccess) {
+        _showPartyFailure(result);
+        return;
+      }
+      final partyId = _partySession.state.partyId;
+      if (partyId == null) {
+        _showPartyFailure(
+          const PartyActionResult.failure(PartyFailureCode.unknown),
+        );
+        return;
+      }
+      final playback = await _audioService.playPartySong(song, enqueue: false);
+      if (!mounted) return;
+      if (playback != PlayResult.ok) {
+        _showPartyFailure(
+          const PartyActionResult.failure(PartyFailureCode.permissionDenied),
+        );
+        return;
+      }
+      final navigator = Navigator.of(context);
+      navigator.pop();
+      await navigator.push(
+        SlideFadeRoute(page: LivePartyScreen(partyId: partyId)),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _joinParty() async {
     final code = _joinController.text.trim();
-    if (code.isEmpty) return;
-
-    // Block if already hosting a party
-    if (_audioService.currentPartyId != null && _audioService.isHost) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1A1A2E),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            icon: const Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.redAccent,
-              size: 48,
-            ),
-            title: Text(
-              'Already Hosting',
-              style: headerTextStyle.copyWith(color: Colors.white),
-            ),
-            content: Text(
-              'You are hosting Room ${_audioService.currentPartyId}. Leave that party first before joining another.',
-              style: bodyTextStyle.copyWith(color: Colors.white70),
-              textAlign: TextAlign.center,
-            ),
-            actionsAlignment: MainAxisAlignment.center,
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(
-                  'Got it',
-                  style: bodyTextStyle.copyWith(
-                    color: cyanAccent,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-      return;
-    }
-
-    // If listener in another party, ask to switch
-    if (_audioService.currentPartyId != null && !_audioService.isHost) {
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: Colors.grey[900],
-          title: Text(
-            'Switch Party?',
-            style: headerTextStyle.copyWith(color: Colors.white),
-          ),
-          content: Text(
-            'You are currently in Room ${_audioService.currentPartyId}. Do you want to leave and join Room $code?',
-            style: bodyTextStyle.copyWith(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(
-                'Cancel',
-                style: bodyTextStyle.copyWith(color: Colors.white54),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(
-                'Switch',
-                style: bodyTextStyle.copyWith(
-                  color: cyanAccent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-      if (confirm != true) return;
-      _audioService.leaveParty();
-    }
-
+    if (code.isEmpty || _isLoading) return;
     setState(() => _isLoading = true);
-    final exists = await _dbService.checkPartyExists(code);
-    setState(() => _isLoading = false);
-
-    if (exists && mounted) {
-      _joinController.clear();
-      await _audioService.joinPartyAsListener(code);
-      Navigator.pop(context); // Close modal
-      Navigator.push(
-        context,
-        SlideFadeRoute(page: LivePartyScreen(partyId: code, isHost: false)),
-      );
-    } else {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1A1A2E),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            icon: const Icon(
-              Icons.search_off_rounded,
-              color: Colors.orangeAccent,
-              size: 48,
-            ),
-            title: Text(
-              'Party Not Found',
-              style: headerTextStyle.copyWith(color: Colors.white),
-            ),
-            content: Text(
-              'Room "$code" does not exist or has already been closed.',
-              style: bodyTextStyle.copyWith(color: Colors.white70),
-              textAlign: TextAlign.center,
-            ),
-            actionsAlignment: MainAxisAlignment.center,
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(
-                  'OK',
-                  style: bodyTextStyle.copyWith(
-                    color: cyanAccent,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
+    try {
+      final targetReady = await _partySession.validateParty(code);
+      if (!mounted) return;
+      if (!targetReady.isSuccess) {
+        _showPartyFailure(targetReady);
+        return;
       }
+      final confirmed = await showPartySwitchConfirmation(
+        context,
+        _partySession.state,
+        code,
+      );
+      if (!mounted || !confirmed) return;
+      final result = await _withPendingCleanupRetry(
+        () => _partySession.switchParty(code),
+      );
+      if (!mounted) return;
+      if (!result.isSuccess) {
+        _showPartyFailure(result);
+        return;
+      }
+      _joinController.clear();
+      final navigator = Navigator.of(context);
+      navigator.pop();
+      await navigator.push(
+        SlideFadeRoute(page: LivePartyScreen(partyId: code)),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

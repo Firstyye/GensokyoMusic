@@ -562,7 +562,7 @@ class AudioPlayerService {
     _currentSongController.add(null);
     _queue.clear();
     _currentIndex = -1;
-    leaveParty();
+    await _partySession.leaveParty();
   }
 
   // ═══════════════════════════════════════════
@@ -792,24 +792,6 @@ class AudioPlayerService {
     _currentIndex = index;
     await _playQueueItem();
     return PlayResult.ok;
-  }
-
-  @Deprecated('Use PartySessionService lifecycle methods')
-  void setHostParty(String partyId) => _onPartySession(_partySession.state);
-
-  @Deprecated('Use PartySessionService.joinParty')
-  Future<void> joinPartyAsListener(String partyId) async {
-    await _partySession.joinParty(partyId);
-  }
-
-  Future<void> leaveParty({bool isEndParty = false}) async {
-    _partyGuard.invalidate();
-    ++_loadToken;
-    if (isEndParty) {
-      await _partySession.endParty();
-    } else {
-      await _partySession.leaveParty();
-    }
   }
 
   Future<void> seek(Duration position) async {

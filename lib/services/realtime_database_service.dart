@@ -275,93 +275,9 @@ class RealtimeDatabaseService implements PartyRepository {
   //  PARTY MANAGEMENT
   // ═══════════════════════════════════════════
 
-  /// Creates a new party room and returns the room code.
-  @Deprecated('Use PartySessionService.createParty with an initial song')
-  Future<String?> createParty({SongInfo? initialSong}) async {
-    _requireUser();
-    if (initialSong == null) return null;
-    final roomId = reservePartyId();
-    await createReservedParty(roomId, initialSong);
-    return roomId;
-  }
-
-  /// Closes the party room and deletes all data/chat
-  Future<void> closeParty(String partyId) => endParty(partyId);
-
-  /// Check if party exists before joining
-  @Deprecated('Use PartySessionService.validateParty')
-  Future<bool> checkPartyExists(String partyId) => isJoinable(partyId);
-
   // ═══════════════════════════════════════════
   //  PARTICIPANTS MANAGEMENT
   // ═══════════════════════════════════════════
-
-  @Deprecated('Use PartySessionService.joinParty')
-  Future<void> joinPartyUser(String partyId, {bool isHost = false}) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    await _db.ref('parties/$partyId/participants/${user.uid}').set({
-      'name': user.displayName ?? user.email?.split('@').first ?? 'Guest',
-      'photoUrl': user.photoURL ?? '',
-      'isHost': isHost,
-      'joinedAt': ServerValue.timestamp,
-    });
-  }
-
-  /// Removes user from party. If user is host, transfers host status or closes party.
-  @Deprecated('Use PartySessionService.leaveParty; server owns host election')
-  Future<void> leavePartyUser(String partyId, bool wasHost) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    final partyRef = _db.ref('parties/$partyId');
-
-    // Remove the user from participants
-    await partyRef.child('participants/${user.uid}').remove();
-
-    if (wasHost) {
-      // Find the next oldest user to promote
-      final participantsSnap = await partyRef.child('participants').get();
-      if (!participantsSnap.exists || participantsSnap.value == null) {
-        // Room is empty, delete it entirely
-        await closeParty(partyId);
-        return;
-      }
-
-      final participantsMap = Map<dynamic, dynamic>.from(
-        participantsSnap.value as Map,
-      );
-      if (participantsMap.isEmpty) {
-        await closeParty(partyId);
-        return;
-      }
-
-      // Find user with earliest joinedAt
-      String? nextHostUid;
-      int earliestTime = double.maxFinite.toInt();
-      String nextHostName = 'Host';
-
-      participantsMap.forEach((uid, data) {
-        final pData = Map<String, dynamic>.from(data);
-        final joinedAt = pData['joinedAt'] ?? 0;
-        if (joinedAt < earliestTime) {
-          earliestTime = joinedAt;
-          nextHostUid = uid.toString();
-          nextHostName = pData['name'] ?? 'Host';
-        }
-      });
-
-      if (nextHostUid != null) {
-        // Promote the next user
-        await partyRef.child('participants/$nextHostUid/isHost').set(true);
-        await partyRef.update({
-          'hostUid': nextHostUid,
-          'hostName': nextHostName,
-        });
-      }
-    }
-  }
 
   Stream<DatabaseEvent> getPartyParticipantsStream(String partyId) {
     return _db.ref('parties/$partyId/participants').onValue;
@@ -370,14 +286,6 @@ class RealtimeDatabaseService implements PartyRepository {
   // ═══════════════════════════════════════════
   //  QUEUE MANAGEMENT
   // ═══════════════════════════════════════════
-
-  Future<void> addSongToQueue(String partyId, SongInfo song) async {
-    await addQueueSong(partyId, song);
-  }
-
-  Future<void> removeSongFromQueue(String partyId, String pushId) async {
-    await removeQueueSong(partyId, pushId);
-  }
 
   /// For reordering, we rewrite the entire queue list to maintain strict order effortlessly
   @override

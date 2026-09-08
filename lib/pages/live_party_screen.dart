@@ -1,25 +1,26 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
 import '../models/song_info.dart';
+import '../models/party_session.dart';
 import '../services/realtime_database_service.dart';
 import '../services/audio_player_service.dart';
+import '../services/party_session_service.dart';
 import '../widgets/add_song_search_sheet.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/_buildMiniPlayer.dart';
 import '../widgets/custom_page_route.dart';
+import '../widgets/party_switch_confirmation.dart';
 import 'full_player_screen.dart';
+import 'loginscreen.dart';
 
 class LivePartyScreen extends StatefulWidget {
   final String partyId;
-  final bool isHost; // Initial host state
 
-  const LivePartyScreen({
-    super.key,
-    required this.partyId,
-    required this.isHost,
-  });
+  const LivePartyScreen({super.key, required this.partyId});
 
   @override
   State<LivePartyScreen> createState() => _LivePartyScreenState();
@@ -28,54 +29,67 @@ class LivePartyScreen extends StatefulWidget {
 class _LivePartyScreenState extends State<LivePartyScreen> {
   final RealtimeDatabaseService _dbService = RealtimeDatabaseService();
   final AudioPlayerService _audioService = AudioPlayerService();
+  final PartySessionService _partySession = PartySessionService();
   final TextEditingController _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   late Stream<DatabaseEvent> _chatStream;
-  late Stream<DatabaseEvent> _metadataStream;
-  late Stream<DatabaseEvent> _queueStream;
+  StreamSubscription<PartySessionState>? _sessionSub;
 
   bool _isCurrentlyHost = false;
+  bool _screenWasActive = false;
+  bool _closing = false;
 
   @override
   void initState() {
     super.initState();
-    _isCurrentlyHost = widget.isHost;
-
     _chatStream = _dbService.getChatStream(widget.partyId).asBroadcastStream();
-    _metadataStream = _dbService
-        .getPartyMetadataStream(widget.partyId)
-        .asBroadcastStream();
-    _queueStream = _dbService
-        .getPartyQueueStream(widget.partyId)
-        .asBroadcastStream();
+    _applySessionState(_partySession.state, notifyPromotion: false);
+    _sessionSub = _partySession.stateStream.listen(_applySessionState);
+  }
 
-    // Listen to metadata to see if the host closes the party or transfers host
-    _metadataStream.listen((event) {
-      if (!event.snapshot.exists && mounted && !_isCurrentlyHost) {
-        // Party deleted — clean up audio service state so HomeScreen banner disappears
-        _audioService.leaveParty();
-        if (Navigator.canPop(context)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('The host closed the party.')),
-          );
-          Navigator.pop(context);
-        }
-      } else if (event.snapshot.exists && mounted) {
-        final meta = Map<String, dynamic>.from(event.snapshot.value as Map);
-        final myUid = FirebaseAuth.instance.currentUser?.uid;
-
-        // If host changes to me
-        if (meta['hostUid'] == myUid && !_isCurrentlyHost) {
-          setState(() {
-            _isCurrentlyHost = true;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('You are now the Host!')),
-          );
-        }
+  void _applySessionState(
+    PartySessionState state, {
+    bool notifyPromotion = true,
+  }) {
+    if (!mounted) return;
+    final belongsHere = state.isActive && state.partyId == widget.partyId;
+    if (belongsHere) {
+      _screenWasActive = true;
+      final promoted = !_isCurrentlyHost && state.isHost;
+      if (_isCurrentlyHost != state.isHost) {
+        setState(() => _isCurrentlyHost = state.isHost);
       }
-    });
+      if (promoted && notifyPromotion) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('You are now the Host!')));
+      }
+      return;
+    }
+    if (_screenWasActive && !_closing) {
+      _closing = true;
+      final failure = state.failure ?? PartyFailureCode.roomClosed;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(partyFailureMessage(failure))));
+      if (failure == PartyFailureCode.unauthenticated) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => LoginScreen()),
+          (_) => false,
+        );
+        return;
+      }
+      if (Navigator.canPop(context)) Navigator.pop(context);
+    }
+  }
+
+  @override
+  void dispose() {
+    _sessionSub?.cancel();
+    _msgController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _sendMessage({SongInfo? song}) {
@@ -122,9 +136,35 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
     );
   }
 
-  void _leaveParty(bool endPartyForAll) {
-    _audioService.leaveParty(isEndParty: endPartyForAll);
-    Navigator.pop(context);
+  void _showPartyFailure(PartyActionResult result) {
+    if (!mounted || result.isSuccess) return;
+    if (result.failure == PartyFailureCode.unknown) {
+      debugPrint('Live Party action failed with an unknown error.');
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(partyFailureMessage(result.failure))),
+    );
+    if (result.failure == PartyFailureCode.unauthenticated) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => LoginScreen()),
+        (_) => false,
+      );
+    }
+  }
+
+  Future<void> _leaveParty(bool endPartyForAll) async {
+    if (_closing) return;
+    _closing = true;
+    final result = endPartyForAll
+        ? await _partySession.endParty()
+        : await _partySession.leaveParty();
+    if (!mounted) return;
+    if (!result.isSuccess) {
+      _closing = false;
+      _showPartyFailure(result);
+      return;
+    }
+    if (Navigator.canPop(context)) Navigator.pop(context);
   }
 
   void _showParticipantsMenu() {
@@ -801,10 +841,12 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
   }
 
   Widget _buildQueueList() {
-    return StreamBuilder<DatabaseEvent>(
-      stream: _queueStream,
+    return StreamBuilder<List<PartyQueueEntry>>(
+      stream: _partySession.queueStream,
+      initialData: _partySession.queue,
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
+        final entries = snapshot.data ?? const <PartyQueueEntry>[];
+        if (entries.isEmpty) {
           return Center(
             child: Text(
               "Queue is empty.",
@@ -813,12 +855,6 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
           );
         }
 
-        final Map<dynamic, dynamic> qMap =
-            snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
-        // Sort keys to maintain chronological push id order
-        final sortedKeys = qMap.keys.toList()..sort();
-
-        // Build the queue display items
         return ReorderableListView.builder(
           padding: const EdgeInsets.fromLTRB(
             0,
@@ -826,34 +862,30 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
             0,
             80,
           ), // Add bottom padding for FAB
-          itemCount: sortedKeys.length,
+          itemCount: entries.length,
           buildDefaultDragHandles: _isCurrentlyHost, // Only host can reorder
-          onReorder: (oldIndex, newIndex) {
+          onReorder: (oldIndex, newIndex) async {
             if (!_isCurrentlyHost) return;
-            setState(() {
-              if (newIndex > oldIndex) newIndex--;
-              final key = sortedKeys.removeAt(oldIndex);
-              sortedKeys.insert(newIndex, key);
-
-              // Map keys back to Songs and overwrite RTDB
-              List<SongInfo> newQueue = sortedKeys.map((k) {
-                return SongInfo.fromMap(Map<String, dynamic>.from(qMap[k]));
-              }).toList();
-
-              _dbService.overwriteQueue(widget.partyId, newQueue);
-            });
+            final reordered = List<PartyQueueEntry>.of(entries);
+            if (newIndex > oldIndex) newIndex--;
+            final entry = reordered.removeAt(oldIndex);
+            reordered.insert(newIndex, entry);
+            final result = await _partySession.overwriteQueue(
+              reordered.map((entry) => entry.song).toList(),
+            );
+            if (!mounted) return;
+            if (!result.isSuccess) _showPartyFailure(result);
           },
           itemBuilder: (context, index) {
-            final key = sortedKeys[index];
-            final songData = Map<String, dynamic>.from(qMap[key]);
-            final song = SongInfo.fromMap(songData);
+            final entry = entries[index];
+            final song = entry.song;
 
             final isPlaying =
                 _audioService.currentSong?.youtubeVideoId ==
                 song.youtubeVideoId;
 
             return ListTile(
-              key: ValueKey(key),
+              key: ValueKey(entry.entryId),
               leading: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: CachedNetworkImage(
@@ -901,11 +933,12 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
                         Icons.remove_circle_outline,
                         color: Colors.white54,
                       ),
-                      onPressed: () {
-                        _dbService.removeSongFromQueue(
-                          widget.partyId,
-                          key.toString(),
+                      onPressed: () async {
+                        final result = await _partySession.removeQueueSong(
+                          entry.entryId,
                         );
+                        if (!mounted) return;
+                        if (!result.isSuccess) _showPartyFailure(result);
                       },
                     )
                   : null,
@@ -1002,11 +1035,16 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return AddSongSearchSheet(
-          onSongSelected: (song) {
-            _dbService.addSongToQueue(widget.partyId, song);
-            Navigator.pop(context);
+          onSongSelected: (song) async {
+            Navigator.pop(sheetContext);
+            final result = await _partySession.addQueueSong(song);
+            if (!mounted) return;
+            if (!result.isSuccess) {
+              _showPartyFailure(result);
+              return;
+            }
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Added ${song.title} to queue')),
             );

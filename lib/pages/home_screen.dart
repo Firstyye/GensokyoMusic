@@ -17,15 +17,19 @@ import 'package:yo/data/touhoudb_service.dart';
 import 'package:yo/data/albumsList.dart';
 import 'package:yo/data/popular_circle.dart';
 import '../services/audio_player_service.dart';
+import '../services/party_session_service.dart';
 import '../services/realtime_database_service.dart';
 import '../services/firestore_service.dart';
+import '../models/party_session.dart';
 import '../models/song_info.dart';
 import 'live_party_modal.dart';
 import 'live_party_screen.dart';
+import 'loginscreen.dart';
 import 'album_details_screen.dart';
 import 'artist_details_screen.dart';
 import '../widgets/_buildMiniPlayer.dart';
 import '../widgets/custom_page_route.dart';
+import '../widgets/party_switch_confirmation.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -39,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen>
   final user = FirebaseAuth.instance.currentUser;
   final TouhouDBService _service = TouhouDBService();
   final AudioPlayerService _audioService = AudioPlayerService();
+  final PartySessionService _partySession = PartySessionService();
   final RealtimeDatabaseService _dbService = RealtimeDatabaseService();
   final FirestoreService _firestoreService = FirestoreService();
 
@@ -53,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   // Live Parties — manual subscription so scroll can't kill it
   StreamSubscription<DatabaseEvent>? _partiesSub;
+  StreamSubscription<PartySessionState>? _partySessionSub;
   List<MapEntry<dynamic, dynamic>> _activeParties = [];
   bool _partiesLoading = true;
 
@@ -102,12 +108,69 @@ class _HomeScreenState extends State<HomeScreen>
         });
       }
     });
+    _partySessionSub = _partySession.stateStream.listen((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _partiesSub?.cancel();
+    _partySessionSub?.cancel();
     super.dispose();
+  }
+
+  void _showPartyFailure(PartyActionResult result) {
+    if (!mounted || result.isSuccess) return;
+    if (result.failure == PartyFailureCode.unknown) {
+      debugPrint('Live Party action failed with an unknown error.');
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(partyFailureMessage(result.failure))),
+    );
+    if (result.failure == PartyFailureCode.unauthenticated) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => LoginScreen()),
+        (_) => false,
+      );
+    }
+  }
+
+  Future<PartyActionResult> _switchWithCleanupRetry(String partyId) async {
+    var result = await _partySession.switchParty(partyId);
+    if (result.failure == PartyFailureCode.alreadyBusy &&
+        !_partySession.state.isActive &&
+        _partySession.state.partyId == null) {
+      final cleanup = await _partySession.leaveParty();
+      if (!cleanup.isSuccess) return cleanup;
+      result = await _partySession.switchParty(partyId);
+    }
+    return result;
+  }
+
+  Future<void> _openParty(String partyId) async {
+    final targetReady = await _partySession.validateParty(partyId);
+    if (!mounted) return;
+    if (!targetReady.isSuccess) {
+      _showPartyFailure(targetReady);
+      return;
+    }
+    final confirmed = await showPartySwitchConfirmation(
+      context,
+      _partySession.state,
+      partyId,
+    );
+    if (!mounted || !confirmed) return;
+    final result = await _switchWithCleanupRetry(partyId);
+    if (!mounted) return;
+    if (!result.isSuccess) {
+      _showPartyFailure(result);
+      return;
+    }
+    await Navigator.push(
+      context,
+      SlideFadeRoute(page: LivePartyScreen(partyId: partyId)),
+    );
   }
 
   Future<void> _refreshData() async {
@@ -192,7 +255,6 @@ class _HomeScreenState extends State<HomeScreen>
                                     SlideFadeRoute(
                                       page: LivePartyScreen(
                                         partyId: currentPartyId,
-                                        isHost: _audioService.isHost,
                                       ),
                                     ),
                                   ).then((_) {
@@ -456,7 +518,8 @@ class _HomeScreenState extends State<HomeScreen>
                         song.youtubeVideoId,
                         song,
                       );
-                      if (result == PlayResult.blockedAsListener && mounted) {
+                      if (result == PlayResult.blockedAsListener &&
+                          context.mounted) {
                         showListenerBlockedDialog(context);
                       }
                     },
@@ -546,7 +609,8 @@ class _HomeScreenState extends State<HomeScreen>
                         song.youtubeVideoId,
                         song,
                       );
-                      if (result == PlayResult.blockedAsListener && mounted) {
+                      if (result == PlayResult.blockedAsListener &&
+                          context.mounted) {
                         showListenerBlockedDialog(context);
                       }
                     },
@@ -768,24 +832,7 @@ class _HomeScreenState extends State<HomeScreen>
             title: title,
             viewerCount: subTitle,
             imageUrl: imageUrl,
-            onTap: () async {
-              if (partyId != _audioService.currentPartyId) {
-                await _audioService.joinPartyAsListener(partyId);
-              }
-              Navigator.push(
-                context,
-                SlideFadeRoute(
-                  page: LivePartyScreen(
-                    partyId: partyId,
-                    isHost: partyId == _audioService.currentPartyId
-                        ? _audioService.isHost
-                        : false,
-                  ),
-                ),
-              ).then((_) {
-                setState(() {});
-              });
-            },
+            onTap: () => _openParty(partyId.toString()),
           );
         },
       ),
@@ -955,7 +1002,7 @@ class _HomeScreenState extends State<HomeScreen>
                   startIndex: index,
                   queueTitle: 'Recommended',
                 );
-                if (result == PlayResult.blockedAsListener && mounted) {
+                if (result == PlayResult.blockedAsListener && context.mounted) {
                   showListenerBlockedDialog(context);
                 }
               },
@@ -1008,7 +1055,7 @@ class _HomeScreenState extends State<HomeScreen>
                   startIndex: index,
                   queueTitle: _chipLabels[_selectedChip],
                 );
-                if (result == PlayResult.blockedAsListener && mounted) {
+                if (result == PlayResult.blockedAsListener && context.mounted) {
                   showListenerBlockedDialog(context);
                 }
               },
@@ -1145,7 +1192,7 @@ class _HomeScreenState extends State<HomeScreen>
                         final added = await _firestoreService.toggleFavorite(
                           song,
                         );
-                        if (mounted) {
+                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
@@ -1360,7 +1407,7 @@ class _HomeScreenState extends State<HomeScreen>
                           onTap: () async {
                             Navigator.pop(context); // Close sheet
                             await _firestoreService.addSongToPlaylist(id, song);
-                            if (mounted) {
+                            if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
