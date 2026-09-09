@@ -22,14 +22,15 @@ void main() {
     );
   });
   test('debug resolves Android bridge and desktop loopback', () {
-    expect(
-      resolveFirebaseEmulatorTarget(
-        isDebug: true,
-        requested: true,
-        platform: TargetPlatform.android,
-      ).host,
-      '10.0.2.2',
+    final android = resolveFirebaseEmulatorTarget(
+      isDebug: true,
+      requested: true,
+      platform: TargetPlatform.android,
     );
+    expect(android.host, '10.0.2.2');
+    expect(android.authPort, 9099);
+    expect(android.databasePort, 9000);
+    expect(android.firestorePort, 8080);
     expect(
       resolveFirebaseEmulatorTarget(
         isDebug: true,

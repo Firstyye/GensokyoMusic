@@ -2,15 +2,28 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 const gensokyoRealtimeDatabaseUrl =
     'https://flutterauth-d67b9-default-rtdb.asia-southeast1.firebasedatabase.app';
 
 class FirebaseEmulatorTarget {
-  const FirebaseEmulatorTarget.disabled() : enabled = false, host = '';
-  const FirebaseEmulatorTarget.enabled({required this.host}) : enabled = true;
+  const FirebaseEmulatorTarget.disabled()
+    : enabled = false,
+      host = '',
+      authPort = 9099,
+      databasePort = 9000,
+      firestorePort = 8080;
+  const FirebaseEmulatorTarget.enabled({required this.host})
+    : enabled = true,
+      authPort = 9099,
+      databasePort = 9000,
+      firestorePort = 8080;
   final bool enabled;
   final String host;
+  final int authPort;
+  final int databasePort;
+  final int firestorePort;
 }
 
 FirebaseEmulatorTarget resolveFirebaseEmulatorTarget({
@@ -38,9 +51,13 @@ Future<void> configureFirebaseEmulators() async {
     hostOverride: const String.fromEnvironment('FIREBASE_EMULATOR_HOST'),
   );
   if (!target.enabled) return;
-  await FirebaseAuth.instance.useAuthEmulator(target.host, 9099);
+  await FirebaseAuth.instance.useAuthEmulator(target.host, target.authPort);
   FirebaseDatabase.instanceFor(
     app: Firebase.app(),
     databaseURL: gensokyoRealtimeDatabaseUrl,
-  ).useDatabaseEmulator(target.host, 9000);
+  ).useDatabaseEmulator(target.host, target.databasePort);
+  FirebaseFirestore.instance.useFirestoreEmulator(
+    target.host,
+    target.firestorePort,
+  );
 }
