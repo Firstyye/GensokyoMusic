@@ -14,6 +14,7 @@ import '../widgets/add_song_search_sheet.dart';
 import '../widgets/_buildMiniPlayer.dart';
 import '../widgets/custom_page_route.dart';
 import '../widgets/party_switch_confirmation.dart';
+import '../widgets/party_route_dismissal.dart';
 import 'full_player_screen.dart';
 import 'loginscreen.dart';
 
@@ -80,7 +81,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
         );
         return;
       }
-      if (Navigator.canPop(context)) Navigator.pop(context);
+      removePartyRoute(context);
     }
   }
 
