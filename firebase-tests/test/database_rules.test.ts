@@ -161,6 +161,12 @@ describe("Realtime Database security rules", () => {
     await assertSucceeds(onDisconnect(futureHostRef).remove());
   });
 
+  it("allows a future host to arm root deletion before party creation", async () => {
+    const hostDb = testEnv.authenticatedContext("future-host").database();
+
+    await assertSucceeds(onDisconnect(ref(hostDb, "parties/future")).remove());
+  });
+
   it("allows the current host to arm root deletion on disconnect", async () => {
     const hostDb = testEnv.authenticatedContext("host").database();
 
@@ -185,6 +191,28 @@ describe("Realtime Database security rules", () => {
       participants: {
         "future-host": participant("Future Host", true),
       },
+    }));
+  });
+
+  it("allows the complete app-shaped party payload on creation", async () => {
+    const hostDb = testEnv.authenticatedContext("future-host").database();
+    const song = seededSong();
+
+    await assertSucceeds(set(ref(hostDb, "parties/future"), {
+      hostUid: "future-host",
+      hostName: "Future Host",
+      status: "active",
+      createdAt: serverTimestamp(),
+      state: {
+        isPlaying: false,
+        positionSeconds: 0,
+        updatedAt: serverTimestamp(),
+        song,
+      },
+      participants: {
+        "future-host": participant("Future Host", true),
+      },
+      queue: {initial: song},
     }));
   });
 
