@@ -152,7 +152,10 @@ class PartySessionService {
       final endedToken = _SessionToken(token.uid, token.generation + 1);
       await _teardownLocal();
       _check(endedToken);
-      await _guardRejected(endedToken, () => _repository.disarmDisconnect(id));
+      await _guardRejected(
+        endedToken,
+        () => _repository.disarmDisconnect(id, PartyRole.host),
+      );
       _check(endedToken);
       _publish(PartySessionState.ended(generation: _state.generation));
       return const PartyActionResult.success();
@@ -225,7 +228,7 @@ class PartySessionService {
     var membershipWritten = false;
     try {
       _check(token);
-      await _repository.armDisconnect(id);
+      await _repository.armDisconnect(id, role);
       armed = true;
       _check(token);
       await write();
@@ -253,7 +256,7 @@ class PartySessionService {
       // A new auth identity must never cancel the previous user's fallback.
       if (armed && _isCurrent(token)) {
         try {
-          await _repository.disarmDisconnect(id);
+          await _repository.disarmDisconnect(id, role);
         } catch (_) {
           /* Keep original failure. */
         }
@@ -299,7 +302,7 @@ class PartySessionService {
           _check(leavingToken);
         }
       }
-      await _repository.disarmDisconnect(id);
+      await _repository.disarmDisconnect(id, role);
       _check(leavingToken);
       _publish(PartySessionState.idle(generation: _state.generation));
       return const PartyActionResult.success();

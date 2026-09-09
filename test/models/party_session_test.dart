@@ -129,7 +129,7 @@ void main() {
           expect(service.state.isHost, true);
           expect(service.state.generation, generation);
           expect(database.cancellations, isEmpty);
-          expect(database.armed, {'parties/push-1/participants/u1'});
+          expect(database.armed, {'parties/push-1'});
           expect(
             (await service.joinParty('another')).failure,
             PartyFailureCode.alreadyBusy,
@@ -168,7 +168,7 @@ void main() {
         await Future<void>.delayed(Duration.zero);
         expect(service.state.isHost, true);
         expect(database.cancellations, isEmpty);
-        expect(database.armed, {'parties/push-1/participants/u1'});
+        expect(database.armed, {'parties/push-1'});
         gate.complete();
         expect((await pending).isSuccess, true);
         expect(service.state.phase, PartySessionPhase.ended);
@@ -181,7 +181,7 @@ void main() {
         expect(database.armed, isEmpty);
         expect(database.writes.map((write) => write.$1), [
           'remove:parties/push-1',
-          'disarm:parties/push-1/participants/u1',
+          'disarm:parties/push-1',
         ]);
       },
     );
@@ -217,7 +217,7 @@ void main() {
             'parties/push-1/queue': 1,
           });
           expect(database.writes, isEmpty);
-          expect(database.armed, {'parties/push-1/participants/u1'});
+          expect(database.armed, {'parties/push-1'});
         },
       );
     }
@@ -286,7 +286,7 @@ void main() {
           expect((await pending).failure, PartyFailureCode.permissionDenied);
           expect(service.state.isHost, true);
           expect(database.cancellations, isEmpty);
-          expect(database.armed, {'parties/push-1/participants/u1'});
+          expect(database.armed, {'parties/push-1'});
         },
       );
     }
@@ -314,7 +314,7 @@ void main() {
         expect((await pending).failure, PartyFailureCode.unauthenticated);
         expect(service.state, same(terminal));
         expect(service.state.isActive, false);
-        expect(database.armed, {'parties/push-1/participants/u1'});
+        expect(database.armed, {'parties/push-1'});
       },
     );
 
@@ -347,13 +347,17 @@ void main() {
     );
 
     test(
-      'arms and cancels disconnect only on the authenticated participant',
+      'arms and cancels disconnect cleanup at the authenticated role path',
       () async {
-        await repository.armDisconnect('room');
-        await repository.disarmDisconnect('room');
+        await repository.armDisconnect('room', PartyRole.listener);
+        await repository.disarmDisconnect('room', PartyRole.listener);
+        await repository.armDisconnect('room', PartyRole.host);
+        await repository.disarmDisconnect('room', PartyRole.host);
         expect(database.writes, [
           ('arm:parties/room/participants/u1', null),
           ('disarm:parties/room/participants/u1', null),
+          ('arm:parties/room', null),
+          ('disarm:parties/room', null),
         ]);
       },
     );
@@ -401,6 +405,138 @@ void main() {
       );
     });
 
+    test('listener leave reads ownership and removes only itself', () async {
+      database.values['parties/room/hostUid'] = 'old-host';
+
+      await repository.leaveOrTransferParty('room');
+
+      expect(database.reads, ['parties/room/hostUid']);
+      expect(database.transactions, isEmpty);
+      expect(database.writes, [('remove:parties/room/participants/u1', null)]);
+    });
+
+    test(
+      'host leave transfers the complete room to the oldest listener',
+      () async {
+        auth.user = _User('old-host');
+        database.values['parties/room/hostUid'] = 'old-host';
+        database.values['parties/room'] = _room()
+          ..['participants'] = <String, dynamic>{
+            'old-host': <String, dynamic>{
+              'name': 'Old',
+              'photoUrl': '',
+              'joinedAt': 1,
+              'isHost': true,
+            },
+            'newer': <String, dynamic>{
+              'name': 'Newer',
+              'photoUrl': '',
+              'joinedAt': 3,
+              'isHost': false,
+            },
+            'oldest': <String, dynamic>{
+              'name': 'Oldest',
+              'photoUrl': '',
+              'joinedAt': 2,
+              'isHost': false,
+            },
+          };
+
+        await repository.leaveOrTransferParty('room');
+
+        expect(database.transactions, ['parties/room']);
+        final result = database.values['parties/room'] as Map;
+        expect(result['hostUid'], 'oldest');
+        expect(result['hostName'], 'Oldest');
+        expect(
+          (result['participants'] as Map).containsKey('old-host'),
+          isFalse,
+        );
+        expect(result['participants']['oldest']['isHost'], isTrue);
+        expect(result['participants']['newer']['isHost'], isFalse);
+      },
+    );
+
+    test(
+      'listener leave retries as host when promotion races its removal',
+      () async {
+        database.values['parties/room/hostUid'] = 'old-host';
+        database.failure = FirebaseException(
+          plugin: 'firebase_database',
+          code: 'permission-denied',
+        );
+        database.afterWrite = (operation, path) {
+          if (operation != 'remove') return;
+          database.values['parties/room/hostUid'] = 'u1';
+          database.values['parties/room'] = <String, dynamic>{
+            ..._room(),
+            'hostUid': 'u1',
+            'hostName': 'Promoted',
+            'participants': <String, dynamic>{
+              'u1': <String, dynamic>{
+                'name': 'Promoted',
+                'photoUrl': '',
+                'joinedAt': 2,
+                'isHost': true,
+              },
+              'u2': <String, dynamic>{
+                'name': 'Next',
+                'photoUrl': '',
+                'joinedAt': 3,
+                'isHost': false,
+              },
+            },
+          };
+        };
+
+        await repository.leaveOrTransferParty('room');
+
+        expect(database.reads, [
+          'parties/room/hostUid',
+          'parties/room/hostUid',
+        ]);
+        expect(database.transactions, ['parties/room']);
+        final result = database.values['parties/room'] as Map;
+        expect(result['hostUid'], 'u2');
+        expect((result['participants'] as Map).containsKey('u1'), isFalse);
+      },
+    );
+
+    test('sole host leave deletes the party through one transaction', () async {
+      auth.user = _User('old-host');
+      database.values['parties/room/hostUid'] = 'old-host';
+      database.values['parties/room'] = _room();
+
+      await repository.leaveOrTransferParty('room');
+
+      expect(database.transactions, ['parties/room']);
+      expect(database.values['parties/room'], isNull);
+      expect(database.writes, [('transaction:parties/room', null)]);
+    });
+
+    test('leave treats a missing party as already closed', () async {
+      await repository.leaveOrTransferParty('gone');
+
+      expect(database.reads, ['parties/gone/hostUid']);
+      expect(database.transactions, isEmpty);
+      expect(database.writes, isEmpty);
+    });
+
+    test('host transaction maps Firebase network failures', () async {
+      auth.user = _User('old-host');
+      database.values['parties/room/hostUid'] = 'old-host';
+      database.values['parties/room'] = _room();
+      database.failure = FirebaseException(
+        plugin: 'firebase_database',
+        code: 'network-error',
+      );
+
+      await expectLater(
+        repository.leaveOrTransferParty('room'),
+        throwsA(_failure(PartyFailureCode.network)),
+      );
+    });
+
     for (final entry in {
       'permission-denied': PartyFailureCode.permissionDenied,
       'network-error': PartyFailureCode.network,
@@ -428,8 +564,8 @@ void main() {
       () async {
         auth.user = null;
         for (final action in <Future<void> Function()>[
-          () => repository.armDisconnect('room'),
-          () => repository.disarmDisconnect('room'),
+          () => repository.armDisconnect('room', PartyRole.listener),
+          () => repository.disarmDisconnect('room', PartyRole.listener),
           () => repository.createReservedParty('room', song),
           () => repository.joinParty('room'),
           () => repository.removeCurrentParticipant('room'),
@@ -793,12 +929,16 @@ void main() {
       final repository = FakePartyRepository(currentUserUid: 'listener-1');
 
       final partyId = repository.reservePartyId();
-      await repository.armDisconnect(partyId);
+      await repository.armDisconnect(partyId, PartyRole.listener);
+      await repository.disarmDisconnect(partyId, PartyRole.listener);
+      await repository.leaveOrTransferParty(partyId);
       await repository.createReservedParty(partyId, song);
 
       expect(repository.callLog, [
         'reservePartyId',
-        'armDisconnect:$partyId',
+        'armDisconnect:$partyId:listener',
+        'disarmDisconnect:$partyId:listener',
+        'leaveOrTransferParty:$partyId',
         'createReservedParty:$partyId',
       ]);
       await repository.dispose();
@@ -882,6 +1022,21 @@ void main() {
       expect(repository.callLog, ['joinParty:room-a']);
       await repository.dispose();
     });
+
+    test('injects leaveOrTransferParty failures independently', () async {
+      final repository = FakePartyRepository(currentUserUid: 'listener-1');
+      repository.failNext(
+        'leaveOrTransferParty',
+        PartyFailureCode.permissionDenied,
+      );
+
+      await expectLater(
+        repository.leaveOrTransferParty('room-a'),
+        throwsA(_failure(PartyFailureCode.permissionDenied)),
+      );
+      expect(repository.callLog, ['leaveOrTransferParty:room-a']);
+      await repository.dispose();
+    });
   });
 }
 
@@ -934,9 +1089,11 @@ class _Database implements FirebaseDatabase {
   final events = <String, StreamController<DatabaseEvent>>{};
   final cancellations = <String, int>{};
   final armed = <String>{};
+  final transactions = <String>[];
   final optimisticRemovals = <String, Completer<void>>{};
   FirebaseException? failure;
   void Function()? afterRead;
+  void Function(String operation, String path)? afterWrite;
   int nextKey = 0;
   @override
   DatabaseReference ref([String? path]) => _Reference(this, path ?? '');
@@ -947,6 +1104,7 @@ class _Database implements FirebaseDatabase {
 
   Future<void> write(String operation, String path, Object? value) async {
     writes.add(('$operation:$path', value));
+    afterWrite?.call(operation, path);
     final pendingRemoval = operation == 'remove'
         ? optimisticRemovals.remove(path)
         : null;
@@ -997,6 +1155,24 @@ class _Reference implements DatabaseReference {
   }
 
   @override
+  Future<TransactionResult> runTransaction(
+    TransactionHandler transactionHandler, {
+    bool applyLocally = true,
+  }) async {
+    database.transactions.add(path);
+    final error = database.failure;
+    database.failure = null;
+    if (error != null) throw error;
+    final transaction = transactionHandler(database.values[path]);
+    if (transaction.aborted) {
+      return _TransactionResult(false, _Snapshot(database.values[path]));
+    }
+    database.values[path] = transaction.value;
+    database.writes.add(('transaction:$path', transaction.value));
+    return _TransactionResult(true, _Snapshot(transaction.value));
+  }
+
+  @override
   OnDisconnect onDisconnect() => _Disconnect(database, path);
   @override
   Stream<DatabaseEvent> get onValue => database.events
@@ -1035,6 +1211,16 @@ class _Snapshot implements DataSnapshot {
   bool get exists => value != null;
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _TransactionResult implements TransactionResult {
+  _TransactionResult(this.committed, this.snapshot);
+
+  @override
+  final bool committed;
+
+  @override
+  final DataSnapshot snapshot;
 }
 
 class _Event implements DatabaseEvent {

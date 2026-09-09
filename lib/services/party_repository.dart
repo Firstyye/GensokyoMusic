@@ -8,9 +8,9 @@ abstract interface class PartyRepository {
 
   String reservePartyId();
 
-  Future<void> armDisconnect(String partyId);
+  Future<void> armDisconnect(String partyId, PartyRole role);
 
-  Future<void> disarmDisconnect(String partyId);
+  Future<void> disarmDisconnect(String partyId, PartyRole role);
 
   Future<void> createReservedParty(String partyId, SongInfo initialSong);
 
@@ -19,6 +19,8 @@ abstract interface class PartyRepository {
   Future<void> joinParty(String partyId);
 
   Future<void> removeCurrentParticipant(String partyId);
+
+  Future<void> leaveOrTransferParty(String partyId);
 
   Future<void> endParty(String partyId);
 

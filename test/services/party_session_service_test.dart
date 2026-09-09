@@ -193,7 +193,11 @@ void main() {
                         'removeCurrentParticipant:$id',
                         'removeCurrentParticipant:$id',
                       ]
-                    : ['removeCurrentParticipant:$id', 'disarmDisconnect:$id'],
+                    : [
+                        'removeCurrentParticipant:$id',
+                        'disarmDisconnect:$id:' +
+                            (creation ? 'host' : 'listener'),
+                      ],
               );
               expect(repository.cancellations, {
                 if (stream != 'watchMetadata') 'metadata:$id': 1,
@@ -269,8 +273,8 @@ void main() {
       expect(calls(), [
         'isJoinable:new',
         'removeCurrentParticipant:old',
-        'disarmDisconnect:old',
-        'armDisconnect:new',
+        'disarmDisconnect:old:listener',
+        'armDisconnect:new:listener',
         'joinParty:new',
       ]);
       expect(service.state.partyId, 'new');
@@ -298,10 +302,10 @@ void main() {
     expect(calls(), [
       'isJoinable:new',
       'removeCurrentParticipant:old',
-      'disarmDisconnect:old',
-      'armDisconnect:new',
+      'disarmDisconnect:old:listener',
+      'armDisconnect:new:listener',
       'joinParty:new',
-      'disarmDisconnect:new',
+      'disarmDisconnect:new:listener',
     ]);
   });
   test(
@@ -310,7 +314,7 @@ void main() {
       expect((await service.createParty(song)).isSuccess, isTrue);
       expect(calls(), [
         'reservePartyId',
-        'armDisconnect:party-1',
+        'armDisconnect:party-1:host',
         'createReservedParty:party-1',
       ]);
       expect(repository.createdSongs['party-1']?.toMap(), {
@@ -327,9 +331,9 @@ void main() {
     expect((await service.createParty(song)).failure, PartyFailureCode.network);
     expect(calls(), [
       'reservePartyId',
-      'armDisconnect:party-1',
+      'armDisconnect:party-1:host',
       'createReservedParty:party-1',
-      'disarmDisconnect:party-1',
+      'disarmDisconnect:party-1:host',
     ]);
     expect(service.state.partyId, isNull);
   });
@@ -341,9 +345,9 @@ void main() {
     );
     expect(calls(), [
       'isJoinable:old',
-      'armDisconnect:old',
+      'armDisconnect:old:listener',
       'joinParty:old',
-      'disarmDisconnect:old',
+      'disarmDisconnect:old:listener',
     ]);
     expect(service.state.partyId, isNull);
   });
@@ -480,7 +484,10 @@ void main() {
       await join();
       expect((await service.leaveParty()).isSuccess, isTrue);
       await service.leaveParty();
-      expect(calls(), ['removeCurrentParticipant:old', 'disarmDisconnect:old']);
+      expect(calls(), [
+        'removeCurrentParticipant:old',
+        'disarmDisconnect:old:listener',
+      ]);
       expect(repository.cancellations, {
         'metadata:old': 1,
         'playback:old': 1,
@@ -504,7 +511,7 @@ void main() {
         'removeCurrentParticipant:old',
         'removeCurrentParticipant:old',
         'removeCurrentParticipant:old',
-        'disarmDisconnect:old',
+        'disarmDisconnect:old:listener',
       ]);
     },
   );
@@ -611,7 +618,7 @@ void main() {
     () async {
       await host();
       expect((await service.endParty()).isSuccess, isTrue);
-      expect(calls(), ['endParty:old', 'disarmDisconnect:old']);
+      expect(calls(), ['endParty:old', 'disarmDisconnect:old:host']);
       expect(service.state.phase, PartySessionPhase.ended);
       cancelledOld();
     },
@@ -699,7 +706,7 @@ void main() {
           expect(calls(), ['isJoinable:old']);
         }
         if (operation == 'armDisconnect') {
-          expect(calls(), ['isJoinable:old', 'armDisconnect:old']);
+          expect(calls(), ['isJoinable:old', 'armDisconnect:old:listener']);
         }
         expect(
           calls().where((call) => call.startsWith('disarmDisconnect')),
@@ -862,7 +869,7 @@ void main() {
       repository.releaseOperation('endParty');
       expect((await pending).isSuccess, isTrue);
       expect(service.state.phase, PartySessionPhase.ended);
-      expect(calls(), ['endParty:old', 'disarmDisconnect:old']);
+      expect(calls(), ['endParty:old', 'disarmDisconnect:old:host']);
       expect(repository.cancellations, {
         'metadata:old': 1,
         'playback:old': 1,
@@ -884,7 +891,11 @@ void main() {
       gate.complete();
       expect((await pending).failure, PartyFailureCode.unauthenticated);
       expect(service.state.partyId, isNull);
-      expect(calls(), ['isJoinable:old', 'armDisconnect:old', 'joinParty:old']);
+      expect(calls(), [
+        'isJoinable:old',
+        'armDisconnect:old:listener',
+        'joinParty:old',
+      ]);
     },
   );
   test(
@@ -896,9 +907,9 @@ void main() {
       await pumpEventQueue();
       expect(calls(), [
         'isJoinable:old',
-        'armDisconnect:old',
+        'armDisconnect:old:listener',
         'joinParty:old',
-        'disarmDisconnect:old',
+        'disarmDisconnect:old:listener',
       ]);
       repository.currentUserUid = 'replacement';
       repository.releaseOperation('disarmDisconnect');
@@ -926,7 +937,7 @@ void main() {
       await join();
       service.stateStream.listen((state) {
         if (state.phase == PartySessionPhase.idle &&
-            repository.callLog.contains('disarmDisconnect:old')) {
+            repository.callLog.contains('disarmDisconnect:old:listener')) {
           repository.currentUserUid = 'replacement';
         }
       });
@@ -939,7 +950,7 @@ void main() {
       expect(calls(), [
         'isJoinable:new',
         'removeCurrentParticipant:old',
-        'disarmDisconnect:old',
+        'disarmDisconnect:old:listener',
       ]);
     },
   );
