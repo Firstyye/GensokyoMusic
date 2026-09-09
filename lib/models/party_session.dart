@@ -50,12 +50,13 @@ class PartySessionState {
     required String partyId,
     required PartyRole role,
     required int generation,
+    PartyFailureCode? warning,
   }) : this._(
          phase: PartySessionPhase.active,
          partyId: partyId,
          role: role,
          generation: generation,
-         failure: null,
+         failure: warning,
        );
 
   const PartySessionState.leaving({
@@ -93,6 +94,8 @@ class PartySessionState {
   bool get isActive => phase == PartySessionPhase.active;
 
   bool get isHost => isActive && role == PartyRole.host;
+
+  PartyFailureCode? get warning => isActive ? failure : null;
 }
 
 class PartyActionResult {

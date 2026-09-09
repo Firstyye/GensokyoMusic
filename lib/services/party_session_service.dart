@@ -250,7 +250,7 @@ class PartySessionService {
       if (membershipWritten) {
         // The remote write succeeded. Subscription setup is a separate stage:
         // rollback membership before cancelling its server cleanup fallback.
-        final cleanup = await _leaveInternal(token);
+        final cleanup = await _leaveInternal(token, rollback: true);
         return cleanup.isSuccess ? _failure(_code(error)) : cleanup;
       }
       // A new auth identity must never cancel the previous user's fallback.
@@ -267,10 +267,18 @@ class PartySessionService {
     }
   }
 
-  Future<PartyActionResult> _leaveInternal(_SessionToken token) async {
+  Future<PartyActionResult> _leaveInternal(
+    _SessionToken token, {
+    bool rollback = false,
+  }) async {
     _check(token);
     final membership = _membership!;
     final id = membership.partyId;
+    final transition = membership.roleTransition;
+    if (transition != null) {
+      await transition;
+      _check(token);
+    }
     final role = _state.role ?? membership.role;
     final leavingToken = _SessionToken(token.uid, token.generation + 1);
     await _teardownLocal();
@@ -287,7 +295,15 @@ class PartySessionService {
       for (var attempt = 0; ; attempt++) {
         _check(leavingToken);
         try {
-          await _repository.removeCurrentParticipant(id);
+          if (rollback) {
+            if (role == PartyRole.host) {
+              await _repository.endParty(id);
+            } else {
+              await _repository.removeCurrentParticipant(id);
+            }
+          } else {
+            await _repository.leaveOrTransferParty(id);
+          }
           _clearMembership(id, token.uid);
           _check(leavingToken);
           break;
@@ -302,7 +318,7 @@ class PartySessionService {
           _check(leavingToken);
         }
       }
-      await _repository.disarmDisconnect(id, role);
+      await _repository.disarmDisconnect(id, membership.armedRole);
       _check(leavingToken);
       _publish(PartySessionState.idle(generation: _state.generation));
       return const PartyActionResult.success();
@@ -333,12 +349,29 @@ class PartySessionService {
         _clearMembership(id, token.uid);
         unawaited(_teardownLocal());
       } else {
+        final membership = _membership;
+        if (membership == null || membership.partyId != id) return;
+        membership.observedHostUid = metadata.hostUid;
+        final nextRole = metadata.hostUid == _repository.currentUserUid
+            ? PartyRole.host
+            : PartyRole.listener;
+        if (nextRole != membership.armedRole) {
+          if (nextRole == PartyRole.listener) {
+            _publish(
+              PartySessionState.active(
+                partyId: id,
+                role: PartyRole.listener,
+                generation: token.generation,
+              ),
+            );
+          }
+          _scheduleRoleTransition(id, token, membership);
+          return;
+        }
         _publish(
           PartySessionState.active(
             partyId: id,
-            role: metadata.hostUid == _repository.currentUserUid
-                ? PartyRole.host
-                : PartyRole.listener,
+            role: nextRole,
             generation: token.generation,
           ),
         );
@@ -359,6 +392,106 @@ class PartySessionService {
   void _onPartyStreamError(_SessionToken token, Object error) {
     if (_isCurrent(token)) unawaited(_teardownLocal(failure: _code(error)));
   }
+
+  void _scheduleRoleTransition(
+    String id,
+    _SessionToken token,
+    _Membership membership,
+  ) {
+    if (membership.roleTransition != null ||
+        !_isCurrent(token) ||
+        _membership != membership) {
+      return;
+    }
+    final targetRole = membership.observedHostUid == token.uid
+        ? PartyRole.host
+        : PartyRole.listener;
+    if (targetRole == membership.armedRole) return;
+    final transition = _transitionRole(id, token, membership, targetRole);
+    membership.roleTransition = transition;
+    unawaited(
+      transition.whenComplete(() {
+        if (membership.roleTransition == transition) {
+          membership.roleTransition = null;
+        }
+        if (_isCurrent(token) &&
+            _membership == membership &&
+            _observedRole(membership, token.uid) != targetRole) {
+          _scheduleRoleTransition(id, token, membership);
+        }
+      }),
+    );
+  }
+
+  Future<void> _transitionRole(
+    String id,
+    _SessionToken token,
+    _Membership membership,
+    PartyRole targetRole,
+  ) async {
+    final previousRole = membership.armedRole;
+    var targetArmed = false;
+    try {
+      await _guardRejected(
+        token,
+        () => _repository.armDisconnect(id, targetRole),
+      );
+      targetArmed = true;
+      _check(token);
+      if (_membership != membership ||
+          _observedRole(membership, token.uid) != targetRole) {
+        await _repository.disarmDisconnect(id, targetRole);
+        return;
+      }
+      await _guardRejected(
+        token,
+        () => _repository.disarmDisconnect(id, previousRole),
+      );
+      if (_membership != membership) return;
+      // The remote cleanup now describes [targetRole], even if metadata or
+      // lifecycle state changed while the previous cleanup was disarming.
+      // Record that fact before validating the UI role so a follow-up
+      // transition can safely converge without briefly exposing stale host
+      // controls.
+      membership.armedRole = targetRole;
+      _check(token);
+      if (_observedRole(membership, token.uid) != targetRole) return;
+      _publish(
+        PartySessionState.active(
+          partyId: id,
+          role: targetRole,
+          generation: token.generation,
+        ),
+      );
+    } catch (error) {
+      if (targetArmed &&
+          membership.armedRole == previousRole &&
+          _isCurrent(token)) {
+        try {
+          await _repository.disarmDisconnect(id, targetRole);
+        } catch (_) {
+          // The previously armed cleanup still describes the active role.
+        }
+      }
+      if (_isCurrent(token) &&
+          _membership == membership &&
+          _observedRole(membership, token.uid) == targetRole) {
+        _publish(
+          PartySessionState.active(
+            partyId: id,
+            role: previousRole == PartyRole.host
+                ? PartyRole.listener
+                : previousRole,
+            generation: token.generation,
+            warning: _code(error),
+          ),
+        );
+      }
+    }
+  }
+
+  static PartyRole _observedRole(_Membership membership, String uid) =>
+      membership.observedHostUid == uid ? PartyRole.host : PartyRole.listener;
 
   /// Invalidates callbacks synchronously. Owns no remote cleanup actions.
   Future<void> _teardownLocal({PartyFailureCode? failure}) async {
@@ -517,8 +650,11 @@ class _SessionToken {
 }
 
 class _Membership {
-  const _Membership(this.partyId, this.uid, this.role);
+  _Membership(this.partyId, this.uid, this.role) : armedRole = role;
   final String partyId;
   final String uid;
   final PartyRole role;
+  PartyRole armedRole;
+  String? observedHostUid;
+  Future<void>? roleTransition;
 }

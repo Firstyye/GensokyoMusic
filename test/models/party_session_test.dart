@@ -802,6 +802,19 @@ void main() {
       expect(state.isHost, isFalse);
       expect(state.partyId, 'room-a');
     });
+
+    test('active state exposes a non-fatal lifecycle warning', () {
+      const state = PartySessionState.active(
+        partyId: 'room-a',
+        role: PartyRole.listener,
+        generation: 4,
+        warning: PartyFailureCode.network,
+      );
+
+      expect(state.isActive, isTrue);
+      expect(state.warning, PartyFailureCode.network);
+      expect(state.failure, PartyFailureCode.network);
+    });
   });
 
   group('PartyActionResult', () {
