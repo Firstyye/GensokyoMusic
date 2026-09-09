@@ -10,6 +10,8 @@ import '../helpers/fake_party_repository.dart';
 class TestPlayer implements ja.AudioPlayer {
   final events = <String>[];
   Completer<void>? installGate;
+  Duration currentPosition = Duration.zero;
+  bool isPlaying = false;
   @override
   Stream<ja.PlayerState> get playerStateStream => const Stream.empty();
   @override
@@ -17,31 +19,35 @@ class TestPlayer implements ja.AudioPlayer {
   @override
   Stream<Duration?> get durationStream => const Stream.empty();
   @override
-  Duration get position => Duration.zero;
+  Duration get position => currentPosition;
   @override
   Duration? get duration => const Duration(minutes: 3);
   @override
-  bool get playing => false;
+  bool get playing => isPlaying;
   @override
   ja.ProcessingState get processingState => ja.ProcessingState.ready;
   @override
   Future<void> stop() async {
     events.add('stop');
+    isPlaying = false;
   }
 
   @override
   Future<void> pause() async {
     events.add('pause');
+    isPlaying = false;
   }
 
   @override
   Future<void> play() async {
     events.add('play');
+    isPlaying = true;
   }
 
   @override
   Future<void> seek(Duration? position, {int? index}) async {
     events.add('seek:${position?.inSeconds}');
+    currentPosition = position ?? Duration.zero;
   }
 
   @override
@@ -68,6 +74,18 @@ PartyPlaybackSnapshot snapshot(String id, int stamp) => PartyPlaybackSnapshot(
   song: song(id),
   isPlaying: true,
   positionSeconds: stamp,
+  updatedAt: stamp,
+);
+
+PartyPlaybackSnapshot playbackAt(
+  String id, {
+  required int position,
+  required int stamp,
+  bool isPlaying = true,
+}) => PartyPlaybackSnapshot(
+  song: song(id),
+  isPlaying: isPlaying,
+  positionSeconds: position,
   updatedAt: stamp,
 );
 
@@ -181,4 +199,157 @@ void main() {
       expect(player.events.where((e) => e == 'play'), isEmpty);
     },
   );
+
+  test(
+    'selecting an uncached song pauses the old song before loading',
+    () async {
+      await session.leaveParty();
+      await pumpEventQueue();
+      final first = audio.playQueue([song('A')]);
+      await pumpEventQueue();
+      complete('A');
+      await first;
+      await pumpEventQueue();
+      player.events.clear();
+
+      final second = audio.playQueue([song('B')]);
+      await pumpEventQueue();
+
+      expect(player.events, ['pause']);
+      expect(audio.currentSong?.youtubeVideoId, 'B');
+      complete('B');
+      await second;
+      expect(player.events, ['pause', 'source:/B', 'play']);
+    },
+  );
+
+  test(
+    'nearby same-song host updates do not interrupt listener audio',
+    () async {
+      await repo.updatePlayback('p', playbackAt('A', position: 10, stamp: 100));
+      await pumpEventQueue();
+      complete('A');
+      await pumpEventQueue();
+      player
+        ..currentPosition = const Duration(seconds: 11)
+        ..isPlaying = true
+        ..events.clear();
+
+      await repo.updatePlayback('p', playbackAt('A', position: 12, stamp: 101));
+      await pumpEventQueue();
+
+      expect(player.events, isEmpty);
+    },
+  );
+
+  test('listener aligns before applying a nearby host pause', () async {
+    await repo.updatePlayback('p', playbackAt('A', position: 10, stamp: 100));
+    await pumpEventQueue();
+    complete('A');
+    await pumpEventQueue();
+    player
+      ..currentPosition = const Duration(seconds: 11)
+      ..isPlaying = true
+      ..events.clear();
+
+    await repo.updatePlayback(
+      'p',
+      playbackAt('A', position: 12, stamp: 101, isPlaying: false),
+    );
+    await pumpEventQueue();
+
+    expect(player.events, ['seek:12', 'pause']);
+  });
+
+  test('host pause realigns a listener at the drift boundary', () async {
+    await repo.updatePlayback('p', playbackAt('A', position: 10, stamp: 100));
+    await pumpEventQueue();
+    complete('A');
+    await pumpEventQueue();
+    player
+      ..currentPosition = const Duration(seconds: 9)
+      ..isPlaying = true
+      ..events.clear();
+
+    await repo.updatePlayback(
+      'p',
+      playbackAt('A', position: 12, stamp: 101, isPlaying: false),
+    );
+    await pumpEventQueue();
+
+    expect(player.events, ['seek:12', 'pause']);
+  });
+
+  test('host resume realigns a listener at the drift boundary', () async {
+    await repo.updatePlayback(
+      'p',
+      playbackAt('A', position: 10, stamp: 100, isPlaying: false),
+    );
+    await pumpEventQueue();
+    complete('A');
+    await pumpEventQueue();
+    player
+      ..currentPosition = const Duration(seconds: 9)
+      ..isPlaying = false
+      ..events.clear();
+
+    await repo.updatePlayback('p', playbackAt('A', position: 12, stamp: 101));
+    await pumpEventQueue();
+
+    expect(player.events, ['seek:12', 'play']);
+  });
+
+  test('source load refreshes to the latest host position', () async {
+    await repo.updatePlayback('p', playbackAt('A', position: 10, stamp: 100));
+    await pumpEventQueue();
+    await repo.updatePlayback('p', playbackAt('A', position: 40, stamp: 101));
+    await pumpEventQueue();
+
+    complete('A');
+    await pumpEventQueue();
+
+    expect(player.events, ['source:/A', 'seek:40', 'play']);
+  });
+
+  test('source load aligns even within the normal drift tolerance', () async {
+    await repo.updatePlayback('p', playbackAt('A', position: 2, stamp: 100));
+    await pumpEventQueue();
+
+    complete('A');
+    await pumpEventQueue();
+
+    expect(player.events, ['source:/A', 'seek:2', 'play']);
+  });
+
+  test('listener corrects same-song drift only beyond the tolerance', () async {
+    await repo.updatePlayback('p', playbackAt('A', position: 10, stamp: 100));
+    await pumpEventQueue();
+    complete('A');
+    await pumpEventQueue();
+    player
+      ..currentPosition = const Duration(seconds: 2)
+      ..isPlaying = true
+      ..events.clear();
+
+    await repo.updatePlayback('p', playbackAt('A', position: 10, stamp: 101));
+    await pumpEventQueue();
+
+    expect(player.events, ['seek:10']);
+  });
+
+  test('failed source load leaves buffering in a paused state', () async {
+    await session.leaveParty();
+    await pumpEventQueue();
+    final states = <PlayerState>[];
+    final sub = audio.playerStateStream.listen(states.add);
+
+    final pending = audio.playQueue([song('missing')]);
+    await pumpEventQueue();
+    loads['missing']!.complete(null);
+    await pending;
+    await pumpEventQueue();
+
+    expect(states, [PlayerState.buffering, PlayerState.paused]);
+    await sub.cancel();
+  });
 }

@@ -172,13 +172,19 @@ class PartySessionService {
 
   Future<PartyActionResult> _hostMutation(
     Future<void> Function(String) write,
-  ) => _operate(() async {
-    final token = _capture();
-    _checkHost(token);
-    await _guardRejected(token, () => write(_state.partyId!));
-    _checkHost(token);
-    return const PartyActionResult.success();
-  });
+  ) async {
+    if (_disposed) return _failure(PartyFailureCode.roomClosed);
+    try {
+      final token = _capture();
+      _checkHost(token);
+      final id = _state.partyId!;
+      await _guardRejected(token, () => write(id));
+      _checkHost(token);
+      return const PartyActionResult.success();
+    } catch (error) {
+      return _failure(_code(error));
+    }
+  }
 
   Future<void> _validate(String id, _SessionToken token) async {
     final joinable = await _guardRejected(

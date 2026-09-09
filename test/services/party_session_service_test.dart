@@ -580,6 +580,32 @@ void main() {
     expect(calls(), ['endParty:old']);
     expect(repository.cancellations, isEmpty);
   });
+  test('host can leave while a playback publication is awaiting', () async {
+    await host();
+    repository.pauseOperation('updatePlayback');
+    final publication = service.updatePlayback(playback);
+    await pumpEventQueue();
+
+    final leave = await service.leaveParty();
+
+    expect(leave.isSuccess, isTrue);
+    expect(service.state.phase, PartySessionPhase.idle);
+    repository.releaseOperation('updatePlayback');
+    expect((await publication).failure, PartyFailureCode.roomClosed);
+  });
+  test('host can end while a playback publication is awaiting', () async {
+    await host();
+    repository.pauseOperation('updatePlayback');
+    final publication = service.updatePlayback(playback);
+    await pumpEventQueue();
+
+    final end = await service.endParty();
+
+    expect(end.isSuccess, isTrue);
+    expect(service.state.phase, PartySessionPhase.ended);
+    repository.releaseOperation('updatePlayback');
+    expect((await publication).failure, PartyFailureCode.roomClosed);
+  });
   test(
     'End Party deletes root before disarming and ends local session',
     () async {

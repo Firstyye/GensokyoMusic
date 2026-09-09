@@ -279,26 +279,37 @@ class AudioPlayerService {
     bool current() =>
         token == _loadToken && !(_partySession.state.isActive && !_isHost);
     _isLoadingSong = true;
+    _currentSong = song;
+    _currentSongController.add(song);
     try {
-      final source =
-          _prefetchCache.remove(song.youtubeVideoId) ??
-          await _buildAudioSource(
-            song.youtubeVideoId,
-            tag: MediaItem(
-              id: song.youtubeVideoId,
-              title: song.title,
-              artist: song.artist,
-              artUri: Uri.tryParse(song.thumbnailUrl),
-            ),
-          );
-      if (!current() || source == null) return;
+      var source = _prefetchCache.remove(song.youtubeVideoId);
+      if (source == null) {
+        await _player.pause();
+        if (!current()) return;
+        _positionController.add(Duration.zero);
+        _durationController.add(Duration.zero);
+        _playerStateController.add(PlayerState.buffering);
+        source = await _buildAudioSource(
+          song.youtubeVideoId,
+          tag: MediaItem(
+            id: song.youtubeVideoId,
+            title: song.title,
+            artist: song.artist,
+            artUri: Uri.tryParse(song.thumbnailUrl),
+          ),
+        );
+      }
+      if (!current()) return;
+      if (source == null) {
+        _playerStateController.add(PlayerState.paused);
+        return;
+      }
+      final readySource = source;
       await _partyCommits.run(() async {
         if (!current()) return;
-        await _player.setAudioSource(source);
+        await _player.setAudioSource(readySource);
         if (!current()) return;
-        _currentSong = song;
         _isLoadingSong = false;
-        _currentSongController.add(song);
         _durationController.add(_player.duration);
         _positionController.add(_player.position);
         unawaited(_player.play());
@@ -754,13 +765,22 @@ class AudioPlayerService {
         fresh.song?.youtubeVideoId != ticket.videoId ||
         !_partyGuard.acceptTimestamp(fresh.updatedAt))
       return;
-    await _player.seek(Duration(seconds: fresh.positionSeconds));
-    if (!_acceptsParty(ticket)) return;
-    if (fresh.isPlaying) {
-      // just_audio play completes only when playback stops; don't block FIFO.
-      unawaited(_player.play());
-    } else {
-      await _player.pause();
+    final target = Duration(seconds: fresh.positionSeconds);
+    final drift = (target - _player.position).abs();
+    final playbackStateChanged = fresh.isPlaying != _player.playing;
+    final mustAlign = refresh || playbackStateChanged;
+    if (drift > Duration.zero &&
+        (mustAlign || drift > const Duration(seconds: 3))) {
+      await _player.seek(target);
+      if (!_acceptsParty(ticket)) return;
+    }
+    if (playbackStateChanged) {
+      if (fresh.isPlaying) {
+        // just_audio play completes only when playback stops; don't block FIFO.
+        unawaited(_player.play());
+      } else {
+        await _player.pause();
+      }
     }
   }
 
