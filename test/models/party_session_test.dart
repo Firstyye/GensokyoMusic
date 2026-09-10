@@ -208,8 +208,8 @@ void main() {
           } else {
             gate.complete('different-host');
           }
-          expect((await pending).failure, PartyFailureCode.roomClosed);
-          expect(service.state.isActive, false);
+          expect((await pending).isSuccess, true);
+          expect(service.state.phase, PartySessionPhase.ended);
           expect(service.state.generation, generation + 1);
           expect(database.cancellations, {
             'parties/push-1': 1,
@@ -231,8 +231,8 @@ void main() {
           database.values['parties/push-1/hostUid'] = null;
           database.emit('parties/push-1', null);
         };
-        expect((await service.endParty()).failure, PartyFailureCode.roomClosed);
-        expect(service.state.isActive, false);
+        expect((await service.endParty()).isSuccess, true);
+        expect(service.state.phase, PartySessionPhase.ended);
         expect(service.state.generation, generation + 1);
         expect(database.cancellations.values, everyElement(1));
       },
@@ -255,8 +255,8 @@ void main() {
             code: 'permission-denied',
           ),
         );
-        expect((await pending).failure, PartyFailureCode.roomClosed);
-        expect(service.state.isActive, false);
+        expect((await pending).isSuccess, true);
+        expect(service.state.phase, PartySessionPhase.ended);
         expect(service.state.generation, generation + 1);
         expect(database.cancellations.values, everyElement(1));
       },

@@ -66,6 +66,9 @@ class AudioPlayerService {
   final _durationController = StreamController<Duration?>.broadcast();
   final _loopModeController = StreamController<LoopMode>.broadcast();
   final _autoplayController = StreamController<bool>.broadcast();
+  final _canControlPlaybackController = StreamController<bool>.broadcast(
+    sync: true,
+  );
 
   // ── Queue Management ──
   final List<SongInfo> _queue = [];
@@ -83,6 +86,8 @@ class AudioPlayerService {
   Stream<Duration?> get durationStream => _durationController.stream;
   Stream<LoopMode> get loopModeStream => _loopModeController.stream;
   Stream<bool> get autoplayStream => _autoplayController.stream;
+  Stream<bool> get canControlPlaybackStream =>
+      _canControlPlaybackController.stream;
 
   SongInfo? get currentSong => _currentSong;
   bool get isPlaying => _isPlaying;
@@ -97,6 +102,7 @@ class AudioPlayerService {
   String get queueTitle => _queueTitle;
   bool get autoplay => _autoplay;
   int get autoplayStartIndex => _autoplayStartIndex;
+  bool get canControlPlayback => _currentPartyId == null || _isHost;
 
   // ── Party Sync & Firestore ──
   String? get _currentPartyId => _partySession.state.partyId;
@@ -110,6 +116,7 @@ class AudioPlayerService {
   StreamSubscription<PartySessionState>? _sessionSub;
   int? _mirroredGeneration;
   PartyRole? _mirroredRole;
+  bool _lastCanControlPlayback = true;
   String? _requestedVideo;
   PartyPlaybackTicket? _listenerTicket;
   late final FirestoreService _firestoreService = FirestoreService();
@@ -618,6 +625,13 @@ class AudioPlayerService {
       return;
     _mirroredGeneration = generation;
     _mirroredRole = state.role;
+    final controlAccess = canControlPlayback;
+    if (controlAccess != _lastCanControlPlayback) {
+      _lastCanControlPlayback = controlAccess;
+      if (!_canControlPlaybackController.isClosed) {
+        _canControlPlaybackController.add(controlAccess);
+      }
+    }
     _partyGuard.invalidate();
     ++_loadToken;
     _listenerTicket = null;
@@ -841,6 +855,7 @@ class AudioPlayerService {
     _durationController.close();
     _loopModeController.close();
     _autoplayController.close();
+    _canControlPlaybackController.close();
     _player.dispose();
     _yt.close();
   }

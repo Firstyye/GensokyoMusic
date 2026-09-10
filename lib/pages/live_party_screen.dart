@@ -15,6 +15,7 @@ import '../widgets/_buildMiniPlayer.dart';
 import '../widgets/custom_page_route.dart';
 import '../widgets/party_switch_confirmation.dart';
 import '../widgets/party_route_dismissal.dart';
+import '../widgets/party_queue_snapshot_builder.dart';
 import 'full_player_screen.dart';
 import 'loginscreen.dart';
 
@@ -861,11 +862,12 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
   }
 
   Widget _buildQueueList() {
-    return StreamBuilder<List<PartyQueueEntry>>(
-      stream: _partySession.queueStream,
-      initialData: _partySession.queue,
-      builder: (context, snapshot) {
-        final entries = snapshot.data ?? const <PartyQueueEntry>[];
+    return PartyQueueSnapshotBuilder(
+      queueStream: _partySession.queueStream,
+      initialQueue: _partySession.queue,
+      currentSongStream: _audioService.currentSongStream,
+      initialSong: _audioService.currentSong,
+      builder: (context, entries, currentSong) {
         if (entries.isEmpty) {
           return Center(
             child: Text(
@@ -901,8 +903,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
             final song = entry.song;
 
             final isPlaying =
-                _audioService.currentSong?.youtubeVideoId ==
-                song.youtubeVideoId;
+                currentSong?.youtubeVideoId == song.youtubeVideoId;
 
             return ListTile(
               key: ValueKey(entry.entryId),

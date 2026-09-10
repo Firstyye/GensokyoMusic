@@ -24,6 +24,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
   bool _isFavorite = false;
   StreamSubscription<bool>? _favoriteSub;
   StreamSubscription<SongInfo?>? _songChangeSub;
+  StreamSubscription<bool>? _controlAccessSub;
   String _lastCheckedVideoId = '';
 
   @override
@@ -40,12 +41,16 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
         if (mounted) setState(() {});
       }
     });
+    _controlAccessSub = _audioService.canControlPlaybackStream.listen((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _favoriteSub?.cancel();
     _songChangeSub?.cancel();
+    _controlAccessSub?.cancel();
     super.dispose();
   }
 
@@ -87,8 +92,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isListener =
-        _audioService.currentPartyId != null && !_audioService.isHost;
+    final bool isListener = !_audioService.canControlPlayback;
 
     // Song changes are now handled by _songChangeSub in initState()
     return Scaffold(

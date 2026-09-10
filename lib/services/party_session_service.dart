@@ -15,7 +15,9 @@ class PartySessionService {
   PartySessionService.withRepository(
     this._repository, {
     Future<void> Function(Duration)? delay,
-  }) : _delay = delay ?? Future<void>.delayed {
+    Duration operationTimeout = const Duration(seconds: 5),
+  }) : _delay = delay ?? Future<void>.delayed,
+       _operationTimeout = operationTimeout {
     _authSub = _repository.watchAuthUid().listen((uid) {
       if (uid == null || (_sessionUid != null && uid != _sessionUid)) {
         unawaited(_teardownLocal(failure: PartyFailureCode.unauthenticated));
@@ -25,6 +27,7 @@ class PartySessionService {
 
   final PartyRepository _repository;
   final Future<void> Function(Duration) _delay;
+  final Duration _operationTimeout;
   final _stateController = StreamController<PartySessionState>.broadcast(
     sync: true,
   );
@@ -43,6 +46,8 @@ class PartySessionService {
   bool _operationInFlight = false;
   bool _disposed = false;
   Future<void>? _disposeFuture;
+  Future<PartyActionResult>? _leaveOperation;
+  Future<PartyActionResult>? _endOperation;
   _SessionToken? _endingToken;
   bool _publishingState = false;
   final _pendingStates = Queue<PartySessionState>();
@@ -121,29 +126,73 @@ class PartySessionService {
     return _joinInternal(id, targetToken, skipPreflight: true);
   });
 
-  Future<PartyActionResult> leaveParty() => _operate(() async {
-    if (!_state.isActive && !_hasPendingMembership)
-      return const PartyActionResult.success();
-    return _leaveInternal(_capture());
-  });
+  Future<PartyActionResult> leaveParty() {
+    final pending = _leaveOperation;
+    if (pending != null) return pending;
+    late final Future<PartyActionResult> operation;
+    operation = _operate(() async {
+      if (!_state.isActive && !_hasPendingMembership) {
+        return const PartyActionResult.success();
+      }
+      return _leaveInternal(_capture());
+    });
+    _leaveOperation = operation;
+    unawaited(
+      operation.whenComplete(() {
+        if (identical(_leaveOperation, operation)) _leaveOperation = null;
+      }),
+    );
+    return operation;
+  }
 
-  Future<PartyActionResult> endParty() => _operate(() async {
+  Future<PartyActionResult> endParty() {
+    final pending = _endOperation;
+    if (pending != null) return pending;
+    late final Future<PartyActionResult> operation;
+    operation = _operate(_endPartyInternal);
+    _endOperation = operation;
+    unawaited(
+      operation.whenComplete(() {
+        if (identical(_endOperation, operation)) _endOperation = null;
+      }),
+    );
+    return operation;
+  }
+
+  Future<PartyActionResult> _endPartyInternal() async {
     final token = _capture();
-    _checkHost(token);
-    final id = _state.partyId!;
+    final membership = _membership;
+    final String id;
+    final PartyRole armedRole;
+    if (_state.isHost) {
+      id = _state.partyId!;
+      armedRole = membership?.armedRole ?? PartyRole.host;
+    } else if (membership != null &&
+        membership.uid == token.uid &&
+        membership.armedRole == PartyRole.host) {
+      // A timed-out Leave has already torn down local streams, but the
+      // acknowledged host membership is deliberately retained for recovery.
+      id = membership.partyId;
+      armedRole = membership.armedRole;
+    } else {
+      _checkHost(token);
+      throw const PartyRepositoryException(PartyFailureCode.permissionDenied);
+    }
     _endingToken = token;
     try {
       // Firebase emits an optimistic null before the server acknowledges a
       // root removal. Keep membership and subscriptions until this succeeds,
       // so rejection/rollback cannot strand a still-live remote membership.
       try {
-        await _guardRejected(token, () => _repository.endParty(id));
+        await _guardRejected(token, () => _bounded(_repository.endParty(id)));
       } on PartyRepositoryException catch (error) {
         // A missing-room read is authoritative even when the matching null
         // event was deferred during this operation's optimistic removal.
         if (error.code == PartyFailureCode.roomClosed && _isCurrent(token)) {
           _clearMembership(id, token.uid);
           await _teardownLocal();
+          _publish(PartySessionState.ended(generation: _state.generation));
+          return const PartyActionResult.success();
         }
         rethrow;
       }
@@ -154,7 +203,7 @@ class PartySessionService {
       _check(endedToken);
       await _guardRejected(
         endedToken,
-        () => _repository.disarmDisconnect(id, PartyRole.host),
+        () => _repository.disarmDisconnect(id, armedRole),
       );
       _check(endedToken);
       _publish(PartySessionState.ended(generation: _state.generation));
@@ -162,7 +211,7 @@ class PartySessionService {
     } finally {
       _endingToken = null;
     }
-  });
+  }
 
   Future<PartyActionResult> updatePlayback(PartyPlaybackSnapshot value) =>
       _hostMutation((id) => _repository.updatePlayback(id, value));
@@ -297,12 +346,12 @@ class PartySessionService {
         try {
           if (rollback) {
             if (role == PartyRole.host) {
-              await _repository.endParty(id);
+              await _bounded(_repository.endParty(id));
             } else {
-              await _repository.removeCurrentParticipant(id);
+              await _bounded(_repository.removeCurrentParticipant(id));
             }
           } else {
-            await _repository.leaveOrTransferParty(id);
+            await _bounded(_repository.leaveOrTransferParty(id));
           }
           _clearMembership(id, token.uid);
           _check(leavingToken);
@@ -548,6 +597,12 @@ class PartySessionService {
       rethrow;
     }
   }
+
+  Future<T> _bounded<T>(Future<T> operation) => operation.timeout(
+    _operationTimeout,
+    onTimeout: () =>
+        throw const PartyRepositoryException(PartyFailureCode.network),
+  );
 
   _SessionToken _capture() {
     final uid = _repository.currentUserUid;
