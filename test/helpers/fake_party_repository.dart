@@ -128,13 +128,19 @@ class FakePartyRepository implements PartyRepository {
   }
 
   @override
-  Future<void> armDisconnect(String partyId) async {
-    await _recordAndAwait('armDisconnect:$partyId', 'armDisconnect');
+  Future<void> armDisconnect(String partyId, PartyRole role) async {
+    await _recordAndAwait(
+      'armDisconnect:$partyId:' + role.name,
+      'armDisconnect',
+    );
   }
 
   @override
-  Future<void> disarmDisconnect(String partyId) async {
-    await _recordAndAwait('disarmDisconnect:$partyId', 'disarmDisconnect');
+  Future<void> disarmDisconnect(String partyId, PartyRole role) async {
+    await _recordAndAwait(
+      'disarmDisconnect:$partyId:' + role.name,
+      'disarmDisconnect',
+    );
   }
 
   @override
@@ -164,6 +170,15 @@ class FakePartyRepository implements PartyRepository {
     await _recordAndAwait(
       'removeCurrentParticipant:$partyId',
       'removeCurrentParticipant',
+    );
+    memberships.remove(partyId);
+  }
+
+  @override
+  Future<void> leaveOrTransferParty(String partyId) async {
+    await _recordAndAwait(
+      'leaveOrTransferParty:$partyId',
+      'leaveOrTransferParty',
     );
     memberships.remove(partyId);
   }

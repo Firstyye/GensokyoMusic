@@ -31,14 +31,68 @@ function seededParticipant(name: string, joinedAt: number, isHost: boolean) {
   return {name, photoUrl: "", joinedAt, isHost};
 }
 
+function seededSong() {
+  return {
+    title: "Moon",
+    artist: "ZUN",
+    thumbnailUrl: "cover",
+    youtubeVideoId: "video",
+  };
+}
+
 function party(participants: Record<string, unknown>) {
   return {
     hostUid: "host",
     hostName: "Host",
     status: "active",
     createdAt: 1,
-    state: {isPlaying: true, positionSeconds: 10},
+    state: {
+      isPlaying: true,
+      positionSeconds: 10,
+      updatedAt: 1,
+      song: seededSong(),
+    },
     participants,
+    queue: {seed: seededSong()},
+    chat: {
+      seed: {
+        uid: "host",
+        name: "Host",
+        photoUrl: "",
+        message: "Welcome",
+        timestamp: 1,
+      },
+    },
+  };
+}
+
+function transferredParty(overrides: Record<string, unknown> = {}) {
+  return {
+    hostUid: "listener",
+    hostName: "Listener",
+    status: "active",
+    createdAt: 1,
+    state: {
+      isPlaying: true,
+      positionSeconds: 10,
+      updatedAt: 1,
+      song: seededSong(),
+    },
+    participants: {
+      listener: seededParticipant("Listener", 2, true),
+      later: seededParticipant("Later", 3, false),
+    },
+    queue: {seed: seededSong()},
+    chat: {
+      seed: {
+        uid: "host",
+        name: "Host",
+        photoUrl: "",
+        message: "Welcome",
+        timestamp: 1,
+      },
+    },
+    ...overrides,
   };
 }
 
@@ -60,6 +114,7 @@ describe("Realtime Database security rules", () => {
       await set(ref(context.database(), "parties/p"), party({
         host: seededParticipant("Host", 1, true),
         listener: seededParticipant("Listener", 2, false),
+        later: seededParticipant("Later", 3, false),
       }));
       await set(ref(context.database(), "private_chats/host_listener"), {
         messages: {seed: {text: "hello"}},
@@ -106,6 +161,24 @@ describe("Realtime Database security rules", () => {
     await assertSucceeds(onDisconnect(futureHostRef).remove());
   });
 
+  it("allows a future host to arm root deletion before party creation", async () => {
+    const hostDb = testEnv.authenticatedContext("future-host").database();
+
+    await assertSucceeds(onDisconnect(ref(hostDb, "parties/future")).remove());
+  });
+
+  it("allows the current host to arm root deletion on disconnect", async () => {
+    const hostDb = testEnv.authenticatedContext("host").database();
+
+    await assertSucceeds(onDisconnect(ref(hostDb, "parties/p")).remove());
+  });
+
+  it("rejects root disconnect deletion armed by a listener", async () => {
+    const listenerDb = testEnv.authenticatedContext("listener").database();
+
+    await assertFails(onDisconnect(ref(listenerDb, "parties/p")).remove());
+  });
+
   it("allows a host to create a valid one-host active party", async () => {
     const hostDb = testEnv.authenticatedContext("future-host").database();
 
@@ -118,6 +191,28 @@ describe("Realtime Database security rules", () => {
       participants: {
         "future-host": participant("Future Host", true),
       },
+    }));
+  });
+
+  it("allows the complete app-shaped party payload on creation", async () => {
+    const hostDb = testEnv.authenticatedContext("future-host").database();
+    const song = seededSong();
+
+    await assertSucceeds(set(ref(hostDb, "parties/future"), {
+      hostUid: "future-host",
+      hostName: "Future Host",
+      status: "active",
+      createdAt: serverTimestamp(),
+      state: {
+        isPlaying: false,
+        positionSeconds: 0,
+        updatedAt: serverTimestamp(),
+        song,
+      },
+      participants: {
+        "future-host": participant("Future Host", true),
+      },
+      queue: {initial: song},
     }));
   });
 
@@ -255,6 +350,149 @@ describe("Realtime Database security rules", () => {
     const hostDb = testEnv.authenticatedContext("host").database();
 
     await assertSucceeds(remove(ref(hostDb, "parties/p")));
+  });
+
+  it("allows the current host to transfer the whole room to an existing listener", async () => {
+    const hostDb = testEnv.authenticatedContext("host").database();
+
+    await assertSucceeds(set(
+      ref(hostDb, "parties/p"),
+      transferredParty(),
+    ));
+  });
+
+  it("rejects a host transfer attempted by a listener", async () => {
+    const listenerDb = testEnv.authenticatedContext("listener").database();
+
+    await assertFails(set(
+      ref(listenerDb, "parties/p"),
+      transferredParty(),
+    ));
+  });
+
+  it("rejects a transfer that keeps the departing host", async () => {
+    const hostDb = testEnv.authenticatedContext("host").database();
+
+    await assertFails(set(
+      ref(hostDb, "parties/p"),
+      transferredParty({
+        participants: {
+          host: seededParticipant("Host", 1, false),
+          listener: seededParticipant("Listener", 2, true),
+        },
+      }),
+    ));
+  });
+
+  it("rejects promotion of a participant absent from the old room", async () => {
+    const hostDb = testEnv.authenticatedContext("host").database();
+
+    await assertFails(set(
+      ref(hostDb, "parties/p"),
+      transferredParty({
+        hostUid: "outsider",
+        hostName: "Outsider",
+        participants: {
+          listener: seededParticipant("Listener", 2, false),
+          outsider: seededParticipant("Outsider", 4, true),
+        },
+      }),
+    ));
+  });
+
+  it("rejects a transfer that injects a new participant", async () => {
+    const hostDb = testEnv.authenticatedContext("host").database();
+
+    await assertFails(set(
+      ref(hostDb, "parties/p"),
+      transferredParty({
+        participants: {
+          listener: seededParticipant("Listener", 2, true),
+          later: seededParticipant("Later", 3, false),
+          outsider: seededParticipant("Outsider", 4, false),
+        },
+      }),
+    ));
+  });
+
+  it("rejects a transfer whose host name does not match the promoted member", async () => {
+    const hostDb = testEnv.authenticatedContext("host").database();
+
+    await assertFails(set(
+      ref(hostDb, "parties/p"),
+      transferredParty({hostName: "Impostor"}),
+    ));
+  });
+
+  it.each([
+    ["status", {status: "ended"}],
+    ["createdAt", {createdAt: 99}],
+    ["playback state", {state: {isPlaying: false, positionSeconds: 0}}],
+    ["queue", {queue: {injected: {title: "Injected"}}}],
+    ["chat", {chat: {injected: {message: "Injected"}}}],
+    ["unknown field", {injected: true}],
+  ])("rejects unrelated %s changes during transfer", async (_label, change) => {
+    const hostDb = testEnv.authenticatedContext("host").database();
+
+    await assertFails(set(
+      ref(hostDb, "parties/p"),
+      transferredParty(change),
+    ));
+  });
+
+  it.each([
+    [
+      "name",
+      {
+        hostName: "Renamed",
+        participants: {
+          listener: seededParticipant("Renamed", 2, true),
+          later: seededParticipant("Later", 3, false),
+        },
+      },
+    ],
+    [
+      "photo URL",
+      {
+        participants: {
+          listener: {
+            ...seededParticipant("Listener", 2, true),
+            photoUrl: "changed",
+          },
+          later: seededParticipant("Later", 3, false),
+        },
+      },
+    ],
+    [
+      "join time",
+      {
+        participants: {
+          listener: seededParticipant("Listener", 99, true),
+          later: seededParticipant("Later", 3, false),
+        },
+      },
+    ],
+  ])("rejects promoted participant %s mutation", async (_label, change) => {
+    const hostDb = testEnv.authenticatedContext("host").database();
+
+    await assertFails(set(
+      ref(hostDb, "parties/p"),
+      transferredParty(change),
+    ));
+  });
+
+  it("rejects a second participant marked as host", async () => {
+    const hostDb = testEnv.authenticatedContext("host").database();
+
+    await assertFails(set(
+      ref(hostDb, "parties/p"),
+      transferredParty({
+        participants: {
+          listener: seededParticipant("Listener", 2, true),
+          later: seededParticipant("Later", 3, true),
+        },
+      }),
+    ));
   });
 
   it("preserves authenticated private-chat reads and writes", async () => {

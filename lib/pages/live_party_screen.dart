@@ -18,6 +18,23 @@ import '../widgets/party_route_dismissal.dart';
 import 'full_player_screen.dart';
 import 'loginscreen.dart';
 
+class PartyWarningNotice {
+  PartyFailureCode? _shownWarning;
+
+  void show(BuildContext context, PartySessionState state) {
+    final warning = state.warning;
+    if (warning == null) {
+      _shownWarning = null;
+      return;
+    }
+    if (_shownWarning == warning) return;
+    _shownWarning = warning;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(partyFailureMessage(warning))));
+  }
+}
+
 class LivePartyScreen extends StatefulWidget {
   final String partyId;
 
@@ -33,6 +50,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
   final PartySessionService _partySession = PartySessionService();
   final TextEditingController _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final PartyWarningNotice _warningNotice = PartyWarningNotice();
 
   late Stream<DatabaseEvent> _chatStream;
   StreamSubscription<PartySessionState>? _sessionSub;
@@ -57,6 +75,7 @@ class _LivePartyScreenState extends State<LivePartyScreen> {
     final belongsHere = state.isActive && state.partyId == widget.partyId;
     if (belongsHere) {
       _screenWasActive = true;
+      if (notifyPromotion) _warningNotice.show(context, state);
       final promoted = !_isCurrentlyHost && state.isHost;
       if (_isCurrentlyHost != state.isHost) {
         setState(() => _isCurrentlyHost = state.isHost);

@@ -48,7 +48,7 @@ void main() {
 
   group('review rejected awaits', () {
     for (final operation in [
-      'removeCurrentParticipant',
+      'leaveOrTransferParty',
       'disarmDisconnect',
       'validate',
       'updatePlayback',
@@ -79,7 +79,7 @@ void main() {
                 throw StateError('rejected after await');
               };
               final pending = switch (operation) {
-                'removeCurrentParticipant' ||
+                'leaveOrTransferParty' ||
                 'disarmDisconnect' => service.leaveParty(),
                 'validate' => service.validateParty('new'),
                 'updatePlayback' => service.updatePlayback(playback),
@@ -164,11 +164,14 @@ void main() {
             '${creation ? 'create' : 'join'} $stream failure ${removalFails ? 'retains fallback on failed removal' : 'removes acknowledged membership before disarm'}',
             () async {
               final id = creation ? 'party-1' : 'old';
+              final cleanupOperation = creation
+                  ? 'endParty'
+                  : 'removeCurrentParticipant';
               repository.failNext(stream, PartyFailureCode.permissionDenied);
               if (removalFails) {
                 for (var i = 0; i < 3; i++) {
                   repository.failNext(
-                    'removeCurrentParticipant',
+                    cleanupOperation,
                     PartyFailureCode.network,
                   );
                 }
@@ -181,7 +184,7 @@ void main() {
               final cleanup = calls()
                   .where(
                     (call) =>
-                        call.startsWith('removeCurrentParticipant') ||
+                        call.startsWith(cleanupOperation) ||
                         call.startsWith('disarmDisconnect'),
                   )
                   .toList();
@@ -189,11 +192,15 @@ void main() {
                 cleanup,
                 removalFails
                     ? [
-                        'removeCurrentParticipant:$id',
-                        'removeCurrentParticipant:$id',
-                        'removeCurrentParticipant:$id',
+                        '$cleanupOperation:$id',
+                        '$cleanupOperation:$id',
+                        '$cleanupOperation:$id',
                       ]
-                    : ['removeCurrentParticipant:$id', 'disarmDisconnect:$id'],
+                    : [
+                        '$cleanupOperation:$id',
+                        'disarmDisconnect:$id:' +
+                            (creation ? 'host' : 'listener'),
+                      ],
               );
               expect(repository.cancellations, {
                 if (stream != 'watchMetadata') 'metadata:$id': 1,
@@ -268,9 +275,9 @@ void main() {
       expect((await service.switchParty('new')).isSuccess, isTrue);
       expect(calls(), [
         'isJoinable:new',
-        'removeCurrentParticipant:old',
-        'disarmDisconnect:old',
-        'armDisconnect:new',
+        'leaveOrTransferParty:old',
+        'disarmDisconnect:old:listener',
+        'armDisconnect:new:listener',
         'joinParty:new',
       ]);
       expect(service.state.partyId, 'new');
@@ -297,11 +304,11 @@ void main() {
     expect(service.state.phase, PartySessionPhase.idle);
     expect(calls(), [
       'isJoinable:new',
-      'removeCurrentParticipant:old',
-      'disarmDisconnect:old',
-      'armDisconnect:new',
+      'leaveOrTransferParty:old',
+      'disarmDisconnect:old:listener',
+      'armDisconnect:new:listener',
       'joinParty:new',
-      'disarmDisconnect:new',
+      'disarmDisconnect:new:listener',
     ]);
   });
   test(
@@ -310,7 +317,7 @@ void main() {
       expect((await service.createParty(song)).isSuccess, isTrue);
       expect(calls(), [
         'reservePartyId',
-        'armDisconnect:party-1',
+        'armDisconnect:party-1:host',
         'createReservedParty:party-1',
       ]);
       expect(repository.createdSongs['party-1']?.toMap(), {
@@ -327,9 +334,9 @@ void main() {
     expect((await service.createParty(song)).failure, PartyFailureCode.network);
     expect(calls(), [
       'reservePartyId',
-      'armDisconnect:party-1',
+      'armDisconnect:party-1:host',
       'createReservedParty:party-1',
-      'disarmDisconnect:party-1',
+      'disarmDisconnect:party-1:host',
     ]);
     expect(service.state.partyId, isNull);
   });
@@ -341,9 +348,9 @@ void main() {
     );
     expect(calls(), [
       'isJoinable:old',
-      'armDisconnect:old',
+      'armDisconnect:old:listener',
       'joinParty:old',
-      'disarmDisconnect:old',
+      'disarmDisconnect:old:listener',
     ]);
     expect(service.state.partyId, isNull);
   });
@@ -443,12 +450,94 @@ void main() {
     );
   }
   test(
-    'metadata promotes host by current uid and demotes on replacement',
+    'promotion waits for host cleanup before publishing host controls',
     () async {
       await join();
+      repository.pauseOperation('armDisconnect');
+
       repository.metadataControllerFor('old').add(hostMetadata);
       await pumpEventQueue();
+
+      expect(service.state.role, PartyRole.listener);
+      expect(calls(), ['armDisconnect:old:host']);
+
+      repository.releaseOperation('armDisconnect');
+      await pumpEventQueue();
+
       expect(service.state.isHost, isTrue);
+      expect(calls(), [
+        'armDisconnect:old:host',
+        'disarmDisconnect:old:listener',
+      ]);
+    },
+  );
+  test(
+    'failed host cleanup keeps listener active with warning and retries',
+    () async {
+      await join();
+      repository.failNext('armDisconnect', PartyFailureCode.network);
+
+      repository.metadataControllerFor('old').add(hostMetadata);
+      await pumpEventQueue();
+
+      expect(service.state.isActive, isTrue);
+      expect(service.state.role, PartyRole.listener);
+      expect(service.state.warning, PartyFailureCode.network);
+      expect(calls(), ['armDisconnect:old:host']);
+
+      repository.metadataControllerFor('old').add(hostMetadata);
+      await pumpEventQueue();
+
+      expect(service.state.isHost, isTrue);
+      expect(service.state.warning, isNull);
+      expect(calls(), [
+        'armDisconnect:old:host',
+        'armDisconnect:old:host',
+        'disarmDisconnect:old:listener',
+      ]);
+    },
+  );
+  test(
+    'duplicate host metadata starts only one promotion transition',
+    () async {
+      await join();
+      repository.pauseOperation('armDisconnect');
+
+      repository.metadataControllerFor('old')
+        ..add(hostMetadata)
+        ..add(hostMetadata);
+      await pumpEventQueue();
+
+      expect(calls(), ['armDisconnect:old:host']);
+
+      repository.releaseOperation('armDisconnect');
+      await pumpEventQueue();
+
+      expect(service.state.isHost, isTrue);
+      expect(calls(), [
+        'armDisconnect:old:host',
+        'disarmDisconnect:old:listener',
+      ]);
+    },
+  );
+  test(
+    'demotion while promotion is disarming never publishes stale host controls',
+    () async {
+      await join();
+      repository.pauseOperation('disarmDisconnect');
+      final roles = <PartyRole?>[];
+      final subscription = service.stateStream.listen(
+        (state) => roles.add(state.role),
+      );
+      addTearDown(subscription.cancel);
+
+      repository.metadataControllerFor('old').add(hostMetadata);
+      await pumpEventQueue();
+      expect(calls(), [
+        'armDisconnect:old:host',
+        'disarmDisconnect:old:listener',
+      ]);
+
       repository
           .metadataControllerFor('old')
           .add(
@@ -459,9 +548,86 @@ void main() {
             ),
           );
       await pumpEventQueue();
+      roles.clear();
+      repository.releaseOperation('disarmDisconnect');
+      await pumpEventQueue();
+
+      expect(roles, isNot(contains(PartyRole.host)));
       expect(service.state.role, PartyRole.listener);
+      expect(calls(), [
+        'armDisconnect:old:host',
+        'disarmDisconnect:old:listener',
+        'armDisconnect:old:listener',
+        'disarmDisconnect:old:host',
+      ]);
     },
   );
+  test(
+    'dispose during promotion keeps the acknowledged host disconnect fallback',
+    () async {
+      await join();
+      repository.pauseOperation('armDisconnect');
+      repository.metadataControllerFor('old').add(hostMetadata);
+      await pumpEventQueue();
+
+      await service.dispose();
+      repository.releaseOperation('armDisconnect');
+      await pumpEventQueue();
+
+      expect(service.state.role, isNull);
+      expect(calls(), ['armDisconnect:old:host']);
+    },
+  );
+  test(
+    'leave waits for promotion and disarms the role actually armed',
+    () async {
+      await join();
+      repository.pauseOperation('armDisconnect');
+      repository.metadataControllerFor('old').add(hostMetadata);
+      await pumpEventQueue();
+      var completed = false;
+
+      final leaving = service.leaveParty().then((result) {
+        completed = true;
+        return result;
+      });
+      await pumpEventQueue();
+
+      expect(completed, isFalse);
+      expect(calls(), ['armDisconnect:old:host']);
+
+      repository.releaseOperation('armDisconnect');
+      expect((await leaving).isSuccess, isTrue);
+      expect(calls(), [
+        'armDisconnect:old:host',
+        'disarmDisconnect:old:listener',
+        'leaveOrTransferParty:old',
+        'disarmDisconnect:old:host',
+      ]);
+    },
+  );
+  test('metadata re-arms cleanup when host is replaced', () async {
+    await join();
+    repository.metadataControllerFor('old').add(hostMetadata);
+    await pumpEventQueue();
+    expect(service.state.isHost, isTrue);
+    repository.callLog.clear();
+    repository
+        .metadataControllerFor('old')
+        .add(
+          const PartyMetadata(
+            hostUid: 'other',
+            hostName: 'Other',
+            createdAt: 2,
+          ),
+        );
+    await pumpEventQueue();
+    expect(service.state.role, PartyRole.listener);
+    expect(calls(), [
+      'armDisconnect:old:listener',
+      'disarmDisconnect:old:host',
+    ]);
+  });
   test(
     'auth null tears down locally and preserves disconnect fallback',
     () async {
@@ -475,12 +641,15 @@ void main() {
     },
   );
   test(
-    'leave removes participant before disarming and cancels each party subscription once',
+    'leave resolves remote membership before disarming and cancels subscriptions once',
     () async {
       await join();
       expect((await service.leaveParty()).isSuccess, isTrue);
       await service.leaveParty();
-      expect(calls(), ['removeCurrentParticipant:old', 'disarmDisconnect:old']);
+      expect(calls(), [
+        'leaveOrTransferParty:old',
+        'disarmDisconnect:old:listener',
+      ]);
       expect(repository.cancellations, {
         'metadata:old': 1,
         'playback:old': 1,
@@ -493,18 +662,18 @@ void main() {
     'transient leave retries twice at 250ms then 1s before disarming',
     () async {
       await join();
-      repository.failNext('removeCurrentParticipant', PartyFailureCode.network);
-      repository.failNext('removeCurrentParticipant', PartyFailureCode.network);
+      repository.failNext('leaveOrTransferParty', PartyFailureCode.network);
+      repository.failNext('leaveOrTransferParty', PartyFailureCode.network);
       expect((await service.leaveParty()).isSuccess, isTrue);
       expect(delays, [
         const Duration(milliseconds: 250),
         const Duration(seconds: 1),
       ]);
       expect(calls(), [
-        'removeCurrentParticipant:old',
-        'removeCurrentParticipant:old',
-        'removeCurrentParticipant:old',
-        'disarmDisconnect:old',
+        'leaveOrTransferParty:old',
+        'leaveOrTransferParty:old',
+        'leaveOrTransferParty:old',
+        'disarmDisconnect:old:listener',
       ]);
     },
   );
@@ -513,18 +682,15 @@ void main() {
     () async {
       await join();
       for (var i = 0; i < 3; i++) {
-        repository.failNext(
-          'removeCurrentParticipant',
-          PartyFailureCode.network,
-        );
+        repository.failNext('leaveOrTransferParty', PartyFailureCode.network);
       }
       expect((await service.leaveParty()).failure, PartyFailureCode.network);
       expect(service.state.phase, PartySessionPhase.failed);
       expect(service.state.partyId, isNull);
       expect(calls(), [
-        'removeCurrentParticipant:old',
-        'removeCurrentParticipant:old',
-        'removeCurrentParticipant:old',
+        'leaveOrTransferParty:old',
+        'leaveOrTransferParty:old',
+        'leaveOrTransferParty:old',
       ]);
       expect(repository.cancellations, {
         'metadata:old': 1,
@@ -539,7 +705,7 @@ void main() {
   test('permission denied leave does not retry or disarm', () async {
     await join();
     repository.failNext(
-      'removeCurrentParticipant',
+      'leaveOrTransferParty',
       PartyFailureCode.permissionDenied,
     );
     expect(
@@ -547,17 +713,14 @@ void main() {
       PartyFailureCode.permissionDenied,
     );
     expect(delays, isEmpty);
-    expect(calls(), ['removeCurrentParticipant:old']);
+    expect(calls(), ['leaveOrTransferParty:old']);
   });
   test(
     'switch does not join target when old removal exhausts retries',
     () async {
       await join();
       for (var i = 0; i < 3; i++) {
-        repository.failNext(
-          'removeCurrentParticipant',
-          PartyFailureCode.network,
-        );
+        repository.failNext('leaveOrTransferParty', PartyFailureCode.network);
       }
       expect(
         (await service.switchParty('new')).failure,
@@ -565,9 +728,9 @@ void main() {
       );
       expect(calls(), [
         'isJoinable:new',
-        'removeCurrentParticipant:old',
-        'removeCurrentParticipant:old',
-        'removeCurrentParticipant:old',
+        'leaveOrTransferParty:old',
+        'leaveOrTransferParty:old',
+        'leaveOrTransferParty:old',
       ]);
       expect(service.state.partyId, isNull);
     },
@@ -611,7 +774,7 @@ void main() {
     () async {
       await host();
       expect((await service.endParty()).isSuccess, isTrue);
-      expect(calls(), ['endParty:old', 'disarmDisconnect:old']);
+      expect(calls(), ['endParty:old', 'disarmDisconnect:old:host']);
       expect(service.state.phase, PartySessionPhase.ended);
       cancelledOld();
     },
@@ -699,7 +862,7 @@ void main() {
           expect(calls(), ['isJoinable:old']);
         }
         if (operation == 'armDisconnect') {
-          expect(calls(), ['isJoinable:old', 'armDisconnect:old']);
+          expect(calls(), ['isJoinable:old', 'armDisconnect:old:listener']);
         }
         expect(
           calls().where((call) => call.startsWith('disarmDisconnect')),
@@ -747,14 +910,14 @@ void main() {
     'auth null during participant removal never disarms using a changed identity',
     () async {
       await join();
-      repository.pauseOperation('removeCurrentParticipant');
+      repository.pauseOperation('leaveOrTransferParty');
       final pending = service.leaveParty();
       await pumpEventQueue();
       repository.emitAuth(null);
       await pumpEventQueue();
-      repository.releaseOperation('removeCurrentParticipant');
+      repository.releaseOperation('leaveOrTransferParty');
       expect((await pending).failure, PartyFailureCode.unauthenticated);
-      expect(calls(), ['removeCurrentParticipant:old']);
+      expect(calls(), ['leaveOrTransferParty:old']);
       expect(service.state.failure, PartyFailureCode.unauthenticated);
     },
   );
@@ -770,14 +933,14 @@ void main() {
       );
       await service.joinParty('old');
       repository.callLog.clear();
-      repository.failNext('removeCurrentParticipant', PartyFailureCode.network);
+      repository.failNext('leaveOrTransferParty', PartyFailureCode.network);
       final pending = service.leaveParty();
       await pumpEventQueue();
       repository.emitAuth(null);
       await pumpEventQueue();
       gate.complete();
       expect((await pending).failure, PartyFailureCode.unauthenticated);
-      expect(calls(), ['removeCurrentParticipant:old']);
+      expect(calls(), ['leaveOrTransferParty:old']);
     },
   );
   test(
@@ -862,7 +1025,7 @@ void main() {
       repository.releaseOperation('endParty');
       expect((await pending).isSuccess, isTrue);
       expect(service.state.phase, PartySessionPhase.ended);
-      expect(calls(), ['endParty:old', 'disarmDisconnect:old']);
+      expect(calls(), ['endParty:old', 'disarmDisconnect:old:host']);
       expect(repository.cancellations, {
         'metadata:old': 1,
         'playback:old': 1,
@@ -884,7 +1047,11 @@ void main() {
       gate.complete();
       expect((await pending).failure, PartyFailureCode.unauthenticated);
       expect(service.state.partyId, isNull);
-      expect(calls(), ['isJoinable:old', 'armDisconnect:old', 'joinParty:old']);
+      expect(calls(), [
+        'isJoinable:old',
+        'armDisconnect:old:listener',
+        'joinParty:old',
+      ]);
     },
   );
   test(
@@ -896,9 +1063,9 @@ void main() {
       await pumpEventQueue();
       expect(calls(), [
         'isJoinable:old',
-        'armDisconnect:old',
+        'armDisconnect:old:listener',
         'joinParty:old',
-        'disarmDisconnect:old',
+        'disarmDisconnect:old:listener',
       ]);
       repository.currentUserUid = 'replacement';
       repository.releaseOperation('disarmDisconnect');
@@ -926,7 +1093,7 @@ void main() {
       await join();
       service.stateStream.listen((state) {
         if (state.phase == PartySessionPhase.idle &&
-            repository.callLog.contains('disarmDisconnect:old')) {
+            repository.callLog.contains('disarmDisconnect:old:listener')) {
           repository.currentUserUid = 'replacement';
         }
       });
@@ -938,8 +1105,8 @@ void main() {
       expect(service.state.failure, PartyFailureCode.unauthenticated);
       expect(calls(), [
         'isJoinable:new',
-        'removeCurrentParticipant:old',
-        'disarmDisconnect:old',
+        'leaveOrTransferParty:old',
+        'disarmDisconnect:old:listener',
       ]);
     },
   );

@@ -3,28 +3,46 @@
     "parties": {
       ".read": "auth != null",
       "$partyId": {
-        ".write": "auth != null && ((!data.exists() && newData.exists() && newData.child('hostUid').val() === auth.uid) || (data.exists() && !newData.exists() && data.child('hostUid').val() === auth.uid))",
-        ".validate": "!newData.exists() || (newData.child('status').val() === 'active' && newData.child('hostUid').isString() && newData.child('hostName').isString() && newData.child('createdAt').isNumber() && newData.child('state').exists() && (newData.child('participants').child(newData.child('hostUid').val()).child('isHost').val() === true || (auth != null && data.child('hostUid').val() === auth.uid && !newData.child('participants').child(auth.uid).exists())))",
+        ".write": "auth != null && ((!data.exists() && !newData.exists()) || (!data.exists() && newData.exists() && newData.child('hostUid').val() === auth.uid) || (data.exists() && !newData.exists() && data.child('hostUid').val() === auth.uid) || (data.exists() && newData.exists() && data.child('hostUid').val() === auth.uid && data.child('hostUid').val() !== newData.child('hostUid').val()))",
+        ".validate": "!newData.exists() || (newData.child('status').val() === 'active' && newData.child('hostUid').isString() && newData.child('hostName').isString() && newData.child('createdAt').isNumber() && newData.child('state').exists() && newData.child('participants').child(newData.child('hostUid').val()).child('isHost').val() === true && (!data.exists() || data.child('hostUid').val() === newData.child('hostUid').val() || (data.child('hostUid').val() === auth.uid && data.child('participants').child(newData.child('hostUid').val()).exists() && !newData.child('participants').child(auth.uid).exists() && newData.child('hostName').val() === data.child('participants').child(newData.child('hostUid').val()).child('name').val() && newData.child('status').val() === data.child('status').val() && newData.child('createdAt').val() === data.child('createdAt').val() && newData.child('state').child('isPlaying').val() === data.child('state').child('isPlaying').val() && newData.child('state').child('positionSeconds').val() === data.child('state').child('positionSeconds').val() && newData.child('state').child('updatedAt').val() === data.child('state').child('updatedAt').val() && newData.child('state').child('song').exists() === data.child('state').child('song').exists() && newData.child('queue').exists() === data.child('queue').exists() && newData.child('chat').exists() === data.child('chat').exists())))",
         "hostUid": {".write": false},
         "hostName": {".write": false},
         "status": {".write": false},
+        "createdAt": {".write": false},
         "state": {
-          ".write": "auth != null && root.child('parties').child($partyId).child('hostUid').val() === auth.uid"
+          ".write": "auth != null && root.child('parties').child($partyId).child('hostUid').val() === auth.uid",
+          "song": {
+            "$field": {
+              ".validate": "($field === 'title' || $field === 'artist' || $field === 'thumbnailUrl' || $field === 'youtubeVideoId') && (!data.parent().parent().parent().exists() || data.parent().parent().parent().child('hostUid').val() === newData.parent().parent().parent().child('hostUid').val() || newData.val() === data.val())"
+            }
+          },
+          "$field": {
+            ".validate": "$field === 'isPlaying' || $field === 'positionSeconds' || $field === 'updatedAt'"
+          }
         },
         "queue": {
-          ".write": "auth != null && root.child('parties').child($partyId).child('hostUid').val() === auth.uid"
+          ".write": "auth != null && root.child('parties').child($partyId).child('hostUid').val() === auth.uid",
+          "$entryId": {
+            ".validate": "!newData.exists() || !data.parent().parent().exists() || data.parent().parent().child('hostUid').val() === newData.parent().parent().child('hostUid').val() || (data.exists() && newData.child('title').val() === data.child('title').val() && newData.child('artist').val() === data.child('artist').val() && newData.child('thumbnailUrl').val() === data.child('thumbnailUrl').val() && newData.child('youtubeVideoId').val() === data.child('youtubeVideoId').val())"
+          }
         },
         "participants": {
           "$uid": {
             ".write": "auth != null && auth.uid === $uid && (root.child('parties').child($partyId).child('status').val() === 'active' || (!data.exists() && !newData.exists()))",
-            ".validate": "!newData.exists() || ((root.child('parties').child($partyId).exists() || $uid === auth.uid) && newData.child('name').isString() && newData.child('photoUrl').isString() && newData.child('joinedAt').isNumber() && ((!data.exists() && newData.child('joinedAt').val() === now) || (data.exists() && newData.child('joinedAt').val() === data.child('joinedAt').val())) && newData.child('isHost').val() === (newData.parent().parent().child('hostUid').val() === $uid))"
+            ".validate": "!newData.exists() || ((root.child('parties').child($partyId).exists() || $uid === auth.uid) && newData.child('name').isString() && newData.child('photoUrl').isString() && newData.child('joinedAt').isNumber() && ((!data.exists() && newData.child('joinedAt').val() === now) || (data.exists() && newData.child('joinedAt').val() === data.child('joinedAt').val())) && newData.child('isHost').val() === (newData.parent().parent().child('hostUid').val() === $uid) && (!data.parent().parent().exists() || data.parent().parent().child('hostUid').val() === newData.parent().parent().child('hostUid').val() || (data.exists() && newData.child('name').val() === data.child('name').val() && newData.child('photoUrl').val() === data.child('photoUrl').val())))",
+            "$field": {
+              ".validate": "$field === 'name' || $field === 'photoUrl' || $field === 'joinedAt' || $field === 'isHost'"
+            }
           }
         },
         "chat": {
           "$messageId": {
             ".write": "auth != null && root.child('parties').child($partyId).child('participants').child(auth.uid).exists() && newData.child('uid').val() === auth.uid",
-            ".validate": "!newData.exists() || (newData.child('uid').isString() && newData.child('name').isString() && newData.child('photoUrl').isString() && newData.child('message').isString() && newData.child('timestamp').isNumber())"
+            ".validate": "!newData.exists() || (newData.child('uid').isString() && newData.child('name').isString() && newData.child('photoUrl').isString() && newData.child('message').isString() && newData.child('timestamp').isNumber() && (data.parent().parent().child('hostUid').val() === newData.parent().parent().child('hostUid').val() || (data.exists() && newData.child('uid').val() === data.child('uid').val() && newData.child('name').val() === data.child('name').val() && newData.child('photoUrl').val() === data.child('photoUrl').val() && newData.child('message').val() === data.child('message').val() && newData.child('timestamp').val() === data.child('timestamp').val())))"
           }
+        },
+        "$other": {
+          ".validate": false
         }
       }
     },

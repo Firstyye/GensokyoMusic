@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/party_session.dart';
 import '../models/song_info.dart';
+import 'party_departure_policy.dart';
 import 'party_repository.dart';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -57,20 +58,24 @@ class RealtimeDatabaseService implements PartyRepository {
   }
 
   @override
-  Future<void> armDisconnect(String partyId) => _authenticated(
-    (user) => _db
-        .ref('parties/$partyId/participants/${user.uid}')
-        .onDisconnect()
-        .remove(),
+  Future<void> armDisconnect(String partyId, PartyRole role) => _authenticated(
+    (user) => _disconnectRef(partyId, user.uid, role).onDisconnect().remove(),
   );
 
   @override
-  Future<void> disarmDisconnect(String partyId) => _authenticated(
-    (user) => _db
-        .ref('parties/$partyId/participants/${user.uid}')
-        .onDisconnect()
-        .cancel(),
-  );
+  Future<void> disarmDisconnect(String partyId, PartyRole role) =>
+      _authenticated(
+        (user) =>
+            _disconnectRef(partyId, user.uid, role).onDisconnect().cancel(),
+      );
+
+  DatabaseReference _disconnectRef(
+    String partyId,
+    String uid,
+    PartyRole role,
+  ) => role == PartyRole.host
+      ? _db.ref('parties/$partyId')
+      : _db.ref('parties/$partyId/participants/$uid');
 
   @override
   Future<void> createReservedParty(String partyId, SongInfo initialSong) =>
@@ -120,6 +125,52 @@ class RealtimeDatabaseService implements PartyRepository {
   Future<void> removeCurrentParticipant(String partyId) => _authenticated(
     (user) => _db.ref('parties/$partyId/participants/${user.uid}').remove(),
   );
+
+  @override
+  Future<void> leaveOrTransferParty(String partyId) => _authenticated((
+    user,
+  ) async {
+    final partyRef = _db.ref('parties/$partyId');
+    final host = await partyRef.child('hostUid').get();
+    if (currentUserUid != user.uid) {
+      throw const PartyRepositoryException(PartyFailureCode.unauthenticated);
+    }
+    if (!host.exists) return;
+    if (host.value == user.uid) {
+      await _leaveAsHost(partyRef, user.uid);
+      return;
+    }
+    try {
+      await partyRef.child('participants/${user.uid}').remove();
+    } on FirebaseException catch (error) {
+      if (_firebaseCode(error) != 'permission-denied') rethrow;
+      final latestHost = await partyRef.child('hostUid').get();
+      if (currentUserUid != user.uid) {
+        throw const PartyRepositoryException(PartyFailureCode.unauthenticated);
+      }
+      if (!latestHost.exists) return;
+      if (latestHost.value != user.uid) rethrow;
+      await _leaveAsHost(partyRef, user.uid);
+    }
+  });
+
+  Future<void> _leaveAsHost(DatabaseReference partyRef, String uid) async {
+    final result = await partyRef.runTransaction((current) {
+      if (current == null) return Transaction.success(null);
+      final party = _map(current);
+      if (party == null) {
+        throw const PartyRepositoryException(PartyFailureCode.unknown);
+      }
+      try {
+        return Transaction.success(resolveHostDeparture(party, uid));
+      } on StateError catch (error) {
+        throw PartyRepositoryException(PartyFailureCode.unknown, cause: error);
+      }
+    });
+    if (!result.committed && result.snapshot.exists) {
+      throw const PartyRepositoryException(PartyFailureCode.unknown);
+    }
+  }
 
   @override
   Future<void> endParty(String partyId) => _authenticated((user) async {
