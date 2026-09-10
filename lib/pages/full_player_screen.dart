@@ -2,9 +2,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constant/my_constant.dart';
+import '../data/albumsList.dart';
+import '../data/touhoudb_service.dart';
 import '../models/song_info.dart';
+import '../models/song_relations.dart';
+import '../pages/album_details_screen.dart';
+import '../pages/artist_details_screen.dart';
 import '../services/audio_player_service.dart';
 import '../services/firestore_service.dart';
+import '../widgets/custom_page_route.dart';
+import '../widgets/full_player_options_sheet.dart';
 import '../widgets/marquee_text.dart';
 
 class FullPlayerScreen extends StatefulWidget {
@@ -19,11 +26,13 @@ class FullPlayerScreen extends StatefulWidget {
 class _FullPlayerScreenState extends State<FullPlayerScreen> {
   final AudioPlayerService _audioService = AudioPlayerService();
   final FirestoreService _firestoreService = FirestoreService();
+  final TouhouDBService _touhouDBService = TouhouDBService();
 
   late SongInfo _currentSong;
   bool _isFavorite = false;
   StreamSubscription<bool>? _favoriteSub;
   StreamSubscription<SongInfo?>? _songChangeSub;
+  StreamSubscription<bool>? _controlAccessSub;
   String _lastCheckedVideoId = '';
 
   @override
@@ -40,12 +49,16 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
         if (mounted) setState(() {});
       }
     });
+    _controlAccessSub = _audioService.canControlPlaybackStream.listen((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _favoriteSub?.cancel();
     _songChangeSub?.cancel();
+    _controlAccessSub?.cancel();
     super.dispose();
   }
 
@@ -87,8 +100,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isListener =
-        _audioService.currentPartyId != null && !_audioService.isHost;
+    final bool isListener = !_audioService.canControlPlayback;
 
     // Song changes are now handled by _songChangeSub in initState()
     return Scaffold(
@@ -119,65 +131,29 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
             onPressed: () {
               showModalBottomSheet(
                 context: context,
+                isScrollControlled: true,
                 backgroundColor: const Color(0xFF1E1E2C),
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
-                builder: (ctx) => SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.white24,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ListTile(
-                          leading: Icon(
-                            _isFavorite
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border_rounded,
-                            color: _isFavorite
-                                ? Colors.redAccent
-                                : Colors.white70,
-                          ),
-                          title: Text(
-                            _isFavorite
-                                ? 'Remove from Favorites'
-                                : 'Add to Favorites',
-                            style: bodyTextStyle.copyWith(color: Colors.white),
-                          ),
-                          onTap: () {
-                            Navigator.pop(ctx);
-                            _firestoreService.toggleFavorite(_currentSong);
-                          },
-                        ),
-                        ListTile(
-                          leading: const Icon(
-                            Icons.playlist_add_rounded,
-                            color: Colors.white70,
-                          ),
-                          title: Text(
-                            'Add to Playlist',
-                            style: bodyTextStyle.copyWith(color: Colors.white),
-                          ),
-                          onTap: () {
-                            Navigator.pop(ctx);
-                            _showAddToPlaylistBottomSheet(
-                              context,
-                              _currentSong,
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
+                builder: (ctx) => FullPlayerOptionsSheet(
+                  isFavorite: _isFavorite,
+                  initialSong: _currentSong,
+                  songStream: _audioService.currentSongStream,
+                  loadRelations:
+                      _touhouDBService.getSongRelationsByYoutubeVideoId,
+                  onToggleFavorite: () {
+                    Navigator.pop(ctx);
+                    _firestoreService.toggleFavorite(_currentSong);
+                  },
+                  onAddToPlaylist: () {
+                    Navigator.pop(ctx);
+                    _showAddToPlaylistBottomSheet(context, _currentSong);
+                  },
+                  onRelatedSelected: (target) {
+                    Navigator.pop(ctx);
+                    _openRelatedTarget(target);
+                  },
                 ),
               );
             },
@@ -833,6 +809,25 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
         );
       },
     );
+  }
+
+  void _openRelatedTarget(SongRelationTarget target) {
+    final page = switch (target.kind) {
+      SongRelationKind.artist || SongRelationKind.circle => ArtistDetailsScreen(
+        artistId: target.id,
+        artistName: target.name,
+        imageUrl: target.imageUrl,
+      ),
+      SongRelationKind.album => AlbumDetailsScreen(
+        album: Albumslist(
+          id: target.id,
+          name: target.name,
+          artist: target.subtitle,
+          image: target.imageUrl,
+        ),
+      ),
+    };
+    Navigator.push(context, SlideFadeRoute(page: page));
   }
 
   void _showAddToPlaylistBottomSheet(BuildContext context, SongInfo song) {

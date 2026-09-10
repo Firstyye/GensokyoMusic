@@ -206,39 +206,45 @@ class _MiniPlayerState extends State<MiniPlayer>
   }
 
   Widget _buildPlayPauseButton() {
-    return StreamBuilder<PlayerState>(
-      stream: _audioService.playerStateStream,
-      initialData: _audioService.playerState,
-      builder: (context, snapshot) {
-        final playerState = snapshot.data;
-        final isPlaying = playerState == PlayerState.playing;
+    return StreamBuilder<bool>(
+      stream: _audioService.canControlPlaybackStream,
+      initialData: _audioService.canControlPlayback,
+      builder: (context, controlSnapshot) {
+        final canControl = controlSnapshot.data ?? true;
+        return StreamBuilder<PlayerState>(
+          stream: _audioService.playerStateStream,
+          initialData: _audioService.playerState,
+          builder: (context, snapshot) {
+            final playerState = snapshot.data;
+            final isPlaying = playerState == PlayerState.playing;
 
-        // Show loading indicator while buffering
-        if (playerState == PlayerState.buffering ||
-            playerState == PlayerState.unStarted) {
-          return const Padding(
-            padding: EdgeInsets.all(12),
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: Colors.white,
+            // Show loading indicator while buffering
+            if (playerState == PlayerState.buffering ||
+                playerState == PlayerState.unStarted) {
+              return const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white,
+                  ),
+                ),
+              );
+            }
+
+            return IconButton(
+              icon: Icon(
+                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: canControl ? Colors.white : Colors.white24,
+                size: 28,
               ),
-            ),
-          );
-        }
-
-        final bool isListener =
-            _audioService.currentPartyId != null && !_audioService.isHost;
-
-        return IconButton(
-          icon: Icon(
-            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            color: isListener ? Colors.white24 : Colors.white,
-            size: 28,
-          ),
-          onPressed: isListener ? null : () => _audioService.togglePlayPause(),
+              onPressed: canControl
+                  ? () => _audioService.togglePlayPause()
+                  : null,
+            );
+          },
         );
       },
     );

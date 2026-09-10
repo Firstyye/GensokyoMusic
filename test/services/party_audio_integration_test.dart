@@ -153,12 +153,24 @@ void main() {
   test(
     'leave rejects a pending download and keeps independent controls available',
     () async {
+      final controlAccess = <bool>[];
+      final controlSub = audio.canControlPlaybackStream.listen(
+        controlAccess.add,
+      );
+      expect(audio.canControlPlayback, isFalse);
       await emit('A', 1);
       await session.leaveParty();
       complete('A');
       await pumpEventQueue();
       expect(player.events.where((e) => e.startsWith('source:')), isEmpty);
       expect(audio.currentPartyId, isNull);
+      expect(audio.canControlPlayback, isTrue);
+      expect(controlAccess, contains(true));
+
+      player.events.clear();
+      await audio.togglePlayPause();
+      expect(player.events, ['play']);
+      await controlSub.cancel();
     },
   );
   test(

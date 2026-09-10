@@ -743,6 +743,56 @@ void main() {
     expect(calls(), ['endParty:old']);
     expect(repository.cancellations, isEmpty);
   });
+  test(
+    'a hung host departure releases the action lock and End Party can recover',
+    () async {
+      await service.dispose();
+      service = PartySessionService.withRepository(
+        repository,
+        delay: (_) async {},
+        operationTimeout: const Duration(milliseconds: 5),
+      );
+      await host();
+      repository.pauseOperation('leaveOrTransferParty');
+
+      final leave = await service.leaveParty();
+
+      expect(leave.failure, PartyFailureCode.network);
+      expect(service.state.phase, PartySessionPhase.failed);
+      repository.releaseOperation('leaveOrTransferParty');
+      await pumpEventQueue();
+
+      final end = await service.endParty();
+
+      expect(end.isSuccess, isTrue);
+      expect(service.state.phase, PartySessionPhase.ended);
+      expect(calls(), contains('endParty:old'));
+    },
+  );
+  test('duplicate End Party calls share the in-flight result', () async {
+    await host();
+    repository.pauseOperation('endParty');
+
+    final first = service.endParty();
+    await pumpEventQueue();
+    final duplicate = service.endParty();
+    await pumpEventQueue();
+    repository.releaseOperation('endParty');
+
+    expect((await first).isSuccess, isTrue);
+    expect((await duplicate).isSuccess, isTrue);
+    expect(calls().where((call) => call == 'endParty:old'), hasLength(1));
+  });
+  test('End Party is successful when the room is already closed', () async {
+    await host();
+    repository.failNext('endParty', PartyFailureCode.roomClosed);
+
+    final end = await service.endParty();
+
+    expect(end.isSuccess, isTrue);
+    expect(service.state.phase, PartySessionPhase.ended);
+    expect(calls(), ['endParty:old']);
+  });
   test('host can leave while a playback publication is awaiting', () async {
     await host();
     repository.pauseOperation('updatePlayback');

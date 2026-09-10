@@ -6,10 +6,61 @@ import 'package:yo/data/customSongsList.dart';
 import 'package:yo/data/albumsList.dart';
 import 'package:yo/data/toprateSong.dart';
 import 'package:yo/data/popular_circle.dart';
+import '../models/song_relations.dart';
 import '../models/song_info.dart';
 
+typedef TouhouDbGetRequest = Future<http.Response> Function(Uri uri);
+
 class TouhouDBService {
+  TouhouDBService({TouhouDbGetRequest? getRequest})
+    : _getRequest = getRequest ?? http.get;
+
   final String baseUrl = "https://touhoudb.com/api";
+  final TouhouDbGetRequest _getRequest;
+  final Map<String, Future<SongRelations>> _songRelationsCache = {};
+
+  Future<SongRelations> getSongRelationsByYoutubeVideoId(String videoId) {
+    final normalizedVideoId = videoId.trim();
+    if (normalizedVideoId.isEmpty) {
+      return Future.value(SongRelations.empty);
+    }
+
+    final cached = _songRelationsCache[normalizedVideoId];
+    if (cached != null) return cached;
+
+    late final Future<SongRelations> request;
+    request = _fetchSongRelations(normalizedVideoId).catchError((
+      Object error,
+      StackTrace stackTrace,
+    ) {
+      if (identical(_songRelationsCache[normalizedVideoId], request)) {
+        _songRelationsCache.remove(normalizedVideoId);
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    });
+    _songRelationsCache[normalizedVideoId] = request;
+    return request;
+  }
+
+  Future<SongRelations> _fetchSongRelations(String videoId) async {
+    final uri = Uri.parse('$baseUrl/songs/byPv').replace(
+      queryParameters: {
+        'pvService': 'Youtube',
+        'pvId': videoId,
+        'fields': 'Albums,Artists,MainPicture',
+      },
+    );
+    final response = await _getRequest(uri);
+
+    if (response.statusCode == 404) return SongRelations.empty;
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load song relations (${response.statusCode})');
+    }
+
+    final decoded = json.decode(response.body);
+    if (decoded is! Map) return SongRelations.empty;
+    return SongRelations.fromTouhouDbSong(Map<String, dynamic>.from(decoded));
+  }
 
   /// Extract the first YouTube pvId from a pvs array, or empty string.
   String _extractYoutubePvId(List<dynamic>? pvs) {
